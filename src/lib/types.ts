@@ -1,0 +1,74 @@
+export type ConvState = 'activo' | 'derivado' | 'agendado' | 'cancelado' | 'resuelto'
+export type Channel = 'whatsapp' | 'instagram' | 'messenger' | 'tiktok' | 'unknown'
+
+export const CHANNEL_CONFIG: Record<Channel, { label: string; color: string; bg: string; dot: string }> = {
+  whatsapp:  { label: 'WhatsApp',  color: '#15803D', bg: '#DCFCE7', dot: '#22C55E' },
+  instagram: { label: 'Instagram', color: '#7E22CE', bg: '#F3E8FF', dot: '#A855F7' },
+  messenger: { label: 'Messenger', color: '#1D4ED8', bg: '#DBEAFE', dot: '#3B82F6' },
+  tiktok:    { label: 'TikTok',    color: '#111827', bg: '#F1F5F9', dot: '#374151' },
+  unknown:   { label: 'Otro',      color: '#374151', bg: '#F3F4F6', dot: '#6B7280' },
+}
+
+export interface Contact { name: string; phone: string; avatar?: string }
+export interface Conversation {
+  id: number
+  state: ConvState
+  labels: string[]
+  status: string
+  channel: Channel
+  contact: Contact
+  assignee: { name: string } | null
+  lastMessage: { content: string; createdAt: number | string; fromHuman: boolean }
+  createdAt: number | string
+  updatedAt: number | string
+  inboxId: number
+  botActive: boolean
+}
+
+export interface Message {
+  id: number
+  content: string
+  messageType: number
+  senderName: string
+  senderType: string
+  createdAt: number
+  isPrivate: boolean
+}
+
+export const STATE_CONFIG: Record<ConvState, { label: string; color: string; bg: string; accent: string; dot: string }> = {
+  activo:   { label: 'En conversación',   color: '#1D4ED8', bg: '#EFF6FF', accent: '#3B82F6', dot: '#3B82F6' },
+  resuelto: { label: 'Quieren agendar',   color: '#B45309', bg: '#FFFBEB', accent: '#F59E0B', dot: '#F59E0B' },
+  agendado: { label: 'Agendaron',         color: '#15803D', bg: '#F0FDF4', accent: '#22C55E', dot: '#22C55E' },
+  derivado: { label: 'Derivado a humano', color: '#6D28D9', bg: '#F5F3FF', accent: '#8B5CF6', dot: '#8B5CF6' },
+  cancelado:{ label: 'Cancelaron',        color: '#9CA3AF', bg: '#F9FAFB', accent: '#9CA3AF', dot: '#9CA3AF' },
+}
+
+// Orden tipo funnel: conversando → interesado → agendó → (derivado/cancelado)
+export const COLUMN_ORDER: ConvState[] = ['activo', 'resuelto', 'agendado', 'derivado', 'cancelado']
+
+export type LeadEstado = 'nuevo' | 'calificado' | 'demo' | 'cliente' | 'descartado'
+
+export const LEAD_COLUMN_ORDER: LeadEstado[] = ['nuevo', 'calificado', 'demo', 'cliente', 'descartado']
+
+export const LEAD_STATE_CONFIG: Record<LeadEstado, { label: string; color: string; bg: string; accent: string }> = {
+  nuevo:      { label: 'Nuevos',      color: '#1D4ED8', bg: '#EFF6FF', accent: '#3B82F6' },
+  calificado: { label: 'Calificados', color: '#6D28D9', bg: '#F5F3FF', accent: '#8B5CF6' },
+  demo:       { label: 'Demo',        color: '#15803D', bg: '#F0FDF4', accent: '#22C55E' },
+  cliente:    { label: 'Clientes',    color: '#B45309', bg: '#FFFBEB', accent: '#F59E0B' },
+  descartado: { label: 'Descartados', color: '#374151', bg: '#F9FAFB', accent: '#9CA3AF' },
+}
+
+export interface Lead {
+  id: number
+  conversation_id: number | null
+  phone: string
+  nombre: string | null
+  negocio: string | null
+  facturacion: string | null
+  dolor: string | null
+  estado: LeadEstado
+  created_at: number
+  mode: 'AI' | 'HUMAN' | null
+  last_message: string | null
+  last_message_at: number | null
+}

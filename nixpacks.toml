@@ -1,0 +1,17 @@
+providers = ["node"]
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+
+[phases.setup]
+nixPkgs = ["nodejs_22", "npm-10_x", "python3", "gcc", "gnumake"]
+# python3 + gcc + gnumake OBLIGATORIOS: better-sqlite3 se compila nativamente con node-gyp
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start:all"

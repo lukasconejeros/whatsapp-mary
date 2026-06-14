@@ -1,0 +1,31 @@
+# Dependencias
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# TypeScript incremental cache — rompe el build de Nixpacks si se sube
+*.tsbuildinfo
+
+# Runtime data (NO versionar)
+data/
+auth/
+
+# Secrets
+.env
+.env.local
+.env*.local
+.restart
+secrets/
+
+# Configuración personal del negocio (NO versionar)
+prompts/negocio.md
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
