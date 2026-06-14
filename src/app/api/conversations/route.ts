@@ -24,7 +24,13 @@ export async function GET() {
     updatedAt: c.last_message_at ?? c.created_at ?? 0,
     inboxId:   1,
     botActive: c.mode === 'AI',
+    categoria: (c.categoria ?? 'mary'),
+    ctwaReferral: c.ctwa_referral ? safeJson(c.ctwa_referral) : null,
   }));
 
   return NextResponse.json({ ok: true, conversations });
+}
+
+function safeJson(s: string): Record<string, unknown> | null {
+  try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
 }
