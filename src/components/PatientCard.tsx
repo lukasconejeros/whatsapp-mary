@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Conversation, CHANNEL_CONFIG } from '@/lib/types'
+import { Conversation, CHANNEL_CONFIG, CATEGORIA_ORDER, CATEGORIA_CONFIG } from '@/lib/types'
 
 function timeAgo(ts: string | number): string {
   if (!ts) return ''
@@ -24,24 +24,27 @@ const CHANNEL_DOT: Record<string, string> = {
   whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#2563EB', tiktok: '#0F172A', unknown: '#94A3B8',
 }
 
-export default function PatientCard({ conv, selected, onSelect, onBotToggle }: {
+export default function PatientCard({ conv, selected, onSelect, onCategoriaChange }: {
   conv: Conversation; selected: boolean
   onSelect: () => void
-  onBotToggle: (id: number, labels: string[], botActive: boolean) => void
+  onCategoriaChange: (id: number, categoria: Conversation['categoria']) => void
 }) {
-  const [toggling, setToggling] = useState(false)
+  const [moving, setMoving] = useState(false)
   const ch = CHANNEL_CONFIG[conv.channel]
 
-  async function toggle(e: React.MouseEvent) {
+  async function move(e: React.ChangeEvent<HTMLSelectElement>) {
     e.stopPropagation()
-    if (toggling) return
-    setToggling(true)
+    const categoria = e.target.value as Conversation['categoria']
+    if (moving || categoria === conv.categoria) return
+    setMoving(true)
     try {
-      const r = await fetch('/api/toggle-bot', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: conv.id, currentLabels: conv.labels }) })
+      const r = await fetch(`/api/categoria/${conv.id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoria }),
+      })
       const d = await r.json()
-      if (d.ok) onBotToggle(conv.id, d.labels, d.botActive)
-    } finally { setToggling(false) }
+      if (d.ok) onCategoriaChange(conv.id, categoria)
+    } finally { setMoving(false) }
   }
 
   return (
@@ -69,22 +72,25 @@ export default function PatientCard({ conv, selected, onSelect, onBotToggle }: {
           <p style={{ fontSize:12, color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
             {conv.lastMessage.content || '—'}
           </p>
+          {conv.ctwaReferral && (
+            <span style={{ display:'inline-block', fontSize:10, fontWeight:600, color:'#1D4ED8',
+              background:'#DBEAFE', borderRadius:4, padding:'1px 6px', marginBottom:6 }}>
+              📣 vino de anuncio
+            </span>
+          )}
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <span style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'#94A3B8' }}>
               <span style={{ width:5, height:5, borderRadius:'50%', background:CHANNEL_DOT[conv.channel], display:'inline-block', flexShrink:0 }}/>
               {ch.label}
             </span>
-            <button onClick={toggle} disabled={toggling} title={conv.botActive ? 'Apagar bot' : 'Activar bot'}
-              style={{ display:'flex', alignItems:'center', gap:5, padding:'2px 6px', borderRadius:4,
-                border:'1px solid #E2E8F0', background:'transparent', fontSize:11, fontWeight:500,
-                color: conv.botActive ? '#2563EB' : '#94A3B8', cursor: toggling ? 'wait' : 'pointer', opacity: toggling ? 0.5 : 1 }}>
-              <span style={{ display:'inline-flex', alignItems:'center', width:22, height:12, borderRadius:99,
-                background: conv.botActive ? '#2563EB' : '#E2E8F0', padding:'1px', transition:'background .15s', flexShrink:0 }}>
-                <span style={{ width:10, height:10, borderRadius:'50%', background:'#fff',
-                  transform: conv.botActive ? 'translateX(10px)' : 'translateX(0)', transition:'transform .15s', display:'block' }}/>
-              </span>
-              {toggling ? '...' : conv.botActive ? 'Bot' : 'Off'}
-            </button>
+            <select value={conv.categoria} onChange={move} onClick={e => e.stopPropagation()} disabled={moving}
+              title="Mover de columna"
+              style={{ fontSize:11, color:'#475569', border:'1px solid #E2E8F0', borderRadius:4,
+                background:'#fff', padding:'2px 4px', cursor: moving ? 'wait' : 'pointer', fontFamily:'inherit', opacity: moving ? 0.5 : 1, maxWidth:130 }}>
+              {CATEGORIA_ORDER.map(cat => (
+                <option key={cat} value={cat}>{CATEGORIA_CONFIG[cat].label}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
