@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { normalizeChilePhone } from "./phone.js";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
@@ -10,6 +11,8 @@ export type MessageRole = "user" | "assistant" | "human";
 export type ConnectionStatus = "disconnected" | "qr" | "connecting" | "connected";
 // Estado del embudo (independiente de mode). 'derivado' se deriva de mode=HUMAN.
 export type ConversationEstado = "activo" | "agendado" | "resuelto" | "cancelado";
+// Categoría de contacto: la columna del embudo de la app de Mary.
+export type Categoria = "mary" | "arteluk" | "potencial";
 
 export interface Conversation {
   id: number;
@@ -18,6 +21,9 @@ export interface Conversation {
   jid: string | null;
   mode: ConversationMode;
   estado: ConversationEstado;
+  categoria: Categoria;
+  categoria_manual: number; // 0 | 1 — si la usuaria la movió a mano
+  ctwa_referral: string | null; // JSON de la señal de anuncio, o null
   last_message_at: number | null;
   created_at: number;
 }
@@ -57,8 +63,11 @@ CREATE TABLE IF NOT EXISTS conversations (
   phone TEXT UNIQUE NOT NULL,
   name TEXT,
   jid TEXT,
-  mode TEXT CHECK(mode IN ('AI','HUMAN')) NOT NULL DEFAULT 'AI',
+  mode TEXT CHECK(mode IN ('AI','HUMAN')) NOT NULL DEFAULT 'HUMAN',
   estado TEXT NOT NULL DEFAULT 'activo',
+  categoria TEXT NOT NULL DEFAULT 'mary',
+  categoria_manual INTEGER NOT NULL DEFAULT 0,
+  ctwa_referral TEXT,
   last_message_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
@@ -104,6 +113,15 @@ CREATE TABLE IF NOT EXISTS leads (
 );
 CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
 CREATE INDEX IF NOT EXISTS idx_leads_estado ON leads(estado, created_at);
+
+CREATE TABLE IF NOT EXISTS clientes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  telefono TEXT UNIQUE NOT NULL,
+  nombre TEXT,
+  airtable_id TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_clientes_tel ON clientes(telefono);
 `;
 
 interface Ctx {
@@ -150,6 +168,15 @@ function build(): Ctx {
   }
   if (!cols.some((c) => c.name === "estado")) {
     db.exec("ALTER TABLE conversations ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'");
+  }
+  if (!cols.some((c) => c.name === "categoria")) {
+    db.exec("ALTER TABLE conversations ADD COLUMN categoria TEXT NOT NULL DEFAULT 'mary'");
+  }
+  if (!cols.some((c) => c.name === "categoria_manual")) {
+    db.exec("ALTER TABLE conversations ADD COLUMN categoria_manual INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!cols.some((c) => c.name === "ctwa_referral")) {
+    db.exec("ALTER TABLE conversations ADD COLUMN ctwa_referral TEXT");
   }
 
   return {
@@ -402,4 +429,60 @@ export function listLeads(estado?: string): Lead[] {
     return c.db.prepare("SELECT * FROM leads WHERE estado = ? ORDER BY created_at DESC").all(estado) as Lead[];
   }
   return c.db.prepare("SELECT * FROM leads ORDER BY created_at DESC").all() as Lead[];
+}
+
+// ── Categoría del embudo (app de Mary) ────────────────────────────────────
+
+export function setCategoria(
+  conversationId: number,
+  categoria: Categoria,
+  manual = false
+): void {
+  ctx().db
+    .prepare("UPDATE conversations SET categoria = ?, categoria_manual = ? WHERE id = ?")
+    .run(categoria, manual ? 1 : 0, conversationId);
+}
+
+export function setCtwaReferral(conversationId: number, referral: unknown): void {
+  ctx().db
+    .prepare("UPDATE conversations SET ctwa_referral = ? WHERE id = ?")
+    .run(referral == null ? null : JSON.stringify(referral), conversationId);
+}
+
+// ── Clientes Arteluk (semilla desde Airtable) ─────────────────────────────
+
+export interface Cliente {
+  id: number;
+  telefono: string;
+  nombre: string | null;
+  airtable_id: string | null;
+  created_at: number;
+}
+
+export function upsertCliente(data: {
+  nombre?: string;
+  telefono: string;
+  airtableId?: string;
+}): boolean {
+  const tel = normalizeChilePhone(data.telefono);
+  if (!tel) return false;
+  ctx().db
+    .prepare(`
+      INSERT INTO clientes (telefono, nombre, airtable_id) VALUES (?, ?, ?)
+      ON CONFLICT(telefono) DO UPDATE SET
+        nombre = COALESCE(excluded.nombre, clientes.nombre),
+        airtable_id = COALESCE(excluded.airtable_id, clientes.airtable_id)
+    `)
+    .run(tel, data.nombre ?? null, data.airtableId ?? null);
+  return true;
+}
+
+export function getClienteByPhone(phone: string): Cliente | null {
+  const tel = normalizeChilePhone(phone);
+  if (!tel) return null;
+  return (
+    (ctx().db.prepare("SELECT * FROM clientes WHERE telefono = ?").get(tel) as
+      | Cliente
+      | undefined) ?? null
+  );
 }
