@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Columns3, BarChart2, Zap, Sparkles, Plug } from 'lucide-react'
+import { Columns3, BarChart2, Zap, Plug } from 'lucide-react'
 
 const items = [
-  { href: '/inbox',         Icon: Columns3,  label: 'Embudo'      },
-  { href: '/configuracion', Icon: Sparkles,  label: 'Entrenar IA' },
-  { href: '/conexion',      Icon: Plug,      label: 'Conexión'    },
-  { href: '/metricas',      Icon: BarChart2, label: 'Métricas'    },
-  { href: '/mejoras',       Icon: Zap,       label: 'Mejoras'     },
+  { href: '/inbox',     Icon: Columns3,  label: 'Embudo'   },
+  { href: '/conexion',  Icon: Plug,      label: 'Conexión' },
+  { href: '/metricas',  Icon: BarChart2, label: 'Métricas' },
+  { href: '/mejoras',   Icon: Zap,       label: 'Mejoras'  },
 ]
 
 export default function AppNav() {
@@ -36,11 +35,11 @@ export default function AppNav() {
       <div className="flex items-center gap-3" style={{ padding: '18px 18px', borderBottom: '1px solid #1D4ED8' }}>
         <div className="flex items-center justify-center shrink-0"
           style={{ width: 34, height: 34, borderRadius: 9, background: '#2563EB', color: '#fff', fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', boxShadow: '0 2px 6px rgba(37,99,235,0.35)' }}>
-          W
+          A
         </div>
         <div>
-          <p style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFF', lineHeight: 1.1, letterSpacing: '-0.01em' }}>Waly</p>
-          <p style={{ fontSize: 11, color: '#93C5FD', marginTop: 3, letterSpacing: '0.01em' }}>Panel de gestión</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#F8FAFF', lineHeight: 1.1, letterSpacing: '-0.01em' }}>Arteluk</p>
+          <p style={{ fontSize: 11, color: '#93C5FD', marginTop: 3, letterSpacing: '0.01em' }}>Panel de Mary</p>
         </div>
       </div>
       <div className="flex flex-col gap-0.5 p-2 mt-1">
