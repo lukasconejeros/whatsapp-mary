@@ -4,8 +4,11 @@ import {
   getConversationById,
   insertMessage,
   getRecentHistory,
+  setCategoria,
+  setCtwaReferral,
 } from "../db.js";
 import { generateReply } from "../ai.js";
+import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import pino from "pino";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
@@ -73,6 +76,16 @@ export async function handleIncomingMessages(
 
     const convo = getOrCreateConversation(phone, name, remoteJid);
     insertMessage(convo.id, "user", text);
+
+    // Clasificación automática (solo si la usuaria no la movió a mano).
+    // La señal CTWA (vino de anuncio) llega solo en el primer mensaje del contacto.
+    const fresh0 = getConversationById(convo.id);
+    if (fresh0 && fresh0.categoria_manual === 0) {
+      const referral = extractCtwaReferral(msg.message as unknown as Record<string, unknown>);
+      if (referral) setCtwaReferral(convo.id, referral);
+      const categoria = classifyCategoria({ phone, ctwaReferral: referral });
+      setCategoria(convo.id, categoria, false);
+    }
 
     const fresh = getConversationById(convo.id);
     if (!fresh || fresh.mode !== "AI") {
