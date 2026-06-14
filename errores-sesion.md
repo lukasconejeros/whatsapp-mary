@@ -139,3 +139,20 @@ Documento de referencia. Consultar ANTES de improvisar soluciones.
 **Causa**: `node_modules` corrupto (instalación anterior interrumpida).
 
 **Solución**: Borra `node_modules/` completamente y ejecuta `npm install` de nuevo. NO es un problema de dependencias.
+
+---
+
+## #14 — "Module not found: Can't resolve './xxx.js'" en una ruta API
+
+**Síntoma**: `tsc` pasa y los scripts con `tsx` corren bien, pero el server de Next
+(Turbopack) devuelve 500 con `Module not found: Can't resolve './phone.js'` al pegarle
+a una ruta `/api/*`.
+
+**Causa**: Un archivo de `src/lib/` que importa Next (web bundle) usaba un import relativo
+con extensión `.js` apuntando a un archivo `.ts` hermano. `tsx` (el bot) resuelve `.js→.ts`,
+pero Turbopack en el bundle web NO hace ese swap. Los `.js` del resto del kit no se notan
+porque viven solo en la ruta del bot (`tsx`).
+
+**Solución**: En archivos de `src/lib/` que importe la web (los que llegan desde una ruta
+`/api/*`), usar imports **sin extensión** (`from "./phone"`), no `.js`. Es válido con
+`moduleResolution: "bundler"` y lo resuelven tanto Turbopack como `tsx`.
