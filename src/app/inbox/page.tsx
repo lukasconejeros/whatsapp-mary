@@ -8,7 +8,7 @@ import { Conversation, CATEGORIA_ORDER, CATEGORIA_CONFIG } from '@/lib/types'
 import { RefreshCw, Search, X } from 'lucide-react'
 
 const COL_DOT: Record<string, string> = {
-  mary: '#94A3B8', arteluk: '#22C55E', potencial: '#3B82F6',
+  mary: '#9CA3AF', arteluk: '#22C55E', potencial: '#EC4899',
 }
 
 export default function InboxPage() {
@@ -48,8 +48,8 @@ export default function InboxPage() {
   const grouped = CATEGORIA_ORDER.reduce((a, cat) => ({ ...a, [cat]: filtered.filter(c => (c.categoria ?? 'mary') === cat) }), {} as Record<string, Conversation[]>)
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center" style={{ background: '#EFF6FF' }}>
-      <div className="flex items-center gap-2" style={{ color: '#93C5FD' }}>
+    <div className="flex h-screen items-center justify-center" style={{ background: '#FDF2F8' }}>
+      <div className="flex items-center gap-2" style={{ color: '#B57795' }}>
         <RefreshCw size={13} className="spin" />
         <span style={{ fontSize: 13 }}>Cargando...</span>
       </div>
@@ -57,26 +57,26 @@ export default function InboxPage() {
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#EFF6FF' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FDF2F8' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="flex items-center gap-3 shrink-0"
-          style={{ height: 48, padding: '0 20px', background: '#FFFFFF', borderBottom: '1px solid #BFDBFE' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#1E3A5F' }}>Embudo</span>
-          <span style={{ fontSize: 12, color: '#93C5FD' }}>{conversations.length} conversaciones</span>
+          style={{ height: 48, padding: '0 20px', background: '#FFFFFF', borderBottom: '1px solid #FBCFE8' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#831843' }}>Embudo</span>
+          <span style={{ fontSize: 12, color: '#B57795' }}>{conversations.length} conversaciones</span>
           <div className="flex-1" />
           <div className="relative flex items-center">
-            <Search size={12} style={{ position: 'absolute', left: 9, color: '#93C5FD', pointerEvents: 'none' }} />
+            <Search size={12} style={{ position: 'absolute', left: 9, color: '#B57795', pointerEvents: 'none' }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
-              style={{ paddingLeft: 28, paddingRight: search ? 28 : 10, height: 30, fontSize: 12, borderRadius: 6,
-                border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#1E3A5F', outline: 'none', width: 180, fontFamily: 'inherit' }}
-              onFocus={e => { e.target.style.borderColor = '#2563EB'; e.target.style.background = '#fff' }}
-              onBlur={e => { e.target.style.borderColor = '#BFDBFE'; e.target.style.background = '#EFF6FF' }} />
-            {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, cursor: 'pointer', color: '#93C5FD', background: 'none', border: 'none', display: 'flex' }}><X size={11} /></button>}
+              style={{ paddingLeft: 28, paddingRight: search ? 28 : 10, height: 30, fontSize: 12, borderRadius: 8,
+                border: '1px solid #FBCFE8', background: '#FDF2F8', color: '#831843', outline: 'none', width: 180, fontFamily: 'inherit' }}
+              onFocus={e => { e.target.style.borderColor = '#EC4899'; e.target.style.background = '#fff' }}
+              onBlur={e => { e.target.style.borderColor = '#FBCFE8'; e.target.style.background = '#FDF2F8' }} />
+            {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, cursor: 'pointer', color: '#B57795', background: 'none', border: 'none', display: 'flex' }}><X size={11} /></button>}
           </div>
           <button onClick={() => load(true)} disabled={refreshing} className="flex items-center gap-1.5"
-            style={{ height: 30, padding: '0 10px', borderRadius: 6, border: '1px solid #BFDBFE', background: '#FFFFFF',
-              fontSize: 12, color: '#2563EB', cursor: 'pointer', fontFamily: 'inherit', opacity: refreshing ? 0.5 : 1 }}>
+            style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid #FBCFE8', background: '#FFFFFF',
+              fontSize: 12, color: '#DB2777', cursor: 'pointer', fontFamily: 'inherit', opacity: refreshing ? 0.5 : 1 }}>
             <RefreshCw size={11} className={refreshing ? 'spin' : ''} />
             Actualizar
           </button>
@@ -90,15 +90,15 @@ export default function InboxPage() {
                 const list = grouped[cat] || []
                 return (
                   <div key={cat} className="flex flex-col shrink-0 overflow-hidden"
-                    style={{ width: selected ? 'clamp(160px, 15vw, 210px)' : 264, borderRadius: 8, background: '#FFFFFF', border: '1px solid #BFDBFE', boxShadow: '0 1px 2px rgba(30,58,95,0.06)' }}>
-                    <div className="flex items-center gap-2 shrink-0" style={{ padding: '10px 14px', borderBottom: '1px solid #DBEAFE' }}>
+                    style={{ width: selected ? 'clamp(160px, 15vw, 210px)' : 264, borderRadius: 12, background: '#FFFFFF', border: '1px solid #FBCFE8', boxShadow: '0 1px 3px rgba(190,24,93,0.06)' }}>
+                    <div className="flex items-center gap-2 shrink-0" style={{ padding: '10px 14px', borderBottom: '1px solid #FCE7F3' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: COL_DOT[cat], display: 'inline-block', flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#1E3A5F', flex: 1 }}>{cfg.label}</span>
-                      <span style={{ fontSize: 11, color: '#93C5FD' }}>{list.length}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#831843', flex: 1 }}>{cfg.label}</span>
+                      <span style={{ fontSize: 11, color: '#B57795' }}>{list.length}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto">
                       {list.length === 0
-                        ? <p style={{ fontSize: 12, color: '#BFDBFE', textAlign: 'center', padding: '28px 0' }}>Sin registros</p>
+                        ? <p style={{ fontSize: 12, color: '#E7BBD0', textAlign: 'center', padding: '28px 0' }}>Sin registros</p>
                         : list.map(conv => (
                           <PatientCard key={conv.id} conv={conv}
                             selected={selectedId === conv.id}
@@ -114,12 +114,12 @@ export default function InboxPage() {
 
           {selected && (
             <div className="slide-in flex flex-col shrink-0"
-              style={{ width: 440, borderLeft: '1px solid #BFDBFE', background: '#fff', overflow: 'hidden' }}>
+              style={{ width: 440, borderLeft: '1px solid #FBCFE8', background: '#fff', overflow: 'hidden' }}>
               <div className="flex items-center justify-between shrink-0"
-                style={{ padding: '0 16px', height: 38, borderBottom: '1px solid #DBEAFE' }}>
-                <span style={{ fontSize: 11, color: '#93C5FD' }}>#{selected.id}</span>
+                style={{ padding: '0 16px', height: 38, borderBottom: '1px solid #FCE7F3' }}>
+                <span style={{ fontSize: 11, color: '#B57795' }}>#{selected.id}</span>
                 <button onClick={() => setSelectedId(null)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#93C5FD' }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#B57795' }}>
                   <X size={12} />
                 </button>
               </div>

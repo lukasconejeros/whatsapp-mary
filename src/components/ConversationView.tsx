@@ -16,7 +16,7 @@ function fmtDate(ts: number | string) {
   return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
 }
 
-const AVATAR_COLORS = ['#3B82F6','#8B5CF6','#EC4899','#10B981','#F59E0B','#6366F1']
+const AVATAR_COLORS = ['#EC4899','#8B5CF6','#F472B6','#10B981','#F59E0B','#F43F5E']
 function avatarBg(name: string) {
   let h = 0; for (const c of name) h = (h*31+c.charCodeAt(0)) % AVATAR_COLORS.length
   return AVATAR_COLORS[Math.abs(h)]
@@ -75,7 +75,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #F1F5F9', background:'#fff', flexShrink:0 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #FCE7F3', background:'#fff', flexShrink:0 }}>
         <div style={{ width:32,height:32,borderRadius:'50%',background:avatarBg(conv.contact.name),color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0 }}>
           {ini(conv.contact.name)}
         </div>
@@ -89,27 +89,27 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             {conv.contact.phone && <span style={{fontSize:11,color:'#94A3B8'}}>{conv.contact.phone}</span>}
           </div>
         </div>
-        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:6,border:'1px solid #E2E8F0',color: conv.botActive ? '#2563EB' : '#94A3B8',background:'#F8FAFC',flexShrink:0 }}>
+        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #FBCFE8',color: conv.botActive ? '#DB2777' : '#94A3B8',background:'#FDF2F8',flexShrink:0 }}>
           {conv.botActive ? '● Bot activo' : '○ Bot apagado'}
         </span>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#F8FAFC' }}>
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FDF2F8' }}>
         {loading ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:6,color:'#94A3B8' }}>
-            <div style={{ width:13,height:13,border:'2px solid #E2E8F0',borderTopColor:'#2563EB',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
+            <div style={{ width:13,height:13,border:'2px solid #FBCFE8',borderTopColor:'#EC4899',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
             <span style={{fontSize:12}}>Cargando...</span>
           </div>
         ) : grouped.length===0 ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%' }}>
-            <p style={{fontSize:12,color:'#CBD5E1'}}>Sin mensajes</p>
+            <p style={{fontSize:12,color:'#E7BBD0'}}>Sin mensajes</p>
           </div>
         ) : grouped.map(g=>(
           <div key={g.date}>
             <div style={{ display:'flex',alignItems:'center',gap:8,margin:'14px 0 10px' }}>
-              <div style={{flex:1,height:1,background:'#E2E8F0'}}/>
+              <div style={{flex:1,height:1,background:'#FCE7F3'}}/>
               <span style={{fontSize:11,color:'#94A3B8',fontWeight:500}}>{g.date}</span>
-              <div style={{flex:1,height:1,background:'#E2E8F0'}}/>
+              <div style={{flex:1,height:1,background:'#FCE7F3'}}/>
             </div>
             {g.msgs.map((m,i)=>{
               const isOut = m.messageType===1
@@ -118,12 +118,12 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
                 <div key={m.id} style={{ display:'flex', justifyContent: isOut?'flex-end':'flex-start', marginBottom:3 }}>
                   <div style={{ maxWidth:'76%' }}>
                     {showName && <p style={{fontSize:11,color:'#94A3B8',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
-                    <div style={{ borderRadius:10, padding:'8px 12px', fontSize:13, lineHeight:1.55,
-                      ...(isOut ? { background:'#0F172A', color:'#fff', borderBottomRightRadius:3 }
-                               : { background:'#FFFFFF', color:'#0F172A', border:'1px solid #E2E8F0', borderBottomLeftRadius:3 }) }}>
+                    <div style={{ borderRadius:12, padding:'8px 12px', fontSize:13, lineHeight:1.55,
+                      ...(isOut ? { background:'#EC4899', color:'#fff', borderBottomRightRadius:4 }
+                               : { background:'#FFFFFF', color:'#0F172A', border:'1px solid #FBCFE8', borderBottomLeftRadius:4 }) }}>
                       {m.content}
                     </div>
-                    <p style={{fontSize:10,color:'#CBD5E1',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
+                    <p style={{fontSize:10,color:'#CDA6BC',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
                       {fmt(m.createdAt)}{isOut&&m.senderName&&m.senderName!=='Tú'&&` · ${m.senderName}`}
                     </p>
                   </div>
@@ -135,10 +135,10 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         <div ref={ref}/>
       </div>
 
-      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #F1F5F9',flexShrink:0 }}>
+      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #FCE7F3',flexShrink:0 }}>
         {!conv.botActive && (
           <button type="button" onClick={suggest} disabled={suggesting}
-            style={{ alignSelf:'flex-start',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:6,border:'1px solid #BFDBFE',background:'#EFF6FF',color:'#2563EB',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
+            style={{ alignSelf:'flex-start',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#DB2777',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
             {suggesting ? '⟳ Pensando...' : '✦ Sugerir respuesta'}
           </button>
         )}
@@ -146,12 +146,12 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           <textarea value={reply} onChange={e=>setReply(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e as unknown as React.FormEvent)}}}
             placeholder="Escribe un mensaje..." rows={2}
-            style={{ flex:1,resize:'none',borderRadius:6,padding:'8px 11px',fontSize:13,border:'1px solid #E2E8F0',background:'#F8FAFC',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
-            onFocus={e=>{e.target.style.borderColor='#2563EB';e.target.style.background='#fff'}}
-            onBlur={e=>{e.target.style.borderColor='#E2E8F0';e.target.style.background='#F8FAFC'}}
+            style={{ flex:1,resize:'none',borderRadius:8,padding:'8px 11px',fontSize:13,border:'1px solid #FBCFE8',background:'#FDF2F8',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
+            onFocus={e=>{e.target.style.borderColor='#EC4899';e.target.style.background='#fff'}}
+            onBlur={e=>{e.target.style.borderColor='#FBCFE8';e.target.style.background='#FDF2F8'}}
           />
           <button type="submit" disabled={!reply.trim()||sending}
-            style={{ width:34,height:34,borderRadius:6,border:'none',background:reply.trim()&&!sending?'#2563EB':'#E2E8F0',color:'#fff',cursor:reply.trim()&&!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            style={{ width:34,height:34,borderRadius:8,border:'none',background:reply.trim()&&!sending?'#EC4899':'#FBCFE8',color:'#fff',cursor:reply.trim()&&!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
             <Send size={13}/>
           </button>
         </div>

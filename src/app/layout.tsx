@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Waly",
-  description: "Panel de gestión WhatsApp",
+  title: "Arteluk · Panel de Mary",
+  description: "Panel de gestión de WhatsApp de Arteluk",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

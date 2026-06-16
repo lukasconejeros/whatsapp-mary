@@ -55,9 +55,9 @@ export type Categoria = 'mary' | 'arteluk' | 'potencial'
 export const CATEGORIA_ORDER: Categoria[] = ['mary', 'arteluk', 'potencial']
 
 export const CATEGORIA_CONFIG: Record<Categoria, { label: string; color: string; bg: string; dot: string }> = {
-  mary:      { label: 'Conversaciones Mary',    color: '#374151', bg: '#F9FAFB', dot: '#94A3B8' },
+  mary:      { label: 'Conversaciones Mary',    color: '#6B7280', bg: '#F9FAFB', dot: '#9CA3AF' },
   arteluk:   { label: 'Conversaciones Arteluk', color: '#15803D', bg: '#F0FDF4', dot: '#22C55E' },
-  potencial: { label: 'Clientes Potenciales',   color: '#1D4ED8', bg: '#EFF6FF', dot: '#3B82F6' },
+  potencial: { label: 'Clientes Potenciales',   color: '#BE185D', bg: '#FCE7F3', dot: '#EC4899' },
 }
 
 export type LeadEstado = 'nuevo' | 'calificado' | 'demo' | 'cliente' | 'descartado'

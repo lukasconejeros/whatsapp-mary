@@ -50,10 +50,10 @@ export default function PatientCard({ conv, selected, onSelect, onCategoriaChang
   return (
     <div onClick={onSelect} role="button" tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onSelect() }}
-      style={{ display:'block', padding:'10px 14px', background: selected ? '#EFF6FF' : 'transparent',
-        borderBottom:'1px solid #F1F5F9', borderLeft: selected ? '2px solid #2563EB' : '2px solid transparent',
+      style={{ display:'block', padding:'10px 14px', background: selected ? '#FCE7F3' : 'transparent',
+        borderBottom:'1px solid #FCE7F3', borderLeft: selected ? '2px solid #EC4899' : '2px solid transparent',
         cursor:'pointer', outline:'none', transition:'background .1s', width:'100%', textAlign:'left' }}
-      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = '#F8FAFC' }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = '#FDF2F8' }}
       onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
       <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
         <div style={{ width:34, height:34, borderRadius:'50%', background:avatarBg(conv.contact.name),
@@ -73,8 +73,8 @@ export default function PatientCard({ conv, selected, onSelect, onCategoriaChang
             {conv.lastMessage.content || '—'}
           </p>
           {conv.ctwaReferral && (
-            <span style={{ display:'inline-block', fontSize:10, fontWeight:600, color:'#1D4ED8',
-              background:'#DBEAFE', borderRadius:4, padding:'1px 6px', marginBottom:6 }}>
+            <span style={{ display:'inline-block', fontSize:10, fontWeight:600, color:'#BE185D',
+              background:'#FCE7F3', borderRadius:6, padding:'1px 6px', marginBottom:6 }}>
               📣 vino de anuncio
             </span>
           )}
@@ -85,7 +85,7 @@ export default function PatientCard({ conv, selected, onSelect, onCategoriaChang
             </span>
             <select value={conv.categoria} onChange={move} onClick={e => e.stopPropagation()} disabled={moving}
               title="Mover de columna"
-              style={{ fontSize:11, color:'#475569', border:'1px solid #E2E8F0', borderRadius:4,
+              style={{ fontSize:11, color:'#9D5577', border:'1px solid #FBCFE8', borderRadius:6,
                 background:'#fff', padding:'2px 4px', cursor: moving ? 'wait' : 'pointer', fontFamily:'inherit', opacity: moving ? 0.5 : 1, maxWidth:130 }}>
               {CATEGORIA_ORDER.map(cat => (
                 <option key={cat} value={cat}>{CATEGORIA_CONFIG[cat].label}</option>
