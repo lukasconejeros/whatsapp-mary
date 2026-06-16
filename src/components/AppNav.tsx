@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Columns3, Wallet, Plug } from 'lucide-react'
+import { Columns3, Wallet, CalendarDays, Plug } from 'lucide-react'
 
 const items = [
-  { href: '/inbox',    Icon: Columns3, label: 'Embudo'   },
-  { href: '/finanzas', Icon: Wallet,   label: 'Finanzas' },
-  { href: '/conexion', Icon: Plug,     label: 'Conexión' },
+  { href: '/inbox',      Icon: Columns3,     label: 'Embudo'     },
+  { href: '/finanzas',   Icon: Wallet,       label: 'Finanzas'   },
+  { href: '/calendario', Icon: CalendarDays, label: 'Calendario' },
+  { href: '/conexion',   Icon: Plug,         label: 'Conexión'   },
 ]
 
 export default function AppNav() {
