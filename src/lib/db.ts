@@ -150,6 +150,17 @@ CREATE TABLE IF NOT EXISTS costos (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_costos_fecha ON costos(fecha);
+
+CREATE TABLE IF NOT EXISTS clases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dia TEXT NOT NULL,
+  profe TEXT NOT NULL,
+  hora TEXT,
+  alumnos TEXT,
+  nota TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_clases_dia ON clases(dia);
 `;
 
 interface Ctx {
@@ -612,4 +623,55 @@ export function upsertCostoFromAirtable(d: CostoInput & { airtableId: string }):
         valor=excluded.valor, notas=excluded.notas
     `)
     .run(d.airtableId, d.fecha, d.tipo ?? null, d.cantidad ?? null, Math.round(d.valor), d.notas ?? null);
+}
+
+// ── Calendario: clases ────────────────────────────────────────────────────
+
+export interface Clase {
+  id: number; dia: string; profe: string; hora: string | null;
+  alumnos: number[]; nota: string | null; created_at: number;
+}
+export interface ClaseInput { dia: string; profe: string; hora?: string; alumnos?: number[]; nota?: string }
+
+interface ClaseRow {
+  id: number; dia: string; profe: string; hora: string | null;
+  alumnos: string | null; nota: string | null; created_at: number;
+}
+function parseClase(r: ClaseRow): Clase {
+  let alumnos: number[] = [];
+  if (r.alumnos) { try { alumnos = JSON.parse(r.alumnos) as number[]; } catch { alumnos = []; } }
+  return { ...r, alumnos };
+}
+
+export function listClases(): Clase[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM clases ORDER BY hora IS NULL, hora ASC, id ASC")
+    .all() as ClaseRow[];
+  return rows.map(parseClase);
+}
+export function addClase(d: ClaseInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO clases (dia, profe, hora, alumnos, nota) VALUES (?,?,?,?,?)")
+    .run(d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null);
+  return r.lastInsertRowid as number;
+}
+export function updateClase(id: number, d: ClaseInput): void {
+  ctx().db
+    .prepare("UPDATE clases SET dia=?, profe=?, hora=?, alumnos=?, nota=? WHERE id=?")
+    .run(d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null, id);
+}
+export function deleteClase(id: number): void {
+  ctx().db.prepare("DELETE FROM clases WHERE id=?").run(id);
+}
+
+export interface ClienteLite { id: number; nombre: string | null; telefono: string; horario: string[] }
+export function listClientes(): ClienteLite[] {
+  const rows = ctx().db
+    .prepare("SELECT id, nombre, telefono, horario FROM clientes ORDER BY nombre ASC")
+    .all() as { id: number; nombre: string | null; telefono: string; horario: string | null }[];
+  return rows.map((r) => {
+    let horario: string[] = [];
+    if (r.horario) { try { horario = JSON.parse(r.horario) as string[]; } catch { horario = []; } }
+    return { id: r.id, nombre: r.nombre, telefono: r.telefono, horario };
+  });
 }
