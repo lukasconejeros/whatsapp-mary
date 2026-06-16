@@ -119,9 +119,37 @@ CREATE TABLE IF NOT EXISTS clientes (
   telefono TEXT UNIQUE NOT NULL,
   nombre TEXT,
   airtable_id TEXT,
+  email TEXT,
+  estado TEXT,
+  horario TEXT,
+  alumnos TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_clientes_tel ON clientes(telefono);
+
+CREATE TABLE IF NOT EXISTS ingresos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha TEXT NOT NULL,
+  apoderado TEXT,
+  monto INTEGER NOT NULL DEFAULT 0,
+  tipo TEXT,
+  detalle TEXT,
+  airtable_id TEXT UNIQUE,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_ingresos_fecha ON ingresos(fecha);
+
+CREATE TABLE IF NOT EXISTS costos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha TEXT NOT NULL,
+  tipo TEXT,
+  cantidad REAL,
+  valor INTEGER NOT NULL DEFAULT 0,
+  notas TEXT,
+  airtable_id TEXT UNIQUE,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_costos_fecha ON costos(fecha);
 `;
 
 interface Ctx {
@@ -177,6 +205,13 @@ function build(): Ctx {
   }
   if (!cols.some((c) => c.name === "ctwa_referral")) {
     db.exec("ALTER TABLE conversations ADD COLUMN ctwa_referral TEXT");
+  }
+  // micro-migración clientes: columnas nuevas (email/estado/horario/alumnos)
+  const cliCols = db.prepare("PRAGMA table_info(clientes)").all() as { name: string }[];
+  for (const col of ["email", "estado", "horario", "alumnos"]) {
+    if (!cliCols.some((c) => c.name === col)) {
+      db.exec(`ALTER TABLE clientes ADD COLUMN ${col} TEXT`);
+    }
   }
 
   return {
@@ -456,6 +491,10 @@ export interface Cliente {
   telefono: string;
   nombre: string | null;
   airtable_id: string | null;
+  email: string | null;
+  estado: string | null;
+  horario: string | null;
+  alumnos: string | null;
   created_at: number;
 }
 
@@ -463,17 +502,29 @@ export function upsertCliente(data: {
   nombre?: string;
   telefono: string;
   airtableId?: string;
+  email?: string;
+  estado?: string;
+  horario?: string[];
+  alumnos?: string;
 }): boolean {
   const tel = normalizeChilePhone(data.telefono);
   if (!tel) return false;
   ctx().db
     .prepare(`
-      INSERT INTO clientes (telefono, nombre, airtable_id) VALUES (?, ?, ?)
+      INSERT INTO clientes (telefono, nombre, airtable_id, email, estado, horario, alumnos)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(telefono) DO UPDATE SET
-        nombre = COALESCE(excluded.nombre, clientes.nombre),
-        airtable_id = COALESCE(excluded.airtable_id, clientes.airtable_id)
+        nombre      = COALESCE(excluded.nombre, clientes.nombre),
+        airtable_id = COALESCE(excluded.airtable_id, clientes.airtable_id),
+        email       = COALESCE(excluded.email, clientes.email),
+        estado      = COALESCE(excluded.estado, clientes.estado),
+        horario     = COALESCE(excluded.horario, clientes.horario),
+        alumnos     = COALESCE(excluded.alumnos, clientes.alumnos)
     `)
-    .run(tel, data.nombre ?? null, data.airtableId ?? null);
+    .run(
+      tel, data.nombre ?? null, data.airtableId ?? null, data.email ?? null,
+      data.estado ?? null, data.horario ? JSON.stringify(data.horario) : null, data.alumnos ?? null
+    );
   return true;
 }
 
@@ -485,4 +536,80 @@ export function getClienteByPhone(phone: string): Cliente | null {
       | Cliente
       | undefined) ?? null
   );
+}
+
+// ── Finanzas: ingresos y costos ───────────────────────────────────────────
+
+export interface Ingreso {
+  id: number; fecha: string; apoderado: string | null; monto: number;
+  tipo: string | null; detalle: string | null; airtable_id: string | null; created_at: number;
+}
+export interface Costo {
+  id: number; fecha: string; tipo: string | null; cantidad: number | null; valor: number;
+  notas: string | null; airtable_id: string | null; created_at: number;
+}
+
+export interface IngresoInput { fecha: string; apoderado?: string; monto: number; tipo?: string; detalle?: string }
+export interface CostoInput { fecha: string; tipo?: string; cantidad?: number; valor: number; notas?: string }
+
+export function listIngresos(mes: string): Ingreso[] {
+  return ctx().db
+    .prepare("SELECT * FROM ingresos WHERE substr(fecha,1,7) = ? ORDER BY fecha DESC, id DESC")
+    .all(mes) as Ingreso[];
+}
+export function addIngreso(d: IngresoInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO ingresos (fecha, apoderado, monto, tipo, detalle) VALUES (?,?,?,?,?)")
+    .run(d.fecha, d.apoderado ?? null, Math.round(d.monto), d.tipo ?? null, d.detalle ?? null);
+  return r.lastInsertRowid as number;
+}
+export function updateIngreso(id: number, d: IngresoInput): void {
+  ctx().db
+    .prepare("UPDATE ingresos SET fecha=?, apoderado=?, monto=?, tipo=?, detalle=? WHERE id=?")
+    .run(d.fecha, d.apoderado ?? null, Math.round(d.monto), d.tipo ?? null, d.detalle ?? null, id);
+}
+export function deleteIngreso(id: number): void {
+  ctx().db.prepare("DELETE FROM ingresos WHERE id=?").run(id);
+}
+export function upsertIngresoFromAirtable(d: IngresoInput & { airtableId: string }): void {
+  ctx().db
+    .prepare(`
+      INSERT INTO ingresos (airtable_id, fecha, apoderado, monto, tipo, detalle)
+      VALUES (?,?,?,?,?,?)
+      ON CONFLICT(airtable_id) DO UPDATE SET
+        fecha=excluded.fecha, apoderado=excluded.apoderado, monto=excluded.monto,
+        tipo=excluded.tipo, detalle=excluded.detalle
+    `)
+    .run(d.airtableId, d.fecha, d.apoderado ?? null, Math.round(d.monto), d.tipo ?? null, d.detalle ?? null);
+}
+
+export function listCostos(mes: string): Costo[] {
+  return ctx().db
+    .prepare("SELECT * FROM costos WHERE substr(fecha,1,7) = ? ORDER BY fecha DESC, id DESC")
+    .all(mes) as Costo[];
+}
+export function addCosto(d: CostoInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO costos (fecha, tipo, cantidad, valor, notas) VALUES (?,?,?,?,?)")
+    .run(d.fecha, d.tipo ?? null, d.cantidad ?? null, Math.round(d.valor), d.notas ?? null);
+  return r.lastInsertRowid as number;
+}
+export function updateCosto(id: number, d: CostoInput): void {
+  ctx().db
+    .prepare("UPDATE costos SET fecha=?, tipo=?, cantidad=?, valor=?, notas=? WHERE id=?")
+    .run(d.fecha, d.tipo ?? null, d.cantidad ?? null, Math.round(d.valor), d.notas ?? null, id);
+}
+export function deleteCosto(id: number): void {
+  ctx().db.prepare("DELETE FROM costos WHERE id=?").run(id);
+}
+export function upsertCostoFromAirtable(d: CostoInput & { airtableId: string }): void {
+  ctx().db
+    .prepare(`
+      INSERT INTO costos (airtable_id, fecha, tipo, cantidad, valor, notas)
+      VALUES (?,?,?,?,?,?)
+      ON CONFLICT(airtable_id) DO UPDATE SET
+        fecha=excluded.fecha, tipo=excluded.tipo, cantidad=excluded.cantidad,
+        valor=excluded.valor, notas=excluded.notas
+    `)
+    .run(d.airtableId, d.fecha, d.tipo ?? null, d.cantidad ?? null, Math.round(d.valor), d.notas ?? null);
 }
