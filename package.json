@@ -15,6 +15,7 @@
     "wizard": "tsx scripts/wizard.ts",
     "check": "tsx scripts/check-system.ts",
     "doctor": "tsx scripts/doctor.ts",
+    "pull:airtable": "tsx scripts/pull-airtable.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },
