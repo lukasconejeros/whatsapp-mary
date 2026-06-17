@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppNav from '@/components/AppNav'
+import CajaTab from '@/components/CajaTab'
 import { INGRESO_TIPOS, COSTO_TIPOS, formatCLP, currentMonth, shiftMonth, monthLabel } from '@/lib/finanzas'
 import { Plus, ChevronLeft, ChevronRight, Trash2, Pencil, X } from 'lucide-react'
 
@@ -9,7 +10,7 @@ type Mov = { id: number; fecha: string; tipo: string | null; detalle?: string | 
 
 export default function FinanzasPage() {
   const [mes, setMes] = useState(currentMonth())
-  const [tab, setTab] = useState<'ganancias' | 'costos'>('ganancias')
+  const [tab, setTab] = useState<'ganancias' | 'costos' | 'caja'>('ganancias')
   const [ingresos, setIngresos] = useState<Mov[]>([])
   const [costos, setCostos] = useState<Mov[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,7 +92,8 @@ export default function FinanzasPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '18px 20px' }}>
-          {/* Resumen */}
+          {/* Resumen (solo Ganancias/Costos, no en Caja) */}
+          {tab !== 'caja' && (
           <div className="flex gap-3" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
             {[
               { l: 'Ingresos', v: totalIng, c: '#15803D', bg: '#F0FDF4', bd: '#BBF7D0' },
@@ -104,25 +106,29 @@ export default function FinanzasPage() {
               </div>
             ))}
           </div>
+          )}
 
           {/* Pestañas */}
           <div className="flex items-center gap-2" style={{ marginBottom: 14 }}>
-            {(['ganancias', 'costos'] as const).map(t => (
+            {(['ganancias', 'costos', 'caja'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); setOpenTipo(null) }}
                 style={{ padding: '6px 14px', borderRadius: 9, border: '1px solid #FBCFE8', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
                   background: tab === t ? '#EC4899' : '#fff', color: tab === t ? '#fff' : '#9D5577' }}>
-                {t === 'ganancias' ? 'Ganancias' : 'Costos'}
+                {t === 'ganancias' ? 'Ganancias' : t === 'costos' ? 'Costos' : 'Caja'}
               </button>
             ))}
             <div className="flex-1" />
-            <button onClick={openNew} className="flex items-center gap-1.5"
-              style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(236,72,153,0.3)' }}>
-              <Plus size={15} /> Agregar {tab === 'ganancias' ? 'ingreso' : 'costo'}
-            </button>
+            {tab !== 'caja' && (
+              <button onClick={openNew} className="flex items-center gap-1.5"
+                style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(236,72,153,0.3)' }}>
+                <Plus size={15} /> Agregar {tab === 'ganancias' ? 'ingreso' : 'costo'}
+              </button>
+            )}
           </div>
 
-          {/* Lista por ítem */}
-          {loading ? <p style={{ color: '#B57795', fontSize: 13 }}>Cargando…</p>
+          {/* Caja (movimientos de Telegram) o lista por ítem (Ganancias/Costos) */}
+          {tab === 'caja' ? <CajaTab mes={mes} />
+            : loading ? <p style={{ color: '#B57795', fontSize: 13 }}>Cargando…</p>
             : grupos.length === 0 ? <p style={{ color: '#C99BB4', fontSize: 13 }}>Sin movimientos este mes.</p>
             : grupos.map(([tipo, g]) => (
               <div key={tipo} style={{ background: '#fff', border: '1px solid #FBCFE8', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
