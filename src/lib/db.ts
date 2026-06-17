@@ -161,6 +161,19 @@ CREATE TABLE IF NOT EXISTS clases (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_clases_dia ON clases(dia);
+
+CREATE TABLE IF NOT EXISTS movimientos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK(tipo IN ('gasto','ingreso')),
+  monto INTEGER NOT NULL DEFAULT 0,
+  categoria TEXT,
+  descripcion TEXT,
+  origen TEXT,
+  chat_id TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos(fecha);
 `;
 
 interface Ctx {
@@ -674,4 +687,34 @@ export function listClientes(): ClienteLite[] {
     if (r.horario) { try { horario = JSON.parse(r.horario) as string[]; } catch { horario = []; } }
     return { id: r.id, nombre: r.nombre, telefono: r.telefono, horario };
   });
+}
+
+// ── Movimientos (asistente de finanzas por Telegram) ──────────────────────
+
+export interface Movimiento {
+  id: number; fecha: string; tipo: "gasto" | "ingreso"; monto: number;
+  categoria: string | null; descripcion: string | null; origen: string | null;
+  chat_id: string | null; created_at: number;
+}
+export interface MovimientoInput {
+  fecha: string; tipo: "gasto" | "ingreso"; monto: number;
+  categoria?: string; descripcion?: string; origen?: string; chat_id?: string;
+}
+
+export function addMovimiento(d: MovimientoInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO movimientos (fecha, tipo, monto, categoria, descripcion, origen, chat_id) VALUES (?,?,?,?,?,?,?)")
+    .run(d.fecha, d.tipo, Math.round(d.monto), d.categoria ?? null, d.descripcion ?? null, d.origen ?? null, d.chat_id ?? null);
+  return r.lastInsertRowid as number;
+}
+
+export function listMovimientos(opts: { mes?: string; categoria?: string } = {}): Movimiento[] {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (opts.mes) { where.push("substr(fecha,1,7) = ?"); params.push(opts.mes); }
+  if (opts.categoria) { where.push("categoria = ?"); params.push(opts.categoria); }
+  const sql = "SELECT * FROM movimientos" +
+    (where.length ? " WHERE " + where.join(" AND ") : "") +
+    " ORDER BY fecha DESC, id DESC";
+  return ctx().db.prepare(sql).all(...params) as Movimiento[];
 }
