@@ -14,7 +14,7 @@ cmds = ["npm ci --include=dev"]
 cmds = ["npm run build"]
 
 [start]
-# Producción: solo la web (Next.js sirve el panel + /api/*). El bot de WhatsApp
-# (start:all) se activa más adelante cuando conectemos el teléfono de Mary;
-# correrlo junto con --kill-others desestabilizaba el contenedor.
-cmd = "npm run start"
+# Producción: web + motor de WhatsApp juntos, PERO sin --kill-others, para que
+# si el motor de WhatsApp hipa NO se lleve la web (antes start:all con
+# --kill-others tumbaba todo). La IA solo sugiere; nada responde solo.
+cmd = "npm run start:prod"

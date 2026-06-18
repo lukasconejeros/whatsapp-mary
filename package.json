@@ -12,6 +12,7 @@
     "start": "next start -p 3002",
     "start:bot": "tsx scripts/start-bot.ts",
     "start:all": "concurrently --kill-others --names BOT,WEB --prefix-colors yellow,cyan \"npm run start:bot\" \"npm run start\"",
+    "start:prod": "concurrently --names BOT,WEB --prefix-colors yellow,cyan \"npm run start:bot\" \"npm run start\"",
     "wizard": "tsx scripts/wizard.ts",
     "check": "tsx scripts/check-system.ts",
     "doctor": "tsx scripts/doctor.ts",
