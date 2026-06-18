@@ -18,6 +18,20 @@ export default function CalendarioPage() {
   const [form, setForm] = useState<{ dia: string; profe: string; hora: string; alumnos: number[] }>({ dia: 'Lunes', profe: 'Mary', hora: '16:00', alumnos: [] })
   const [search, setSearch] = useState('')
 
+  // Fechas de la semana actual (lunes→sábado), solo como referencia visual.
+  const weekDates: Record<string, string> = (() => {
+    const now = new Date()
+    const dow = now.getDay() // 0=domingo .. 6=sábado
+    const monday = new Date(now)
+    monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
+    const out: Record<string, string> = {}
+    DIAS.forEach((d, i) => {
+      const x = new Date(monday); x.setDate(monday.getDate() + i)
+      out[d] = `${x.getDate()} ${x.toLocaleDateString('es-CL', { month: 'short' })}`
+    })
+    return out
+  })()
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -98,7 +112,7 @@ export default function CalendarioPage() {
               <div key={dia} className="flex flex-col shrink-0 overflow-hidden"
                 style={{ width: 230, borderRadius: 12, background: '#FFFFFF', border: '1px solid #FBCFE8', boxShadow: '0 1px 3px rgba(190,24,93,0.06)' }}>
                 <div className="flex items-center gap-2 shrink-0" style={{ padding: '10px 14px', borderBottom: '1px solid #FCE7F3' }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#831843', flex: 1 }}>{DIA_LABEL[dia]}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#831843', flex: 1 }}>{DIA_LABEL[dia]} <span style={{ fontWeight: 500, color: '#B57795', fontSize: 11 }}>{weekDates[dia]}</span></span>
                   <button onClick={() => openNew(dia)} title="Agregar clase"
                     style={{ display: 'flex', border: 'none', background: '#FCE7F3', borderRadius: 7, padding: 4, cursor: 'pointer', color: '#DB2777' }}><Plus size={14} /></button>
                 </div>
