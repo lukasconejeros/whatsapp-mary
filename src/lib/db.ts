@@ -718,3 +718,7 @@ export function listMovimientos(opts: { mes?: string; categoria?: string } = {})
     " ORDER BY fecha DESC, id DESC";
   return ctx().db.prepare(sql).all(...params) as Movimiento[];
 }
+
+export function deleteMovimiento(id: number): void {
+  ctx().db.prepare("DELETE FROM movimientos WHERE id = ?").run(id);
+}

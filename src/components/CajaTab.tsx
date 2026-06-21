@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatCLP } from '@/lib/finanzas'
 import { todaySantiago } from '@/lib/fechas'
+import { Trash2 } from 'lucide-react'
 
 type Mov = { id: number; fecha: string; tipo: 'gasto' | 'ingreso'; monto: number; categoria: string | null; descripcion: string | null; origen: string | null; chat_id: string | null }
 
@@ -20,6 +21,11 @@ export default function CajaTab({ mes }: { mes: string }) {
     } finally { setLoading(false) }
   }, [mes])
   useEffect(() => { load() }, [load])
+
+  async function del(id: number) {
+    if (!confirm('¿Borrar este movimiento?')) return
+    if ((await fetch(`/api/movimientos/${id}`, { method: 'DELETE' }).then(r => r.json())).ok) load()
+  }
 
   const hoy = todaySantiago()
   const sum = (list: Mov[], tipo: 'gasto' | 'ingreso') => list.filter(m => m.tipo === tipo).reduce((s, m) => s + m.monto, 0)
@@ -88,6 +94,7 @@ export default function CajaTab({ mes }: { mes: string }) {
               <span style={{ fontWeight: 700, color: m.tipo === 'gasto' ? '#BE185D' : '#15803D' }}>
                 {m.tipo === 'gasto' ? '−' : '+'}{formatCLP(m.monto)}
               </span>
+              <button onClick={() => del(m.id)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#D98BB0' }}><Trash2 size={13} /></button>
             </div>
           ))}
       </div>
