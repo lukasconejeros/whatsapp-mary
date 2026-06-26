@@ -2,7 +2,7 @@ import { listMovimientos, listIngresos, listCostos, listClases, listClientes } f
 import { monthSantiago, nowSantiago } from "./fechas";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const HAIKU_MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-sonnet-4-6";
 const WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions";
 
 export interface AccionIA {
@@ -90,6 +90,8 @@ INTERPRETACIÓN DE MONTOS CHILENOS (en pesos CLP, número entero):
 
 Si el mensaje NO es claramente un gasto/ingreso (saludo, pregunta, charla), NO registres nada: responde.
 
+IMPORTANTE: la "respuesta" debe ser MUY corta, máximo 1 o 2 frases. Nada de explicaciones largas ni listas extensas.
+
 Devuelve SIEMPRE y SOLO un JSON (sin texto antes ni después), con una de estas dos formas:
 - Para registrar: {"accion":"registrar","tipo":"gasto"|"ingreso","monto":<entero>,"categoria":"<corta>","descripcion":"<breve>","respuesta":"<confirmación cálida y breve>"}
 - Para responder: {"accion":"responder","respuesta":"<respuesta breve usando solo el contexto>"}`;
@@ -106,8 +108,8 @@ export async function procesarMensaje(texto: string, mes = monthSantiago()): Pro
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: HAIKU_MODEL,
-      max_tokens: 600,
+      model: MODEL,
+      max_tokens: 300,
       system: SYSTEM,
       messages: [
         { role: "user", content: `CONTEXTO:\n${contexto}\n\nMENSAJE DE MARY (fecha ${nowSantiago().slice(0, 10)}):\n${texto}` },
