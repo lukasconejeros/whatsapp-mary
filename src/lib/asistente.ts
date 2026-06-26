@@ -1,4 +1,4 @@
-import { listMovimientos, listIngresos, listCostos, listClases, listClientes } from "./db";
+import { listMovimientos, listIngresos, listCostos, listClases, listClientes, listChatMensajes } from "./db";
 import { monthSantiago, nowSantiago } from "./fechas";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -90,6 +90,11 @@ INTERPRETACIÓN DE MONTOS CHILENOS (en pesos CLP, número entero):
 
 Si el mensaje NO es claramente un gasto/ingreso (saludo, pregunta, charla), NO registres nada: responde.
 
+PREGUNTA SI FALTA INFORMACIÓN antes de registrar. Fíjate si tienes lo esencial:
+- Para un INGRESO de una clase o mensualidad necesitas saber DE QUÉ TALLER O CLASE es (ej: óleo, dibujo, acuarela, niños). Si no te lo dijeron, NO registres todavía.
+- Para un GASTO necesitas saber EN QUÉ se gastó. Si no está claro, NO registres todavía.
+Cuando falte ese dato, usa accion "responder" y pregúntalo de forma corta y cálida (ej: "¿De qué taller es la mensualidad de Claudia?"). Usa los MENSAJES ANTERIORES de la conversación para juntar la información: cuando Mary te responda con el dato que faltaba, recién ahí registra con todo (monto + de qué taller/en qué se gastó).
+
 IMPORTANTE: la "respuesta" debe ser MUY corta, máximo 1 o 2 frases. Nada de explicaciones largas ni listas extensas.
 
 Devuelve SIEMPRE y SOLO un JSON (sin texto antes ni después), con una de estas dos formas:
@@ -100,6 +105,19 @@ export async function procesarMensaje(texto: string, mes = monthSantiago()): Pro
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("Falta ANTHROPIC_API_KEY");
   const contexto = construirContexto(mes);
+  const system = `${SYSTEM}\n\nHoy es ${nowSantiago().slice(0, 10)}.\n\nCONTEXTO ACTUAL (datos del mes, úsalos para responder):\n${contexto}`;
+
+  // Memoria de la conversación: últimos mensajes en orden, alternando user/assistant
+  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  for (const m of listChatMensajes(12)) {
+    const role: "user" | "assistant" = m.rol === "asistente" ? "assistant" : "user";
+    const last = messages[messages.length - 1];
+    if (last && last.role === role) last.content += "\n" + m.texto;
+    else messages.push({ role, content: m.texto });
+  }
+  while (messages.length && messages[0].role === "assistant") messages.shift();
+  if (messages.length === 0) messages.push({ role: "user", content: texto });
+
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
@@ -107,14 +125,7 @@ export async function procesarMensaje(texto: string, mes = monthSantiago()): Pro
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 300,
-      system: SYSTEM,
-      messages: [
-        { role: "user", content: `CONTEXTO:\n${contexto}\n\nMENSAJE DE MARY (fecha ${nowSantiago().slice(0, 10)}):\n${texto}` },
-      ],
-    }),
+    body: JSON.stringify({ model: MODEL, max_tokens: 300, system, messages }),
   });
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
   const data = (await res.json()) as { content?: { text?: string }[] };

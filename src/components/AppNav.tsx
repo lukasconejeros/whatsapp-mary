@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Columns3, Wallet, CalendarDays, Plug, MessageCircle } from 'lucide-react'
+import { Columns3, Wallet, CalendarDays, Plug, MessageCircle, Paintbrush } from 'lucide-react'
 
 const items = [
   { href: '/inbox',      Icon: Columns3,      label: 'Embudo'     },
@@ -37,8 +37,8 @@ export default function AppNav() {
       {/* Marca */}
       <div className="flex items-center gap-3" style={{ padding: '20px 18px 16px', borderBottom: '1px solid #FCE7F3' }}>
         <div className="flex items-center justify-center shrink-0"
-          style={{ width: 38, height: 38, borderRadius: 11, background: 'linear-gradient(135deg, #EC4899, #F472B6)', color: '#fff', fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', boxShadow: '0 4px 12px rgba(236,72,153,0.35)' }}>
-          A
+          style={{ width: 38, height: 38, borderRadius: 11, background: '#fff', border: '1px solid #FBCFE8', boxShadow: '0 4px 12px rgba(236,72,153,0.2)' }}>
+          <Paintbrush size={20} strokeWidth={2} style={{ color: '#EC4899' }} />
         </div>
         <div>
           <p style={{ fontSize: 15, fontWeight: 700, color: '#831843', lineHeight: 1.1, letterSpacing: '-0.01em' }}>Arteluk</p>
