@@ -44,12 +44,14 @@ export async function POST(req: NextRequest) {
   try {
     accion = await procesarMensaje(texto, mes);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ ok: false, error: msg }, { status: 502 });
+    const msg = "Uy, no pude pensar la respuesta ahora. Intenta de nuevo en un ratito.";
+    addChatMensaje("asistente", msg);
+    return NextResponse.json({ ok: false, respuesta: msg, error: String(e) }, { status: 502 });
   }
 
   // Si la IA quiere registrar un movimiento, registrarlo
-  if (accion.accion === "registrar" && accion.tipo && accion.monto && accion.monto > 0) {
+  let registrado = false;
+  if (accion.accion === "registrar" && accion.monto && accion.monto > 0 && accion.tipo) {
     addMovimiento({
       fecha: nowSantiago(),
       tipo: accion.tipo,
@@ -58,10 +60,11 @@ export async function POST(req: NextRequest) {
       descripcion: accion.descripcion,
       origen,
     });
+    registrado = true;
   }
 
   // Guardar respuesta del asistente
   addChatMensaje("asistente", accion.respuesta);
 
-  return NextResponse.json({ ok: true, accion });
+  return NextResponse.json({ ok: true, respuesta: accion.respuesta, registrado });
 }
