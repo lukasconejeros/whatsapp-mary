@@ -29,3 +29,6 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Hoja de claves para copiar/pegar (NO subir)
+ENTORNO-EASYPANEL.local.txt
