@@ -35,6 +35,8 @@ export default function AsistentePage() {
         body: JSON.stringify({ texto: limpio, origen }),
       }).then(r => r.json())
       setMsgs(m => [...m, { id: Date.now() + 1, rol: 'asistente', texto: d.respuesta ?? 'No pude responder.' }])
+    } catch {
+      setMsgs(m => [...m, { id: Date.now() + 1, rol: 'asistente', texto: 'No pude conectar. Revisa tu internet e intenta de nuevo.' }])
     } finally {
       setPensando(false)
     }
@@ -45,31 +47,36 @@ export default function AsistentePage() {
       recRef.current?.stop()
       return
     }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const rec = new MediaRecorder(stream)
-    chunksRef.current = []
-    rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-    rec.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop())
-      setGrabando(false)
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-      const form = new FormData()
-      form.append('file', blob, 'audio.webm')
-      setPensando(true)
-      try {
-        const d = await fetch('/api/asistente/transcribir', { method: 'POST', body: form }).then(r => r.json())
-        if (d.ok && d.texto) {
-          await enviar(d.texto, 'audio')
-        } else {
-          setMsgs(m => [...m, { id: Date.now(), rol: 'asistente', texto: 'No te escuché bien, ¿lo intentas de nuevo?' }])
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setGrabando(false)
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const form = new FormData()
+        form.append('file', blob, 'audio.webm')
+        setPensando(true)
+        try {
+          const d = await fetch('/api/asistente/transcribir', { method: 'POST', body: form }).then(r => r.json())
+          if (d.ok && d.texto) {
+            await enviar(d.texto, 'audio')
+          } else {
+            setMsgs(m => [...m, { id: Date.now(), rol: 'asistente', texto: 'No te escuché bien, ¿lo intentas de nuevo?' }])
+          }
+        } finally {
+          setPensando(false)
         }
-      } finally {
-        setPensando(false)
       }
+      rec.start()
+      recRef.current = rec
+      setGrabando(true)
+    } catch {
+      setGrabando(false)
+      setMsgs(m => [...m, { id: Date.now(), rol: 'asistente', texto: 'No pude usar el micrófono. Revisa el permiso del navegador e intenta de nuevo.' }])
     }
-    rec.start()
-    recRef.current = rec
-    setGrabando(true)
   }
 
   return (

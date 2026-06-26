@@ -12,13 +12,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   let texto: string;
-  let mes: string | undefined;
   let origen: string;
 
   try {
     const b = (await req.json()) as {
       texto?: string;
-      mes?: string;
       origen?: string;
     };
     if (!b.texto || typeof b.texto !== "string" || !b.texto.trim()) {
@@ -28,7 +26,6 @@ export async function POST(req: NextRequest) {
       );
     }
     texto = b.texto.trim();
-    mes = typeof b.mes === "string" && b.mes.trim() ? b.mes.trim() : undefined;
     origen = b.origen === "audio" ? "audio" : "texto";
   } catch {
     return NextResponse.json(
@@ -42,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   let accion;
   try {
-    accion = await procesarMensaje(texto, mes);
+    accion = await procesarMensaje(texto);
   } catch (e) {
     const msg = "Uy, no pude pensar la respuesta ahora. Intenta de nuevo en un ratito.";
     addChatMensaje("asistente", msg);
