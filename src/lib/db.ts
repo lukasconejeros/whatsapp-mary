@@ -174,6 +174,14 @@ CREATE TABLE IF NOT EXISTS movimientos (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_movimientos_fecha ON movimientos(fecha);
+
+CREATE TABLE IF NOT EXISTS chat_mensajes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rol TEXT NOT NULL CHECK(rol IN ('user','asistente')),
+  texto TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_chat_mensajes_created ON chat_mensajes(created_at);
 `;
 
 interface Ctx {
@@ -721,4 +729,24 @@ export function listMovimientos(opts: { mes?: string; categoria?: string } = {})
 
 export function deleteMovimiento(id: number): void {
   ctx().db.prepare("DELETE FROM movimientos WHERE id = ?").run(id);
+}
+
+// ── Chat del Asistente (IA en la app) ─────────────────────────────────────
+
+export interface ChatMensaje {
+  id: number; rol: "user" | "asistente"; texto: string; created_at: number;
+}
+
+export function addChatMensaje(rol: "user" | "asistente", texto: string): number {
+  const r = ctx().db
+    .prepare("INSERT INTO chat_mensajes (rol, texto) VALUES (?,?)")
+    .run(rol, texto);
+  return r.lastInsertRowid as number;
+}
+
+export function listChatMensajes(limit = 50): ChatMensaje[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM chat_mensajes ORDER BY id DESC LIMIT ?")
+    .all(limit) as ChatMensaje[];
+  return rows.reverse();
 }
