@@ -7,7 +7,7 @@ export const DIA_LABEL: Record<string, string> = {
 
 export interface Profe { nombre: string; color: string; bg: string; bd: string }
 export const PROFES: Profe[] = [
-  { nombre: "Mary",     color: "#B76E79", bg: "#F3E7EC", bd: "#EBDCE3" },
+  { nombre: "Mary",     color: "#EC4899", bg: "#FDE7F1", bd: "#FAD1E5" },
   { nombre: "Paula",    color: "#8B5CF6", bg: "#F3E8FF", bd: "#E9D5FF" },
   { nombre: "Lusmaría", color: "#F59E0B", bg: "#FEF3C7", bd: "#FDE68A" },
 ];

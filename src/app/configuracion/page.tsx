@@ -46,26 +46,26 @@ export default function ConfiguracionPage() {
   const tecnicas = bloques.map((b, i) => ({ b, i })).filter(x => x.b.tipo === 'seccion' && (x.b as { tecnica: boolean }).tecnica)
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center" style={{ background: '#FBF7F9' }}>
-      <div className="flex items-center gap-2" style={{ color: '#DFC9D2' }}>
+    <div className="flex h-screen items-center justify-center" style={{ background: '#FFF4FA' }}>
+      <div className="flex items-center gap-2" style={{ color: '#F7CFE1' }}>
         <RefreshCw size={13} className="spin" /><span style={{ fontSize: 13 }}>Cargando...</span>
       </div>
     </div>
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FBF7F9' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="flex items-center shrink-0"
-          style={{ height: 56, padding: '0 28px', background: '#fff', borderBottom: '1px solid #EBDCE3' }}>
-          <h1 style={{ fontSize: 15, fontWeight: 700, color: '#4A2E39', letterSpacing: '-0.01em' }}>Entrenar IA</h1>
+          style={{ height: 56, padding: '0 28px', background: '#fff', borderBottom: '1px solid #FAD1E5' }}>
+          <h1 style={{ fontSize: 15, fontWeight: 700, color: '#9D174D', letterSpacing: '-0.01em' }}>Entrenar IA</h1>
           <div className="flex-1" />
           <button onClick={save} disabled={saving}
             className="flex items-center gap-1.5"
             style={{ height: 34, padding: '0 16px', borderRadius: 8, border: 'none',
-              background: saved ? '#16A34A' : '#B76E79', color: '#fff', fontSize: 13, fontWeight: 600,
+              background: saved ? '#16A34A' : '#EC4899', color: '#fff', fontSize: 13, fontWeight: 600,
               cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, fontFamily: 'inherit',
               boxShadow: '0 1px 3px rgba(37,99,235,0.3)' }}>
             {saving ? <><RefreshCw size={13} className="spin" /> Guardando…</>
@@ -78,9 +78,9 @@ export default function ConfiguracionPage() {
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
 
             {/* Intro */}
-            <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 12, background: '#F3E7EC', border: '1px solid #DFC9D2', marginBottom: 24 }}>
-              <Sparkles size={18} style={{ color: '#B76E79', flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 13, color: '#4A2E39', lineHeight: 1.55 }}>
+            <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 12, background: '#FDE7F1', border: '1px solid #F7CFE1', marginBottom: 24 }}>
+              <Sparkles size={18} style={{ color: '#EC4899', flexShrink: 0, marginTop: 1 }} />
+              <p style={{ fontSize: 13, color: '#9D174D', lineHeight: 1.55 }}>
                 Acá entrenas tu asistente: cambia precios, promociones, horarios y servicios.
                 Los cambios se aplican al bot al instante, sin reiniciar nada.
               </p>
@@ -135,9 +135,9 @@ export default function ConfiguracionPage() {
 function SeccionEditor({ titulo, contenido, onChange, tecnica }: { titulo: string; contenido: string; onChange: (v: string) => void; tecnica?: boolean }) {
   const lines = Math.min(Math.max(contenido.split('\n').length + 1, 3), 16)
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${tecnica ? '#FDE68A' : '#EBDCE3'}`, overflow: 'hidden', boxShadow: '0 1px 2px rgba(30,58,95,0.04)' }}>
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid #FBF7F9', background: tecnica ? '#FFFBEB' : '#FBF7F9' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#4A2E39' }}>{titulo}</span>
+    <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${tecnica ? '#FDE68A' : '#FAD1E5'}`, overflow: 'hidden', boxShadow: '0 1px 2px rgba(30,58,95,0.04)' }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #FFF4FA', background: tecnica ? '#FFFBEB' : '#FFF4FA' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#9D174D' }}>{titulo}</span>
       </div>
       <textarea
         value={contenido}

@@ -52,11 +52,11 @@ export default function LeadSidebar({ lead, onClose, onUpdate }: {
             <div key={msg.id} className={`flex gap-2 ${isUser ? "justify-start" : "justify-end"}`}>
               {isUser && <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center shrink-0 mt-0.5"><User size={10} className="text-slate-500" /></div>}
               <div className="max-w-[75%] rounded-lg px-3 py-1.5 text-xs"
-                style={isUser ? { background: "#F1F5F9", color: "#1E293B" } : isHuman ? { background: "#FEF9C3", color: "#713F12" } : { background: "#F3E7EC", color: "#1E40AF" }}>
+                style={isUser ? { background: "#F1F5F9", color: "#1E293B" } : isHuman ? { background: "#FEF9C3", color: "#713F12" } : { background: "#FDE7F1", color: "#BE185D" }}>
                 {msg.content}
               </div>
               {!isUser && <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                style={isHuman ? { background: "#FEF3C7" } : { background: "#F3E7EC" }}>
+                style={isHuman ? { background: "#FEF3C7" } : { background: "#FDE7F1" }}>
                 {isHuman ? <PhoneCall size={10} className="text-yellow-700" /> : <Bot size={10} className="text-blue-600" />}
               </div>}
             </div>

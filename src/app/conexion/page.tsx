@@ -41,11 +41,11 @@ export default function ConexionPage() {
       : { color: '#B45309', bg: '#FFFBEB', bd: '#FDE68A', Icon: WifiOff, label: 'Desconectado' }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FBF7F9' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="flex items-center shrink-0" style={{ height: 56, padding: '0 28px', background: '#fff', borderBottom: '1px solid #EBDCE3' }}>
-          <h1 style={{ fontSize: 15, fontWeight: 700, color: '#4A2E39', letterSpacing: '-0.01em' }}>Conexión</h1>
+        <header className="flex items-center shrink-0" style={{ height: 56, padding: '0 28px', background: '#fff', borderBottom: '1px solid #FAD1E5' }}>
+          <h1 style={{ fontSize: 15, fontWeight: 700, color: '#9D174D', letterSpacing: '-0.01em' }}>Conexión</h1>
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '28px' }}>
@@ -62,17 +62,17 @@ export default function ConexionPage() {
             </div>
 
             {/* Tarjeta principal */}
-            <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #EBDCE3', boxShadow: '0 1px 3px rgba(30,58,95,0.06)', padding: '28px', textAlign: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #FAD1E5', boxShadow: '0 1px 3px rgba(30,58,95,0.06)', padding: '28px', textAlign: 'center' }}>
               {connected ? (
                 <>
-                  <p style={{ fontSize: 14, color: '#4A2E39', fontWeight: 600, marginBottom: 6 }}>WhatsApp vinculado y funcionando ✅</p>
+                  <p style={{ fontSize: 14, color: '#9D174D', fontWeight: 600, marginBottom: 6 }}>WhatsApp vinculado y funcionando ✅</p>
                   <p style={{ fontSize: 13, color: '#64748B', marginBottom: 22, lineHeight: 1.55 }}>
                     Si cambiaste de teléfono o necesitas vincular otro número, genera un código nuevo.
                   </p>
                 </>
               ) : qrPng ? (
                 <>
-                  <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #F3E7EC', padding: 12, display: 'inline-block', marginBottom: 18 }}>
+                  <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #FDE7F1', padding: 12, display: 'inline-block', marginBottom: 18 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={qrPng} alt="QR de WhatsApp" width={260} height={260} style={{ display: 'block', borderRadius: 6 }} />
                   </div>
@@ -84,15 +84,15 @@ export default function ConexionPage() {
                 </>
               ) : (
                 <div style={{ padding: '30px 0' }}>
-                  <div style={{ width: 26, height: 26, margin: '0 auto 12px', border: '3px solid #F3E7EC', borderTopColor: '#B76E79', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  <div style={{ width: 26, height: 26, margin: '0 auto 12px', border: '3px solid #FDE7F1', borderTopColor: '#EC4899', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
                   <p style={{ fontSize: 13, color: '#64748B' }}>{regenerating ? 'Generando código nuevo…' : 'Generando código QR…'}</p>
                 </div>
               )}
 
               <button onClick={regenerar} disabled={regenerating}
                 className="flex items-center justify-center gap-1.5"
-                style={{ width: '100%', marginTop: 16, height: 38, borderRadius: 8, border: '1px solid #EBDCE3',
-                  background: connected ? '#fff' : '#B76E79', color: connected ? '#B76E79' : '#fff',
+                style={{ width: '100%', marginTop: 16, height: 38, borderRadius: 8, border: '1px solid #FAD1E5',
+                  background: connected ? '#fff' : '#EC4899', color: connected ? '#EC4899' : '#fff',
                   fontSize: 13, fontWeight: 600, cursor: regenerating ? 'wait' : 'pointer', opacity: regenerating ? 0.6 : 1, fontFamily: 'inherit' }}>
                 <RefreshCw size={13} className={regenerating ? 'spin' : ''} />
                 {connected ? 'Vincular otro número (nuevo QR)' : 'Generar código QR nuevo'}

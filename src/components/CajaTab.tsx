@@ -51,18 +51,18 @@ export default function CajaTab({ mes }: { mes: string }) {
 
   function Card({ titulo, t }: { titulo: string; t: { gasto: number; ingreso: number; saldo: number } }) {
     return (
-      <div style={{ flex: 1, minWidth: 200, background: '#fff', border: '1px solid #EBDCE3', borderRadius: 14, padding: '14px 16px' }}>
-        <p style={{ fontSize: 12, color: '#8A7079', marginBottom: 8, fontWeight: 600 }}>{titulo}</p>
+      <div style={{ flex: 1, minWidth: 200, background: '#fff', border: '1px solid #FAD1E5', borderRadius: 14, padding: '14px 16px' }}>
+        <p style={{ fontSize: 12, color: '#B0708C', marginBottom: 8, fontWeight: 600 }}>{titulo}</p>
         <div className="flex gap-4">
-          <div><p style={{ fontSize: 11, color: '#8A7079' }}>Gastos</p><p style={{ fontSize: 16, fontWeight: 800, color: '#8E5563' }}>{formatCLP(t.gasto)}</p></div>
-          <div><p style={{ fontSize: 11, color: '#8A7079' }}>Ingresos</p><p style={{ fontSize: 16, fontWeight: 800, color: '#15803D' }}>{formatCLP(t.ingreso)}</p></div>
-          <div><p style={{ fontSize: 11, color: '#8A7079' }}>Saldo</p><p style={{ fontSize: 16, fontWeight: 800, color: t.saldo >= 0 ? '#15803D' : '#DC2626' }}>{formatCLP(t.saldo)}</p></div>
+          <div><p style={{ fontSize: 11, color: '#B0708C' }}>Gastos</p><p style={{ fontSize: 16, fontWeight: 800, color: '#BE185D' }}>{formatCLP(t.gasto)}</p></div>
+          <div><p style={{ fontSize: 11, color: '#B0708C' }}>Ingresos</p><p style={{ fontSize: 16, fontWeight: 800, color: '#15803D' }}>{formatCLP(t.ingreso)}</p></div>
+          <div><p style={{ fontSize: 11, color: '#B0708C' }}>Saldo</p><p style={{ fontSize: 16, fontWeight: 800, color: t.saldo >= 0 ? '#15803D' : '#DC2626' }}>{formatCLP(t.saldo)}</p></div>
         </div>
       </div>
     )
   }
 
-  if (loading) return <p style={{ color: '#9A8188', fontSize: 13 }}>Cargando…</p>
+  if (loading) return <p style={{ color: '#C0879F', fontSize: 13 }}>Cargando…</p>
 
   return (
     <div>
@@ -72,29 +72,29 @@ export default function CajaTab({ mes }: { mes: string }) {
       </div>
 
       {porCategoria.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #EBDCE3', borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#4A2E39', marginBottom: 8 }}>Por categoría</p>
+        <div style={{ background: '#fff', border: '1px solid #FAD1E5', borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#9D174D', marginBottom: 8 }}>Por categoría</p>
           {porCategoria.map(([cat, v]) => (
-            <div key={cat} className="flex items-center" style={{ fontSize: 12, padding: '4px 0', borderBottom: '1px solid #FBF7F9' }}>
+            <div key={cat} className="flex items-center" style={{ fontSize: 12, padding: '4px 0', borderBottom: '1px solid #FFF4FA' }}>
               <span style={{ flex: 1, color: '#6B5563' }}>{cat}</span>
-              {v.gasto > 0 && <span style={{ color: '#8E5563', fontWeight: 600, marginLeft: 10 }}>−{formatCLP(v.gasto)}</span>}
+              {v.gasto > 0 && <span style={{ color: '#BE185D', fontWeight: 600, marginLeft: 10 }}>−{formatCLP(v.gasto)}</span>}
               {v.ingreso > 0 && <span style={{ color: '#15803D', fontWeight: 600, marginLeft: 10 }}>+{formatCLP(v.ingreso)}</span>}
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ background: '#fff', border: '1px solid #EBDCE3', borderRadius: 12, overflow: 'hidden' }}>
-        {movs.length === 0 ? <p style={{ fontSize: 13, color: '#B6A2AA', textAlign: 'center', padding: '24px 0' }}>Sin movimientos este mes. Tu mamá los registra por Telegram 💬</p>
+      <div style={{ background: '#fff', border: '1px solid #FAD1E5', borderRadius: 12, overflow: 'hidden' }}>
+        {movs.length === 0 ? <p style={{ fontSize: 13, color: '#DBAFC6', textAlign: 'center', padding: '24px 0' }}>Sin movimientos este mes. Tu mamá los registra por Telegram 💬</p>
           : movs.map(m => (
-            <div key={m.id} className="flex items-center gap-3" style={{ padding: '9px 14px', borderBottom: '1px solid #FBF7F9', fontSize: 12 }}>
+            <div key={m.id} className="flex items-center gap-3" style={{ padding: '9px 14px', borderBottom: '1px solid #FFF4FA', fontSize: 12 }}>
               <span title={m.origen ?? ''} style={{ fontSize: 14 }}>{ORIGEN_ICON[m.origen ?? ''] ?? '•'}</span>
-              <span style={{ color: '#8A7079', width: 96 }}>{m.fecha.slice(0, 16)}</span>
+              <span style={{ color: '#B0708C', width: 96 }}>{m.fecha.slice(0, 16)}</span>
               <span style={{ flex: 1, color: '#374151' }}>{m.categoria || '—'}{m.descripcion ? ` · ${m.descripcion}` : ''}</span>
-              <span style={{ fontWeight: 700, color: m.tipo === 'gasto' ? '#8E5563' : '#15803D' }}>
+              <span style={{ fontWeight: 700, color: m.tipo === 'gasto' ? '#BE185D' : '#15803D' }}>
                 {m.tipo === 'gasto' ? '−' : '+'}{formatCLP(m.monto)}
               </span>
-              <button onClick={() => del(m.id)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#C08A9B' }}><Trash2 size={13} /></button>
+              <button onClick={() => del(m.id)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#EC8FB8' }}><Trash2 size={13} /></button>
             </div>
           ))}
       </div>

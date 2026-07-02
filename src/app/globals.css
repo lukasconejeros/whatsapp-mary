@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg:          #FBF7F9;
+  --color-bg:          #FFF4FA;
   --color-surface:     #FFFFFF;
-  --color-border:      #EBDCE3;
-  --color-border-soft: #F3E7EC;
+  --color-border:      #FAD1E5;
+  --color-border-soft: #FDE7F1;
 
-  --color-ink-1:  #3F1D2E;
-  --color-ink-2:  #B76E79;
+  --color-ink-1:  #5A1A38;
+  --color-ink-2:  #EC4899;
   --color-ink-3:  #9CA3AF;
-  --color-ink-4:  #D8B4C6;
+  --color-ink-4:  #EFC3D8;
 
-  --color-pink:    #B76E79;
-  --color-pink-h:  #8E5563;
-  --color-pink-bg: #F3E7EC;
-  --color-pink-bd: #EBDCE3;
+  --color-pink:    #EC4899;
+  --color-pink-h:  #BE185D;
+  --color-pink-bg: #FDE7F1;
+  --color-pink-bd: #FAD1E5;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -39,12 +39,12 @@ body {
 
 button { transition: background .15s ease, color .15s ease, opacity .15s ease, box-shadow .15s ease; }
 
-:focus-visible { outline: 2px solid #C98A97; outline-offset: 1px; border-radius: 6px; }
+:focus-visible { outline: 2px solid #F48FC0; outline-offset: 1px; border-radius: 6px; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #E3CDD6; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #CE9FAE; }
+::-webkit-scrollbar-thumb { background: #F9D3E4; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #EFA0C4; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin .6s linear infinite; }
@@ -69,7 +69,7 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
     height: auto !important;
     flex-direction: row !important;
     border-right: none !important;
-    border-top: 1px solid #EBDCE3;
+    border-top: 1px solid #FAD1E5;
     box-shadow: 0 -4px 16px rgba(74,46,57,0.06);
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -107,8 +107,8 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-.chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #EBDCE3; min-height: 0; }
-.chat-detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #FBF7F9; }
+.chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #FAD1E5; min-height: 0; }
+.chat-detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #FFF4FA; }
 .chat-back { display: none; }
 
 @media (max-width: 767px) {

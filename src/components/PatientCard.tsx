@@ -13,7 +13,7 @@ function timeAgo(ts: string | number): string {
   return `${Math.floor(s / 86400)}d`
 }
 
-const HUE = ['#B76E79','#8B5CF6','#B76E79','#10B981','#F59E0B','#6366F1']
+const HUE = ['#EC4899','#8B5CF6','#EC4899','#10B981','#F59E0B','#6366F1']
 function avatarBg(name: string) {
   let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % HUE.length
   return HUE[Math.abs(h)]
@@ -21,7 +21,7 @@ function avatarBg(name: string) {
 function ini(n: string) { return n.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') }
 
 const CHANNEL_DOT: Record<string, string> = {
-  whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#B76E79', tiktok: '#0F172A', unknown: '#94A3B8',
+  whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#EC4899', tiktok: '#0F172A', unknown: '#94A3B8',
 }
 
 export default function PatientCard({ conv, selected, onSelect, onCategoriaChange }: {
@@ -50,10 +50,10 @@ export default function PatientCard({ conv, selected, onSelect, onCategoriaChang
   return (
     <div onClick={onSelect} role="button" tabIndex={0}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onSelect() }}
-      style={{ display:'block', padding:'10px 14px', background: selected ? '#F3E7EC' : 'transparent',
-        borderBottom:'1px solid #F3E7EC', borderLeft: selected ? '2px solid #B76E79' : '2px solid transparent',
+      style={{ display:'block', padding:'10px 14px', background: selected ? '#FDE7F1' : 'transparent',
+        borderBottom:'1px solid #FDE7F1', borderLeft: selected ? '2px solid #EC4899' : '2px solid transparent',
         cursor:'pointer', outline:'none', transition:'background .1s', width:'100%', textAlign:'left' }}
-      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = '#FBF7F9' }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
       onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
       <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
         <div style={{ width:34, height:34, borderRadius:'50%', background:avatarBg(conv.contact.name),
@@ -73,8 +73,8 @@ export default function PatientCard({ conv, selected, onSelect, onCategoriaChang
             {conv.lastMessage.content || '—'}
           </p>
           {conv.ctwaReferral && (
-            <span style={{ display:'inline-block', fontSize:10, fontWeight:600, color:'#8E5563',
-              background:'#F3E7EC', borderRadius:6, padding:'1px 6px', marginBottom:6 }}>
+            <span style={{ display:'inline-block', fontSize:10, fontWeight:600, color:'#BE185D',
+              background:'#FDE7F1', borderRadius:6, padding:'1px 6px', marginBottom:6 }}>
               📣 vino de anuncio
             </span>
           )}
@@ -85,7 +85,7 @@ export default function PatientCard({ conv, selected, onSelect, onCategoriaChang
             </span>
             <select value={conv.categoria} onChange={move} onClick={e => e.stopPropagation()} disabled={moving}
               title="Mover de columna"
-              style={{ fontSize:11, color:'#8A7079', border:'1px solid #EBDCE3', borderRadius:6,
+              style={{ fontSize:11, color:'#B0708C', border:'1px solid #FAD1E5', borderRadius:6,
                 background:'#fff', padding:'2px 4px', cursor: moving ? 'wait' : 'pointer', fontFamily:'inherit', opacity: moving ? 0.5 : 1, maxWidth:130 }}>
               {CATEGORIA_ORDER.map(cat => (
                 <option key={cat} value={cat}>{CATEGORIA_CONFIG[cat].label}</option>
