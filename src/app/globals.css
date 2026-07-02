@@ -104,3 +104,17 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 
   .app-sidebar .app-navitems a span { flex: 0 0 auto !important; }
 }
+
+/* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
+.chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+.chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #EBDCE3; min-height: 0; }
+.chat-detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #FBF7F9; }
+.chat-back { display: none; }
+
+@media (max-width: 767px) {
+  .chat-list-pane { width: 100%; border-right: none; }
+  .chat-shell .chat-detail-pane { display: none; }
+  .chat-shell.has-selection .chat-list-pane { display: none; }
+  .chat-shell.has-selection .chat-detail-pane { display: flex; }
+  .chat-back { display: flex; }
+}

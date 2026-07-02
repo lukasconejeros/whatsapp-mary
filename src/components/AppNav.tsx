@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Columns3, Wallet, CalendarDays, Plug, MessageCircle, Brush } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, MessageCircle, Brush } from 'lucide-react'
 
 const items = [
-  { href: '/inbox',      Icon: Columns3,      label: 'Embudo'     },
+  { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
   { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
   { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
   { href: '/asistente',  Icon: MessageCircle, label: 'Asistente'  },
