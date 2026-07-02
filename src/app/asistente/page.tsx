@@ -89,6 +89,11 @@ export default function AsistentePage() {
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 720, width: '100%', margin: '0 auto' }}>
+          {msgs.length === 0 && !pensando && (
+            <div style={{ alignSelf: 'flex-start', maxWidth: '80%', background: '#fff', color: '#374151', border: '1px solid #FAD1E5', borderRadius: 14, padding: '9px 13px', fontSize: 13 }}>
+              ¡Hola Mary! 🎨 ¿En qué puedo ayudarte hoy? Cuéntame un gasto o ingreso, o pregúntame por la plata y el calendario.
+            </div>
+          )}
           {msgs.map(m => (
             <div key={m.id} style={{ alignSelf: m.rol === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.rol === 'user' ? '#EC4899' : '#fff', color: m.rol === 'user' ? '#fff' : '#374151', border: m.rol === 'user' ? 'none' : '1px solid #FAD1E5', borderRadius: 14, padding: '9px 13px', fontSize: 13, whiteSpace: 'pre-wrap' }}>
               {m.texto}

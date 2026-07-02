@@ -105,6 +105,28 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .app-sidebar .app-navitems a span { flex: 0 0 auto !important; }
 }
 
+/* ── Botón flotante del Asistente IA (pincel brillante) ── */
+.asistente-fab {
+  position: fixed; right: 18px; bottom: 24px; z-index: 60;
+  width: 58px; height: 58px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; text-decoration: none;
+  background: linear-gradient(135deg, #FB6FB0 0%, #EC4899 55%, #BE185D 100%);
+  box-shadow: 0 8px 24px rgba(236,72,153,0.5), 0 0 0 4px rgba(236,72,153,0.14);
+  animation: fabGlow 2.4s ease-in-out infinite;
+  transition: transform .15s ease;
+}
+.asistente-fab:hover { transform: scale(1.08); }
+.asistente-fab:active { transform: scale(0.95); }
+@keyframes fabGlow {
+  0%, 100% { box-shadow: 0 8px 24px rgba(236,72,153,0.5), 0 0 0 4px rgba(236,72,153,0.14); }
+  50%      { box-shadow: 0 12px 32px rgba(236,72,153,0.72), 0 0 0 8px rgba(236,72,153,0.10); }
+}
+@media (max-width: 767px) {
+  /* Sube el botón por encima de la barra inferior */
+  .asistente-fab { bottom: 70px; right: 16px; width: 54px; height: 54px; }
+}
+
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #FAD1E5; min-height: 0; }

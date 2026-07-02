@@ -22,8 +22,10 @@ const FILTERS: { key: 'todas' | Categoria; label: string }[] = [
   { key: 'todas', label: 'Todas' },
   { key: 'mary', label: 'Mary' },
   { key: 'arteluk', label: 'Arteluk' },
-  { key: 'potencial', label: 'Potenciales' },
+  { key: 'potencial', label: 'Meta' },
 ]
+
+const CATS: Categoria[] = ['mary', 'arteluk', 'potencial']
 
 export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -62,6 +64,16 @@ export default function InboxPage() {
   }, [conversations, filter, search])
 
   const selected = conversations.find(c => c.id === selectedId) ?? null
+
+  async function cambiarCategoria(id: number, categoria: Categoria) {
+    setConversations(p => p.map(c => c.id === id ? { ...c, categoria } : c))
+    try {
+      await fetch(`/api/categoria/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoria }),
+      })
+    } catch { /* la UI ya se actualizó de forma optimista */ }
+  }
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center" style={{ background: '#FFF4FA' }}>
@@ -156,6 +168,20 @@ export default function InboxPage() {
                   style={{ gap: 8, height: 42, padding: '0 12px', border: 'none', borderBottom: '1px solid #FDE7F1', background: '#fff', color: '#BE185D', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
                   <ArrowLeft size={17} /> Chats
                 </button>
+                {/* Mover la conversación de grupo (funciona en teléfono y PC) */}
+                <div className="flex items-center" style={{ gap: 6, padding: '6px 12px', borderBottom: '1px solid #FDE7F1', background: '#fff', flexShrink: 0, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: '#B0708C', marginRight: 2 }}>Grupo:</span>
+                  {CATS.map(cat => {
+                    const on = (selected.categoria ?? 'mary') === cat
+                    return (
+                      <button key={cat} onClick={() => cambiarCategoria(selected.id, cat)}
+                        style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                          border: on ? '1px solid #EC4899' : '1px solid #FAD1E5', background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
+                        {CATEGORIA_CONFIG[cat].label}
+                      </button>
+                    )
+                  })}
+                </div>
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                   <ConversationView key={selected.id} conv={selected} />
                 </div>

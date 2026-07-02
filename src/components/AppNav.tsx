@@ -3,13 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessagesSquare, Wallet, CalendarDays, Plug, MessageCircle, Brush } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, Brush } from 'lucide-react'
 
 const items = [
   { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
   { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
   { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
-  { href: '/asistente',  Icon: MessageCircle, label: 'Asistente'  },
   { href: '/conexion',   Icon: Plug,          label: 'Conexión'   },
 ]
 
@@ -31,6 +30,12 @@ export default function AppNav() {
   }, [])
 
   return (
+    <>
+    {/* Botón flotante del Asistente IA: pincel brillante, siempre visible */}
+    <Link href="/asistente" className="asistente-fab" aria-label="Asistente IA" title="Asistente IA">
+      <Brush size={24} strokeWidth={2.2} />
+    </Link>
+
     <nav className="app-sidebar flex flex-col h-full shrink-0"
       style={{ width: 212, background: '#FFFFFF', borderRight: '1px solid #FAD1E5' }}>
 
@@ -95,5 +100,6 @@ export default function AppNav() {
         </div>
       </div>
     </nav>
+    </>
   )
 }
