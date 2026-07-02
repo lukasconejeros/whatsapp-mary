@@ -7,7 +7,7 @@ import { RefreshCw, TrendingUp, Users, Calendar, CheckCircle, AlertCircle, Messa
 interface DLMetrics { agendadas: number; atendidas: number; canceladas: number; inasistencias: number; tasaAsistencia: number; tasaAusentismo: number; lastUpdated: string; cached: boolean; [k: string]: unknown }
 interface CWMetrics { total: number; total30d: number; byState: { activo: number; derivado: number; agendado: number; cancelado: number; resuelto: number }; byChannel: { whatsapp: number; instagram: number; messenger: number; tiktok: number; unknown: number }; botActive: number; botOff: number; reactivados: number; sinRespuesta: number }
 
-const CH_DOT: Record<string, string> = { whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#3B82F6', tiktok: '#000000', unknown: '#9CA3AF' }
+const CH_DOT: Record<string, string> = { whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#B76E79', tiktok: '#000000', unknown: '#9CA3AF' }
 const CH_LABEL: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', messenger: 'Messenger', tiktok: 'TikTok', unknown: 'Otro' }
 
 function KpiCard({ label, value, sub, icon: Icon, accent, loading }: { label: string; value: string | number; sub?: string; icon: React.ElementType; accent?: string; loading?: boolean }) {
@@ -61,7 +61,7 @@ export default function MetricasPage() {
           <div style={{ marginBottom: 28 }}>
             <SectionLabel>Leads · Embudo de ventas</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              <KpiCard label="Total leads" value={dl?.totalLeads as number ?? '—'} sub="en base de datos" icon={Users} loading={loadingDl} accent="#3B82F6" />
+              <KpiCard label="Total leads" value={dl?.totalLeads as number ?? '—'} sub="en base de datos" icon={Users} loading={loadingDl} accent="#B76E79" />
               <KpiCard label="Nuevos (30d)" value={dl?.leads30d as number ?? '—'} sub="últimos 30 días" icon={TrendingUp} loading={loadingDl} accent="#22C55E" />
               <KpiCard label="Demos agendadas" value={dl?.demos as number ?? '—'} sub="leads calificados" icon={Calendar} loading={loadingDl} accent="#8B5CF6" />
               <KpiCard label="Clientes" value={dl?.clientes as number ?? '—'} sub={dl && (dl.demos as number) > 0 ? `${Math.round(((dl.clientes as number) / (dl.demos as number)) * 100)}% conversión` : 'tasa de cierre'} icon={CheckCircle} loading={loadingDl} accent="#F59E0B" />
@@ -71,7 +71,7 @@ export default function MetricasPage() {
             <SectionLabel>Conversaciones · WhatsApp Bot</SectionLabel>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               <KpiCard label="Total" value={cw?.total ?? '—'} sub="conversaciones" icon={MessageSquare} loading={loadingCw} accent="#6366F1" />
-              <KpiCard label="Activas (30d)" value={cw?.total30d ?? '—'} sub="actividad reciente" icon={TrendingUp} loading={loadingCw} accent="#3B82F6" />
+              <KpiCard label="Activas (30d)" value={cw?.total30d ?? '—'} sub="actividad reciente" icon={TrendingUp} loading={loadingCw} accent="#B76E79" />
               <KpiCard label="Bot activo" value={cw?.botActive ?? '—'} sub="modo IA" icon={Bot} loading={loadingCw} accent="#22C55E" />
               <KpiCard label="Sin respuesta" value={cw?.sinRespuesta ?? '—'} sub=">24h sin actividad" icon={AlertCircle} loading={loadingCw} accent="#EF4444" />
             </div>
@@ -89,7 +89,7 @@ export default function MetricasPage() {
             <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-border)', padding: '16px 18px' }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>Estado del bot</p>
               {cw && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[['Bot activo (IA)', cw.byState.activo, '#3B82F6'], ['Derivado a humano', cw.byState.derivado, '#8B5CF6'], ['Resueltos', cw.byState.resuelto, '#9CA3AF']].map(([label, count, color]) => (
+                {[['Bot activo (IA)', cw.byState.activo, '#B76E79'], ['Derivado a humano', cw.byState.derivado, '#8B5CF6'], ['Resueltos', cw.byState.resuelto, '#9CA3AF']].map(([label, count, color]) => (
                   <div key={label as string} className="flex items-center justify-between"><span className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--color-ink-2)' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: color as string, display: 'inline-block' }} />{label as string}</span><span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ink-1)' }}>{count as number}</span></div>
                 ))}
               </div>}

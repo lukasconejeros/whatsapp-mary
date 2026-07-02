@@ -16,7 +16,7 @@ function fmtDate(ts: number | string) {
   return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
 }
 
-const AVATAR_COLORS = ['#EC4899','#8B5CF6','#F472B6','#10B981','#F59E0B','#F43F5E']
+const AVATAR_COLORS = ['#B76E79','#8B5CF6','#C98A97','#10B981','#F59E0B','#F43F5E']
 function avatarBg(name: string) {
   let h = 0; for (const c of name) h = (h*31+c.charCodeAt(0)) % AVATAR_COLORS.length
   return AVATAR_COLORS[Math.abs(h)]
@@ -24,7 +24,7 @@ function avatarBg(name: string) {
 function ini(n: string) { return n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') }
 
 const CHANNEL_DOT: Record<string, string> = {
-  whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#2563EB', tiktok: '#0F172A', unknown: '#94A3B8',
+  whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#B76E79', tiktok: '#0F172A', unknown: '#94A3B8',
 }
 
 export default function ConversationView({ conv }: { conv: Conversation }) {
@@ -75,7 +75,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #FCE7F3', background:'#fff', flexShrink:0 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #F3E7EC', background:'#fff', flexShrink:0 }}>
         <div style={{ width:32,height:32,borderRadius:'50%',background:avatarBg(conv.contact.name),color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0 }}>
           {ini(conv.contact.name)}
         </div>
@@ -89,27 +89,27 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             {conv.contact.phone && <span style={{fontSize:11,color:'#94A3B8'}}>{conv.contact.phone}</span>}
           </div>
         </div>
-        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #FBCFE8',color: conv.botActive ? '#DB2777' : '#94A3B8',background:'#FDF2F8',flexShrink:0 }}>
+        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #EBDCE3',color: conv.botActive ? '#B76E79' : '#94A3B8',background:'#FBF7F9',flexShrink:0 }}>
           {conv.botActive ? '● Bot activo' : '○ Bot apagado'}
         </span>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FDF2F8' }}>
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FBF7F9' }}>
         {loading ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:6,color:'#94A3B8' }}>
-            <div style={{ width:13,height:13,border:'2px solid #FBCFE8',borderTopColor:'#EC4899',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
+            <div style={{ width:13,height:13,border:'2px solid #EBDCE3',borderTopColor:'#B76E79',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
             <span style={{fontSize:12}}>Cargando...</span>
           </div>
         ) : grouped.length===0 ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%' }}>
-            <p style={{fontSize:12,color:'#E7BBD0'}}>Sin mensajes</p>
+            <p style={{fontSize:12,color:'#DFC9D2'}}>Sin mensajes</p>
           </div>
         ) : grouped.map(g=>(
           <div key={g.date}>
             <div style={{ display:'flex',alignItems:'center',gap:8,margin:'14px 0 10px' }}>
-              <div style={{flex:1,height:1,background:'#FCE7F3'}}/>
+              <div style={{flex:1,height:1,background:'#F3E7EC'}}/>
               <span style={{fontSize:11,color:'#94A3B8',fontWeight:500}}>{g.date}</span>
-              <div style={{flex:1,height:1,background:'#FCE7F3'}}/>
+              <div style={{flex:1,height:1,background:'#F3E7EC'}}/>
             </div>
             {g.msgs.map((m,i)=>{
               const isOut = m.messageType===1
@@ -119,8 +119,8 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
                   <div style={{ maxWidth:'76%' }}>
                     {showName && <p style={{fontSize:11,color:'#94A3B8',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
                     <div style={{ borderRadius:12, padding:'8px 12px', fontSize:13, lineHeight:1.55,
-                      ...(isOut ? { background:'#EC4899', color:'#fff', borderBottomRightRadius:4 }
-                               : { background:'#FFFFFF', color:'#0F172A', border:'1px solid #FBCFE8', borderBottomLeftRadius:4 }) }}>
+                      ...(isOut ? { background:'#B76E79', color:'#fff', borderBottomRightRadius:4 }
+                               : { background:'#FFFFFF', color:'#0F172A', border:'1px solid #EBDCE3', borderBottomLeftRadius:4 }) }}>
                       {m.content}
                     </div>
                     <p style={{fontSize:10,color:'#CDA6BC',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
@@ -135,10 +135,10 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         <div ref={ref}/>
       </div>
 
-      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #FCE7F3',flexShrink:0 }}>
+      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #F3E7EC',flexShrink:0 }}>
         {!conv.botActive && (
           <button type="button" onClick={suggest} disabled={suggesting}
-            style={{ alignSelf:'flex-start',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#DB2777',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
+            style={{ alignSelf:'flex-start',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #EBDCE3',background:'#F3E7EC',color:'#B76E79',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
             {suggesting ? '⟳ Pensando...' : '✦ Sugerir respuesta'}
           </button>
         )}
@@ -146,12 +146,12 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           <textarea value={reply} onChange={e=>setReply(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e as unknown as React.FormEvent)}}}
             placeholder="Escribe un mensaje..." rows={2}
-            style={{ flex:1,resize:'none',borderRadius:8,padding:'8px 11px',fontSize:13,border:'1px solid #FBCFE8',background:'#FDF2F8',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
-            onFocus={e=>{e.target.style.borderColor='#EC4899';e.target.style.background='#fff'}}
-            onBlur={e=>{e.target.style.borderColor='#FBCFE8';e.target.style.background='#FDF2F8'}}
+            style={{ flex:1,resize:'none',borderRadius:8,padding:'8px 11px',fontSize:13,border:'1px solid #EBDCE3',background:'#FBF7F9',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
+            onFocus={e=>{e.target.style.borderColor='#B76E79';e.target.style.background='#fff'}}
+            onBlur={e=>{e.target.style.borderColor='#EBDCE3';e.target.style.background='#FBF7F9'}}
           />
           <button type="submit" disabled={!reply.trim()||sending}
-            style={{ width:34,height:34,borderRadius:8,border:'none',background:reply.trim()&&!sending?'#EC4899':'#FBCFE8',color:'#fff',cursor:reply.trim()&&!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            style={{ width:34,height:34,borderRadius:8,border:'none',background:reply.trim()&&!sending?'#B76E79':'#EBDCE3',color:'#fff',cursor:reply.trim()&&!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
             <Send size={13}/>
           </button>
         </div>

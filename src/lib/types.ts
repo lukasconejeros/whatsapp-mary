@@ -4,7 +4,7 @@ export type Channel = 'whatsapp' | 'instagram' | 'messenger' | 'tiktok' | 'unkno
 export const CHANNEL_CONFIG: Record<Channel, { label: string; color: string; bg: string; dot: string }> = {
   whatsapp:  { label: 'WhatsApp',  color: '#15803D', bg: '#DCFCE7', dot: '#22C55E' },
   instagram: { label: 'Instagram', color: '#7E22CE', bg: '#F3E8FF', dot: '#A855F7' },
-  messenger: { label: 'Messenger', color: '#1D4ED8', bg: '#DBEAFE', dot: '#3B82F6' },
+  messenger: { label: 'Messenger', color: '#8E5563', bg: '#F3E7EC', dot: '#B76E79' },
   tiktok:    { label: 'TikTok',    color: '#111827', bg: '#F1F5F9', dot: '#374151' },
   unknown:   { label: 'Otro',      color: '#374151', bg: '#F3F4F6', dot: '#6B7280' },
 }
@@ -38,7 +38,7 @@ export interface Message {
 }
 
 export const STATE_CONFIG: Record<ConvState, { label: string; color: string; bg: string; accent: string; dot: string }> = {
-  activo:   { label: 'En conversación',   color: '#1D4ED8', bg: '#EFF6FF', accent: '#3B82F6', dot: '#3B82F6' },
+  activo:   { label: 'En conversación',   color: '#8E5563', bg: '#FBF7F9', accent: '#B76E79', dot: '#B76E79' },
   resuelto: { label: 'Quieren agendar',   color: '#B45309', bg: '#FFFBEB', accent: '#F59E0B', dot: '#F59E0B' },
   agendado: { label: 'Agendaron',         color: '#15803D', bg: '#F0FDF4', accent: '#22C55E', dot: '#22C55E' },
   derivado: { label: 'Derivado a humano', color: '#6D28D9', bg: '#F5F3FF', accent: '#8B5CF6', dot: '#8B5CF6' },
@@ -57,7 +57,7 @@ export const CATEGORIA_ORDER: Categoria[] = ['mary', 'arteluk', 'potencial']
 export const CATEGORIA_CONFIG: Record<Categoria, { label: string; color: string; bg: string; dot: string }> = {
   mary:      { label: 'Conversaciones Mary',    color: '#6B7280', bg: '#F9FAFB', dot: '#9CA3AF' },
   arteluk:   { label: 'Conversaciones Arteluk', color: '#15803D', bg: '#F0FDF4', dot: '#22C55E' },
-  potencial: { label: 'Clientes Potenciales',   color: '#BE185D', bg: '#FCE7F3', dot: '#EC4899' },
+  potencial: { label: 'Clientes Potenciales',   color: '#8E5563', bg: '#F3E7EC', dot: '#B76E79' },
 }
 
 export type LeadEstado = 'nuevo' | 'calificado' | 'demo' | 'cliente' | 'descartado'
@@ -65,7 +65,7 @@ export type LeadEstado = 'nuevo' | 'calificado' | 'demo' | 'cliente' | 'descarta
 export const LEAD_COLUMN_ORDER: LeadEstado[] = ['nuevo', 'calificado', 'demo', 'cliente', 'descartado']
 
 export const LEAD_STATE_CONFIG: Record<LeadEstado, { label: string; color: string; bg: string; accent: string }> = {
-  nuevo:      { label: 'Nuevos',      color: '#1D4ED8', bg: '#EFF6FF', accent: '#3B82F6' },
+  nuevo:      { label: 'Nuevos',      color: '#8E5563', bg: '#FBF7F9', accent: '#B76E79' },
   calificado: { label: 'Calificados', color: '#6D28D9', bg: '#F5F3FF', accent: '#8B5CF6' },
   demo:       { label: 'Demo',        color: '#15803D', bg: '#F0FDF4', accent: '#22C55E' },
   cliente:    { label: 'Clientes',    color: '#B45309', bg: '#FFFBEB', accent: '#F59E0B' },

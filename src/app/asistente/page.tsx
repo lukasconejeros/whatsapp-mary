@@ -80,30 +80,30 @@ export default function AsistentePage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FDF2F8' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FBF7F9' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="shrink-0" style={{ padding: '18px 20px', borderBottom: '1px solid #FBCFE8', background: '#FFFFFF' }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#831843', margin: 0 }}>Asistente</h1>
-          <p style={{ fontSize: 12, color: '#9D5577', margin: '4px 0 0' }}>Cuéntame tus gastos e ingresos o pregúntame por la plata y el calendario.</p>
+        <header className="shrink-0" style={{ padding: '18px 20px', borderBottom: '1px solid #EBDCE3', background: '#FFFFFF' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#4A2E39', margin: 0 }}>Asistente</h1>
+          <p style={{ fontSize: 12, color: '#8A7079', margin: '4px 0 0' }}>Cuéntame tus gastos e ingresos o pregúntame por la plata y el calendario.</p>
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 720, width: '100%', margin: '0 auto' }}>
           {msgs.map(m => (
-            <div key={m.id} style={{ alignSelf: m.rol === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.rol === 'user' ? '#EC4899' : '#fff', color: m.rol === 'user' ? '#fff' : '#374151', border: m.rol === 'user' ? 'none' : '1px solid #FBCFE8', borderRadius: 14, padding: '9px 13px', fontSize: 13, whiteSpace: 'pre-wrap' }}>
+            <div key={m.id} style={{ alignSelf: m.rol === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.rol === 'user' ? '#B76E79' : '#fff', color: m.rol === 'user' ? '#fff' : '#374151', border: m.rol === 'user' ? 'none' : '1px solid #EBDCE3', borderRadius: 14, padding: '9px 13px', fontSize: 13, whiteSpace: 'pre-wrap' }}>
               {m.texto}
             </div>
           ))}
-          {pensando && <div style={{ alignSelf: 'flex-start', color: '#B57795', fontSize: 12, fontStyle: 'italic' }}>escribiendo…</div>}
+          {pensando && <div style={{ alignSelf: 'flex-start', color: '#9A8188', fontSize: 12, fontStyle: 'italic' }}>escribiendo…</div>}
           <div ref={finRef} />
         </div>
 
-        <form onSubmit={e => { e.preventDefault(); enviar(texto) }} style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #FBCFE8', background: '#FFFFFF', maxWidth: 720, width: '100%', margin: '0 auto', flexShrink: 0 }}>
-          <button type="button" onClick={toggleMic} title={grabando ? 'Detener' : 'Grabar audio'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: grabando ? '#DC2626' : '#FBCFE8', color: grabando ? '#fff' : '#831843' }}>
+        <form onSubmit={e => { e.preventDefault(); enviar(texto) }} style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #EBDCE3', background: '#FFFFFF', maxWidth: 720, width: '100%', margin: '0 auto', flexShrink: 0 }}>
+          <button type="button" onClick={toggleMic} title={grabando ? 'Detener' : 'Grabar audio'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: grabando ? '#DC2626' : '#EBDCE3', color: grabando ? '#fff' : '#4A2E39' }}>
             {grabando ? <Square size={18} /> : <Mic size={18} />}
           </button>
-          <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escribe aquí…" style={{ flex: 1, borderRadius: 12, border: '1px solid #FBCFE8', padding: '0 14px', fontSize: 13, outline: 'none' }} />
-          <button type="submit" disabled={pensando || !texto.trim()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: '#EC4899', color: '#fff', opacity: pensando || !texto.trim() ? 0.5 : 1 }}>
+          <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escribe aquí…" style={{ flex: 1, borderRadius: 12, border: '1px solid #EBDCE3', padding: '0 14px', fontSize: 13, outline: 'none' }} />
+          <button type="submit" disabled={pensando || !texto.trim()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: '#B76E79', color: '#fff', opacity: pensando || !texto.trim() ? 0.5 : 1 }}>
             <Send size={18} />
           </button>
         </form>

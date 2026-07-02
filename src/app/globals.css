@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg:          #FDF2F8;
+  --color-bg:          #FBF7F9;
   --color-surface:     #FFFFFF;
-  --color-border:      #FBCFE8;
-  --color-border-soft: #FCE7F3;
+  --color-border:      #EBDCE3;
+  --color-border-soft: #F3E7EC;
 
   --color-ink-1:  #3F1D2E;
-  --color-ink-2:  #DB2777;
+  --color-ink-2:  #B76E79;
   --color-ink-3:  #9CA3AF;
   --color-ink-4:  #D8B4C6;
 
-  --color-pink:    #DB2777;
-  --color-pink-h:  #BE185D;
-  --color-pink-bg: #FCE7F3;
-  --color-pink-bd: #FBCFE8;
+  --color-pink:    #B76E79;
+  --color-pink-h:  #8E5563;
+  --color-pink-bg: #F3E7EC;
+  --color-pink-bd: #EBDCE3;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -39,12 +39,12 @@ body {
 
 button { transition: background .15s ease, color .15s ease, opacity .15s ease, box-shadow .15s ease; }
 
-:focus-visible { outline: 2px solid #F472B6; outline-offset: 1px; border-radius: 6px; }
+:focus-visible { outline: 2px solid #C98A97; outline-offset: 1px; border-radius: 6px; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #F1C4DA; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #E79CC0; }
+::-webkit-scrollbar-thumb { background: #E3CDD6; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #CE9FAE; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin .6s linear infinite; }
@@ -58,3 +58,49 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 /* Tarjetas del embudo: aparición suave */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 .fade-up { animation: fadeUp .2s ease both; }
+
+/* ── Responsive: en teléfono la barra lateral pasa a ser barra inferior ── */
+@media (max-width: 767px) {
+  /* El shell de la app apila el contenido arriba y la navegación abajo */
+  .flex.h-screen.overflow-hidden { flex-direction: column-reverse; }
+
+  .app-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    flex-direction: row !important;
+    border-right: none !important;
+    border-top: 1px solid #EBDCE3;
+    box-shadow: 0 -4px 16px rgba(74,46,57,0.06);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* En la barra inferior no caben marca, banner ni pie */
+  .app-sidebar .app-brand,
+  .app-sidebar .app-menuLabel,
+  .app-sidebar .app-reconnect,
+  .app-sidebar .app-footer,
+  .app-sidebar .app-spacer { display: none !important; }
+
+  .app-sidebar .app-navitems {
+    flex-direction: row !important;
+    justify-content: space-around;
+    width: 100%;
+    gap: 0 !important;
+    padding: 6px 4px !important;
+  }
+
+  .app-sidebar .app-navitems a {
+    flex: 1;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center;
+    gap: 3px !important;
+    padding: 7px 2px !important;
+    font-size: 10px !important;
+    text-align: center;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .app-sidebar .app-navitems a span { flex: 0 0 auto !important; }
+}
