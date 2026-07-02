@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import ConversationView from '@/components/ConversationView'
+import { Avatar } from '@/components/Avatar'
 import { Conversation, CATEGORIA_CONFIG, Categoria } from '@/lib/types'
 import { RefreshCw, Search, X, ArrowLeft, MessageCircle } from 'lucide-react'
 
@@ -16,10 +17,6 @@ function timeAgo(ts: string | number): string {
   if (s < 172800) return 'ayer'
   return `${Math.floor(s / 86400)}d`
 }
-
-const HUE = ['#EC4899', '#8B5CF6', '#F48FC0', '#10B981', '#F59E0B', '#6366F1']
-function avatarBg(name: string) { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % HUE.length; return HUE[Math.abs(h)] }
-function ini(n: string) { return n.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?' }
 
 const FILTERS: { key: 'todas' | Categoria; label: string }[] = [
   { key: 'todas', label: 'Todas' },
@@ -133,9 +130,7 @@ export default function InboxPage() {
                     onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
                     <div style={{ position: 'relative', flexShrink: 0 }}>
-                      <div style={{ width: 46, height: 46, borderRadius: '50%', background: avatarBg(conv.contact.name), color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {ini(conv.contact.name)}
-                      </div>
+                      <Avatar src={conv.contact.avatar} size={46} />
                       <span title={CATEGORIA_CONFIG[cat].label} style={{ position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: '50%', background: CATEGORIA_CONFIG[cat].dot, border: '2px solid #fff' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

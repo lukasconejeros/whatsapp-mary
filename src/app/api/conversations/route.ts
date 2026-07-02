@@ -13,7 +13,7 @@ export async function GET() {
     status:  'open',
     labels:  c.mode === 'HUMAN' ? ['apagar_bot'] : [],
     channel: 'whatsapp',
-    contact: { name: c.name ?? c.phone, phone: c.phone, avatar: '' },
+    contact: { name: c.name ?? c.phone, phone: c.phone, avatar: avatarUrl(c.photo) },
     assignee: null,
     lastMessage: {
       content:   c.last_message_preview ?? '',
@@ -33,4 +33,11 @@ export async function GET() {
 
 function safeJson(s: string): Record<string, unknown> | null {
   try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
+}
+
+// WhatsApp = nombre de archivo local → se sirve vía /api/media/<name>.
+// Si ya es una URL (http…), se pasa tal cual. Vacío = sin foto (avatar gris).
+function avatarUrl(photo?: string | null): string {
+  if (!photo) return '';
+  return /^https?:\/\//.test(photo) ? photo : `/api/media/${photo}`;
 }

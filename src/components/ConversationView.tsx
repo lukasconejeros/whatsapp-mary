@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Conversation, Message, CHANNEL_CONFIG } from '@/lib/types'
 import { Send, Smile } from 'lucide-react'
+import { ImageNote, AudioNote, VideoNote } from './MediaContent'
+import { Avatar } from './Avatar'
 
 const EMOJIS = ['😀','😃','😄','😁','😊','🙂','😉','😍','🥰','😘','😅','😂','🤣','😌','😎','🤩','🥳','😇','🤗','🤔','🙃','😢','😭','👍','👎','👏','🙏','💪','🎉','✨','🔥','❤️','💕','💖','💐','🌸','🎨','🖌️','👋','🙌','✅','❌','📅','📸','💬','⭐','😴','🤝']
 
@@ -18,15 +20,18 @@ function fmtDate(ts: number | string) {
   return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
 }
 
-const AVATAR_COLORS = ['#EC4899','#8B5CF6','#F48FC0','#10B981','#F59E0B','#F43F5E']
-function avatarBg(name: string) {
-  let h = 0; for (const c of name) h = (h*31+c.charCodeAt(0)) % AVATAR_COLORS.length
-  return AVATAR_COLORS[Math.abs(h)]
-}
-function ini(n: string) { return n.split(' ').filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('') }
-
 const CHANNEL_DOT: Record<string, string> = {
   whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#EC4899', tiktok: '#0F172A', unknown: '#94A3B8',
+}
+
+// Placeholders genéricos que ponemos cuando no se pudo describir/transcribir un
+// medio. Si el mensaje trae media Y el texto es solo un placeholder, no lo mostramos
+// (ya se ve la foto/audio). Si trae una descripción o caption real, sí se muestra.
+const PLACEHOLDER = /^(📷\s*foto|🎤\s*audio|🎥\s*video|🌟\s*sticker)$/i
+function showText(m: Message): boolean {
+  if (!m.content) return false
+  if (m.media && PLACEHOLDER.test(m.content.trim())) return false
+  return true
 }
 
 export default function ConversationView({ conv }: { conv: Conversation }) {
@@ -79,9 +84,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #FDE7F1', background:'#fff', flexShrink:0 }}>
-        <div style={{ width:32,height:32,borderRadius:'50%',background:avatarBg(conv.contact.name),color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0 }}>
-          {ini(conv.contact.name)}
-        </div>
+        <Avatar src={conv.contact.avatar} size={32} />
         <div style={{ flex:1, minWidth:0 }}>
           <p style={{ fontSize:13,fontWeight:600,color:'#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{conv.contact.name}</p>
           <div style={{ display:'flex',alignItems:'center',gap:6,marginTop:2 }}>
@@ -124,7 +127,16 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
                     <div style={{ borderRadius:12, padding:'8px 12px', fontSize:13, lineHeight:1.55,
                       ...(isOut ? { background:'#EC4899', color:'#fff', borderBottomRightRadius:4 }
                                : { background:'#FFFFFF', color:'#0F172A', border:'1px solid #FAD1E5', borderBottomLeftRadius:4 }) }}>
-                      {m.content}
+                      {m.media && (
+                        <div style={{ marginBottom: showText(m) ? 6 : 0 }}>
+                          {/\.(ogg|opus|mp3|m4a)$/i.test(m.media)
+                            ? <AudioNote src={m.media} />
+                            : /\.(mp4|webm|mov|3gp)$/i.test(m.media)
+                              ? <VideoNote src={m.media} />
+                              : <ImageNote src={m.media} />}
+                        </div>
+                      )}
+                      {showText(m) && <span style={{ whiteSpace:'pre-wrap' }}>{m.content}</span>}
                     </div>
                     <p style={{fontSize:10,color:'#E9A9CC',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
                       {fmt(m.createdAt)}{isOut&&m.senderName&&m.senderName!=='Tú'&&` · ${m.senderName}`}

@@ -19,6 +19,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     senderType:  m.role,
     createdAt:   m.created_at,
     isPrivate:   false,
+    media:       m.media ? `/api/media/${m.media}` : null,
   }));
 
   return NextResponse.json({ ok: true, messages });

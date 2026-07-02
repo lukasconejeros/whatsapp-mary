@@ -35,6 +35,7 @@ export interface Message {
   senderType: string
   createdAt: number
   isPrivate: boolean
+  media?: string | null
 }
 
 export const STATE_CONFIG: Record<ConvState, { label: string; color: string; bg: string; accent: string; dot: string }> = {

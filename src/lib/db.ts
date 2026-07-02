@@ -26,6 +26,7 @@ export interface Conversation {
   ctwa_referral: string | null; // JSON de la señal de anuncio, o null
   last_message_at: number | null;
   created_at: number;
+  photo?: string | null; // foto de perfil (archivo local o URL); vacío = avatar gris
 }
 
 export interface ConversationListItem extends Conversation {
@@ -38,6 +39,7 @@ export interface Message {
   role: MessageRole;
   content: string;
   created_at: number;
+  media?: string | null; // nombre del archivo de foto/audio guardado (data/media/<name>), si lo hay
 }
 
 export interface ConnectionState {
@@ -238,6 +240,16 @@ function build(): Ctx {
   if (!cols.some((c) => c.name === "ctwa_referral")) {
     db.exec("ALTER TABLE conversations ADD COLUMN ctwa_referral TEXT");
   }
+  // photo: foto de perfil del contacto (nombre de archivo en data/media/<name> o URL).
+  // Vacío = avatar gris tipo WhatsApp.
+  if (!cols.some((c) => c.name === "photo")) {
+    db.exec("ALTER TABLE conversations ADD COLUMN photo TEXT");
+  }
+  // messages.media: nombre del archivo de foto/audio guardado (data/media/<name>), si lo hay.
+  const mcols = db.prepare("PRAGMA table_info(messages)").all() as { name: string }[];
+  if (!mcols.some((c) => c.name === "media")) {
+    db.exec("ALTER TABLE messages ADD COLUMN media TEXT");
+  }
   // micro-migración clientes: columnas nuevas (email/estado/horario/alumnos)
   const cliCols = db.prepare("PRAGMA table_info(clientes)").all() as { name: string }[];
   for (const col of ["email", "estado", "horario", "alumnos"]) {
@@ -266,7 +278,7 @@ function build(): Ctx {
     `),
     setModeStmt: db.prepare("UPDATE conversations SET mode = ? WHERE id = ?"),
     insertMsg: db.prepare(
-      "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)"
+      "INSERT INTO messages (conversation_id, role, content, media) VALUES (?, ?, ?, ?)"
     ),
     updateLastMsg: db.prepare(
       "UPDATE conversations SET last_message_at = unixepoch() WHERE id = ?"
@@ -366,11 +378,12 @@ export function setMode(conversationId: number, mode: ConversationMode): void {
 export function insertMessage(
   conversationId: number,
   role: MessageRole,
-  content: string
+  content: string,
+  media?: string | null
 ): number {
   const c = ctx();
   const insert = c.db.transaction(() => {
-    const result = c.insertMsg.run(conversationId, role, content);
+    const result = c.insertMsg.run(conversationId, role, content, media ?? null);
     c.updateLastMsg.run(conversationId);
     return result.lastInsertRowid as number;
   });
@@ -514,6 +527,13 @@ export function setCtwaReferral(conversationId: number, referral: unknown): void
   ctx().db
     .prepare("UPDATE conversations SET ctwa_referral = ? WHERE id = ?")
     .run(referral == null ? null : JSON.stringify(referral), conversationId);
+}
+
+// Guarda la foto de perfil de una conversación (archivo local o URL).
+export function setConversationPhoto(id: number, photo: string): void {
+  try {
+    ctx().db.prepare("UPDATE conversations SET photo = ? WHERE id = ?").run(photo, id);
+  } catch { /* no crítico */ }
 }
 
 // ── Clientes Arteluk (semilla desde Airtable) ─────────────────────────────
