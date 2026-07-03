@@ -133,19 +133,27 @@ export async function procesarMensaje(texto: string, mes = monthSantiago()): Pro
   return parseAccionIA(raw);
 }
 
+// Transcribe voz → texto. Usa Groq Whisper (gratis/rápido) si hay GROQ_API_KEY,
+// si no OpenAI. Sin ninguna clave no se puede transcribir (lanza error claro).
 export async function transcribirAudio(buffer: Buffer, filename = "audio.webm"): Promise<string> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error("Falta OPENAI_API_KEY");
+  const groq = process.env.GROQ_API_KEY?.trim();
+  const openai = process.env.OPENAI_API_KEY?.trim();
+  if (!groq && !openai) {
+    throw new Error("Falta GROQ_API_KEY (o OPENAI_API_KEY) para transcribir el audio");
+  }
+  const url = groq ? "https://api.groq.com/openai/v1/audio/transcriptions" : WHISPER_URL;
+  const model = groq ? "whisper-large-v3-turbo" : "whisper-1";
+  const key = groq ?? openai!;
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(buffer)]), filename);
-  form.append("model", "whisper-1");
+  form.append("model", model);
   form.append("language", "es");
-  const res = await fetch(WHISPER_URL, {
+  const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: form,
   });
-  if (!res.ok) throw new Error(`Whisper ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`Transcripción ${res.status}: ${await res.text()}`);
   const data = (await res.json()) as { text?: string };
   return (data.text ?? "").trim();
 }

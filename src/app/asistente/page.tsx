@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
-import { Send, Mic, Square } from 'lucide-react'
+import { Send, Mic, Square, History } from 'lucide-react'
 
 type Msg = { id: number; rol: 'user' | 'asistente'; texto: string }
 
@@ -15,11 +15,13 @@ export default function AsistentePage() {
   const chunksRef = useRef<Blob[]>([])
   const finRef = useRef<HTMLDivElement | null>(null)
 
-  const cargar = useCallback(async () => {
+  // El chat arranca LIMPIO cada vez que entras (solo el saludo). El historial
+  // completo se carga a demanda con el botón "Ver historial".
+  const [historialVisto, setHistorialVisto] = useState(false)
+  const cargarHistorial = useCallback(async () => {
     const d = await fetch('/api/asistente').then(r => r.json())
-    if (d.ok) setMsgs(d.mensajes)
+    if (d.ok) { setMsgs(d.mensajes); setHistorialVisto(true) }
   }, [])
-  useEffect(() => { cargar() }, [cargar])
   useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, pensando])
 
   async function enviar(t: string, origen: 'texto' | 'audio' = 'texto') {
@@ -83,9 +85,17 @@ export default function AsistentePage() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="shrink-0" style={{ padding: '18px 20px', borderBottom: '1px solid #FAD1E5', background: '#FFFFFF' }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#9D174D', margin: 0 }}>Asistente</h1>
-          <p style={{ fontSize: 12, color: '#B0708C', margin: '4px 0 0' }}>Cuéntame tus gastos e ingresos o pregúntame por la plata y el calendario.</p>
+        <header className="shrink-0 flex items-center" style={{ gap: 12, padding: '16px 20px', borderBottom: '1px solid #FAD1E5', background: '#FFFFFF' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: 18, fontWeight: 800, color: '#9D174D', margin: 0 }}>Asistente</h1>
+            <p style={{ fontSize: 12, color: '#B0708C', margin: '4px 0 0' }}>Cuéntame tus gastos e ingresos o pregúntame por la plata y el calendario.</p>
+          </div>
+          {!historialVisto && (
+            <button onClick={cargarHistorial} title="Ver el historial completo"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 10, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#BE185D', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <History size={14} /> Ver historial
+            </button>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 720, width: '100%', margin: '0 auto' }}>
