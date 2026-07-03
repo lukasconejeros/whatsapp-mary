@@ -640,6 +640,18 @@ export function listCostos(mes: string): Costo[] {
     .prepare("SELECT * FROM costos WHERE substr(fecha,1,7) = ? ORDER BY fecha DESC, id DESC")
     .all(mes) as Costo[];
 }
+
+// Rango de fechas (desde/hasta en formato YYYY-MM-DD, inclusive) — para Métricas.
+export function listIngresosRange(desde: string, hasta: string): Ingreso[] {
+  return ctx().db
+    .prepare("SELECT * FROM ingresos WHERE substr(fecha,1,10) BETWEEN ? AND ? ORDER BY fecha DESC, id DESC")
+    .all(desde, hasta) as Ingreso[];
+}
+export function listCostosRange(desde: string, hasta: string): Costo[] {
+  return ctx().db
+    .prepare("SELECT * FROM costos WHERE substr(fecha,1,10) BETWEEN ? AND ? ORDER BY fecha DESC, id DESC")
+    .all(desde, hasta) as Costo[];
+}
 export function addCosto(d: CostoInput): number {
   const r = ctx().db
     .prepare("INSERT INTO costos (fecha, tipo, cantidad, valor, notas) VALUES (?,?,?,?,?)")

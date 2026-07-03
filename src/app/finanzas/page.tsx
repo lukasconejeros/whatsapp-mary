@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppNav from '@/components/AppNav'
-import CajaTab from '@/components/CajaTab'
+import MetricasTab from '@/components/MetricasTab'
 import { INGRESO_TIPOS, COSTO_TIPOS, formatCLP, currentMonth, shiftMonth, monthLabel } from '@/lib/finanzas'
 import { Plus, ChevronLeft, ChevronRight, Trash2, Pencil, X } from 'lucide-react'
 
@@ -10,7 +10,7 @@ type Mov = { id: number; fecha: string; tipo: string | null; detalle?: string | 
 
 export default function FinanzasPage() {
   const [mes, setMes] = useState(currentMonth())
-  const [tab, setTab] = useState<'ganancias' | 'costos' | 'caja'>('ganancias')
+  const [tab, setTab] = useState<'ganancias' | 'costos' | 'metricas'>('ganancias')
   const [ingresos, setIngresos] = useState<Mov[]>([])
   const [costos, setCostos] = useState<Mov[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,8 +92,8 @@ export default function FinanzasPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '18px 20px' }}>
-          {/* Resumen (solo Ganancias/Costos, no en Caja) */}
-          {tab !== 'caja' && (
+          {/* Resumen del mes (solo Ganancias/Costos; Métricas tiene su propio filtro) */}
+          {tab !== 'metricas' && (
           <div className="flex gap-3" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
             {[
               { l: 'Ingresos', v: totalIng, c: '#15803D', bg: '#F0FDF4', bd: '#BBF7D0' },
@@ -110,15 +110,15 @@ export default function FinanzasPage() {
 
           {/* Pestañas */}
           <div className="flex items-center gap-2" style={{ marginBottom: 14 }}>
-            {(['ganancias', 'costos', 'caja'] as const).map(t => (
+            {(['ganancias', 'costos', 'metricas'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); setOpenTipo(null) }}
                 style={{ padding: '6px 14px', borderRadius: 9, border: '1px solid #FAD1E5', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
                   background: tab === t ? '#EC4899' : '#fff', color: tab === t ? '#fff' : '#B0708C' }}>
-                {t === 'ganancias' ? 'Ganancias' : t === 'costos' ? 'Costos' : 'Caja'}
+                {t === 'ganancias' ? 'Ganancias' : t === 'costos' ? 'Costos' : 'Métricas'}
               </button>
             ))}
             <div className="flex-1" />
-            {tab !== 'caja' && (
+            {tab !== 'metricas' && (
               <button onClick={openNew} className="flex items-center gap-1.5"
                 style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(236,72,153,0.3)' }}>
                 <Plus size={15} /> Agregar {tab === 'ganancias' ? 'ingreso' : 'costo'}
@@ -127,7 +127,7 @@ export default function FinanzasPage() {
           </div>
 
           {/* Caja (movimientos de Telegram) o lista por ítem (Ganancias/Costos) */}
-          {tab === 'caja' ? <CajaTab mes={mes} />
+          {tab === 'metricas' ? <MetricasTab />
             : loading ? <p style={{ color: '#C0879F', fontSize: 13 }}>Cargando…</p>
             : grupos.length === 0 ? <p style={{ color: '#DBAFC6', fontSize: 13 }}>Sin movimientos este mes.</p>
             : grupos.map(([tipo, g]) => (

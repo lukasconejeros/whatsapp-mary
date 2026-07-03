@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addChatMensaje, listChatMensajes, addMovimiento } from "@/lib/db";
+import { addChatMensaje, listChatMensajes, addIngreso, addCosto } from "@/lib/db";
 import { procesarMensaje } from "@/lib/asistente";
 import { nowSantiago } from "@/lib/fechas";
 
@@ -12,13 +12,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   let texto: string;
-  let origen: string;
 
   try {
-    const b = (await req.json()) as {
-      texto?: string;
-      origen?: string;
-    };
+    const b = (await req.json()) as { texto?: string; origen?: string };
     if (!b.texto || typeof b.texto !== "string" || !b.texto.trim()) {
       return NextResponse.json(
         { ok: false, error: "texto es requerido" },
@@ -26,7 +22,6 @@ export async function POST(req: NextRequest) {
       );
     }
     texto = b.texto.trim();
-    origen = b.origen === "audio" ? "audio" : "texto";
   } catch {
     return NextResponse.json(
       { ok: false, error: "JSON inválido" },
@@ -46,17 +41,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, respuesta: msg, error: String(e) }, { status: 502 });
   }
 
-  // Si la IA quiere registrar un movimiento, registrarlo
+  // Si la IA quiere registrar, va al MISMO lugar que los botones (ingresos/costos),
+  // así aparece en Ganancias/Costos y en Métricas. (origen 'texto'|'audio' ya no
+  // se usa como columna, pero se mantiene por compatibilidad del contrato.)
   let registrado = false;
   if (accion.accion === "registrar" && accion.monto && accion.monto > 0 && accion.tipo) {
-    addMovimiento({
-      fecha: nowSantiago(),
-      tipo: accion.tipo,
-      monto: accion.monto,
-      categoria: accion.categoria,
-      descripcion: accion.descripcion,
-      origen,
-    });
+    const fecha = nowSantiago().slice(0, 10); // YYYY-MM-DD, como el botón "Agregar"
+    if (accion.tipo === "ingreso") {
+      addIngreso({ fecha, monto: accion.monto, tipo: accion.categoria, detalle: accion.descripcion });
+    } else {
+      addCosto({ fecha, valor: accion.monto, tipo: accion.categoria, notas: accion.descripcion });
+    }
     registrado = true;
   }
 
