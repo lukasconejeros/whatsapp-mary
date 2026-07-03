@@ -15,3 +15,14 @@ export const PROFE_NOMBRES = PROFES.map((p) => p.nombre);
 export function profeColor(nombre: string): Profe {
   return PROFES.find((p) => p.nombre === nombre) ?? { nombre, color: "#9CA3AF", bg: "#F3F4F6", bd: "#E5E7EB" };
 }
+
+// Días de la semana en formato sin tilde, indexados por getDay() de JS (0=domingo).
+// Domingo no está en DIAS (la academia trabaja Lun–Sáb) pero puede caer una fecha ahí.
+export const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"] as const;
+
+// Deriva el nombre del día (sin tilde, convención de DIAS) a partir de una fecha YYYY-MM-DD.
+// Usa mediodía para evitar corrimientos por zona horaria.
+export function diaFromFecha(fecha: string): string {
+  const d = new Date(`${fecha}T12:00:00`);
+  return DIAS_SEMANA[d.getDay()];
+}

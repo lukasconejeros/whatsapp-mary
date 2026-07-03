@@ -127,6 +127,15 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .asistente-fab { bottom: 70px; right: 16px; width: 54px; height: 54px; }
 }
 
+/* ── Calendario mensual: grilla del mes + detalle del día ── */
+.cal-main { display: flex; gap: 16px; align-items: flex-start; padding: 16px 20px; }
+.cal-grid { flex: 1; min-width: 0; }
+.cal-detail { width: 340px; flex-shrink: 0; position: sticky; top: 0; }
+@media (max-width: 767px) {
+  .cal-main { flex-direction: column; padding: 12px; gap: 12px; }
+  .cal-detail { width: 100%; position: static; }
+}
+
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #FAD1E5; min-height: 0; }

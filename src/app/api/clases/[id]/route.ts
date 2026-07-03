@@ -7,11 +7,11 @@ interface Ctx { params: Promise<{ id: string }> }
 export async function PUT(req: NextRequest, ctx: Ctx) {
   const id = parseInt((await ctx.params).id, 10);
   if (Number.isNaN(id)) return NextResponse.json({ ok: false, error: "id inválido" }, { status: 400 });
-  const b = await req.json() as { dia?: string; profe?: string; hora?: string; alumnos?: number[]; nota?: string };
+  const b = await req.json() as { fecha?: string; dia?: string; profe?: string; hora?: string; alumnos?: (string | number)[]; nota?: string };
   if (!b.dia || !b.profe) {
     return NextResponse.json({ ok: false, error: "dia y profe son obligatorios" }, { status: 400 });
   }
-  updateClase(id, { dia: b.dia, profe: b.profe, hora: b.hora, alumnos: b.alumnos, nota: b.nota });
+  updateClase(id, { fecha: b.fecha, dia: b.dia, profe: b.profe, hora: b.hora, alumnos: b.alumnos, nota: b.nota });
   return NextResponse.json({ ok: true });
 }
 

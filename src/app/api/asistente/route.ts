@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addChatMensaje, listChatMensajes, addIngreso, addCosto } from "@/lib/db";
+import { addChatMensaje, listChatMensajes, addIngreso, addCosto, addClase } from "@/lib/db";
 import { procesarMensaje } from "@/lib/asistente";
 import { nowSantiago } from "@/lib/fechas";
+import { diaFromFecha } from "@/lib/calendario";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
   // así aparece en Ganancias/Costos y en Métricas. (origen 'texto'|'audio' ya no
   // se usa como columna, pero se mantiene por compatibilidad del contrato.)
   let registrado = false;
+  let agendado = false;
   if (accion.accion === "registrar" && accion.monto && accion.monto > 0 && accion.tipo) {
     const fecha = nowSantiago().slice(0, 10); // YYYY-MM-DD, como el botón "Agregar"
     if (accion.tipo === "ingreso") {
@@ -53,10 +55,27 @@ export async function POST(req: NextRequest) {
       addCosto({ fecha, valor: accion.monto, tipo: accion.categoria, notas: accion.descripcion });
     }
     registrado = true;
+  } else if (accion.accion === "agendar" && accion.fecha && /^\d{4}-\d{2}-\d{2}$/.test(accion.fecha)) {
+    // Agenda una clase/evento en el calendario. El 'dia' se deriva de la fecha.
+    const dia = diaFromFecha(accion.fecha);
+    const alumnos: string[] = accion.alumnos && accion.alumnos.includes(",")
+      ? accion.alumnos.split(",").map((s) => s.trim()).filter(Boolean)
+      : accion.alumnos && accion.alumnos.trim()
+        ? [accion.alumnos.trim()]
+        : [];
+    addClase({
+      fecha: accion.fecha,
+      dia,
+      profe: accion.profe || "Mary",
+      hora: accion.hora,
+      alumnos,
+      nota: accion.titulo,
+    });
+    agendado = true;
   }
 
   // Guardar respuesta del asistente
   addChatMensaje("asistente", accion.respuesta);
 
-  return NextResponse.json({ ok: true, respuesta: accion.respuesta, registrado });
+  return NextResponse.json({ ok: true, respuesta: accion.respuesta, registrado, agendado });
 }

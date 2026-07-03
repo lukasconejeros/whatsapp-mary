@@ -257,6 +257,13 @@ function build(): Ctx {
       db.exec(`ALTER TABLE clientes ADD COLUMN ${col} TEXT`);
     }
   }
+  // micro-migración clases: columna fecha (YYYY-MM-DD) para eventos con fecha exacta.
+  // Las clases antiguas sin fecha siguen guardadas por 'dia'; el calendario mensual usa 'fecha'.
+  const claseCols = db.prepare("PRAGMA table_info(clases)").all() as { name: string }[];
+  if (!claseCols.some((c) => c.name === "fecha")) {
+    db.exec("ALTER TABLE clases ADD COLUMN fecha TEXT");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_clases_fecha ON clases(fecha)");
 
   return {
     db,
@@ -681,18 +688,18 @@ export function upsertCostoFromAirtable(d: CostoInput & { airtableId: string }):
 // ── Calendario: clases ────────────────────────────────────────────────────
 
 export interface Clase {
-  id: number; dia: string; profe: string; hora: string | null;
-  alumnos: number[]; nota: string | null; created_at: number;
+  id: number; fecha: string | null; dia: string; profe: string; hora: string | null;
+  alumnos: (string | number)[]; nota: string | null; created_at: number;
 }
-export interface ClaseInput { dia: string; profe: string; hora?: string; alumnos?: number[]; nota?: string }
+export interface ClaseInput { fecha?: string; dia: string; profe: string; hora?: string; alumnos?: (string | number)[]; nota?: string }
 
 interface ClaseRow {
-  id: number; dia: string; profe: string; hora: string | null;
+  id: number; fecha: string | null; dia: string; profe: string; hora: string | null;
   alumnos: string | null; nota: string | null; created_at: number;
 }
 function parseClase(r: ClaseRow): Clase {
-  let alumnos: number[] = [];
-  if (r.alumnos) { try { alumnos = JSON.parse(r.alumnos) as number[]; } catch { alumnos = []; } }
+  let alumnos: (string | number)[] = [];
+  if (r.alumnos) { try { alumnos = JSON.parse(r.alumnos) as (string | number)[]; } catch { alumnos = []; } }
   return { ...r, alumnos };
 }
 
@@ -702,16 +709,23 @@ export function listClases(): Clase[] {
     .all() as ClaseRow[];
   return rows.map(parseClase);
 }
+// Eventos con fecha dentro del rango [desde, hasta] (YYYY-MM-DD, inclusive) — para el calendario mensual.
+export function listClasesRange(desde: string, hasta: string): Clase[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM clases WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora IS NULL, hora ASC, id ASC")
+    .all(desde, hasta) as ClaseRow[];
+  return rows.map(parseClase);
+}
 export function addClase(d: ClaseInput): number {
   const r = ctx().db
-    .prepare("INSERT INTO clases (dia, profe, hora, alumnos, nota) VALUES (?,?,?,?,?)")
-    .run(d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null);
+    .prepare("INSERT INTO clases (fecha, dia, profe, hora, alumnos, nota) VALUES (?,?,?,?,?,?)")
+    .run(d.fecha ?? null, d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null);
   return r.lastInsertRowid as number;
 }
 export function updateClase(id: number, d: ClaseInput): void {
   ctx().db
-    .prepare("UPDATE clases SET dia=?, profe=?, hora=?, alumnos=?, nota=? WHERE id=?")
-    .run(d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null, id);
+    .prepare("UPDATE clases SET fecha=?, dia=?, profe=?, hora=?, alumnos=?, nota=? WHERE id=?")
+    .run(d.fecha ?? null, d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null, id);
 }
 export function deleteClase(id: number): void {
   ctx().db.prepare("DELETE FROM clases WHERE id=?").run(id);
