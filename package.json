@@ -17,6 +17,8 @@
     "check": "tsx scripts/check-system.ts",
     "doctor": "tsx scripts/doctor.ts",
     "pull:airtable": "tsx scripts/pull-airtable.ts",
+    "import:contactos": "tsx scripts/import-contactos-arteluk.ts",
+    "test:contactos": "tsx scripts/test-contactos.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },

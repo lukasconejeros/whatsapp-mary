@@ -597,6 +597,40 @@ export function getClienteByPhone(phone: string): Cliente | null {
   );
 }
 
+// Normaliza texto para búsqueda/comparación: sin acentos, minúsculas, sin espacios sobrantes.
+export function normalizarTexto(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+
+// Todos los contactos (clientes) con sus campos, ordenados por nombre.
+export function listContactos(): Cliente[] {
+  return ctx()
+    .db.prepare("SELECT * FROM clientes ORDER BY nombre COLLATE NOCASE ASC")
+    .all() as Cliente[];
+}
+
+// Marca un contacto como 'activo' | 'inactivo' (u otro estado libre).
+export function setClienteEstado(telefono: string, estado: string): boolean {
+  const tel = normalizeChilePhone(telefono);
+  if (!tel) return false;
+  const r = ctx()
+    .db.prepare("UPDATE clientes SET estado = ? WHERE telefono = ?")
+    .run(estado, tel);
+  return r.changes > 0;
+}
+
+// Búsqueda difusa de clientes por nombre del apoderado o del/los alumno(s),
+// ignorando acentos y mayúsculas. Usada por el flujo de feedback ("la mamá de Amparo").
+export function searchClientes(term: string): Cliente[] {
+  const q = normalizarTexto(term);
+  if (!q) return [];
+  const rows = ctx().db.prepare("SELECT * FROM clientes").all() as Cliente[];
+  return rows.filter((c) => {
+    const hay = normalizarTexto(`${c.nombre ?? ""} ${c.alumnos ?? ""}`);
+    return hay.includes(q);
+  });
+}
+
 // ── Finanzas: ingresos y costos ───────────────────────────────────────────
 
 export interface Ingreso {
