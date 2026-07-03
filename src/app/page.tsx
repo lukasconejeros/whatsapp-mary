@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Brush } from 'lucide-react'
 
 type Status = 'disconnected' | 'qr' | 'connecting' | 'connected' | 'unknown'
 
@@ -32,10 +33,12 @@ export default function Home() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFF4FA', fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
       <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #FAD1E5', boxShadow: '0 4px 24px rgba(30,58,95,0.08)', padding: '36px 40px', maxWidth: 420, textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EC4899', color: '#fff', fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(37,99,235,0.35)' }}>W</div>
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#9D174D', letterSpacing: '-0.02em' }}>Waly</span>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fff', border: '1px solid #FAD1E5', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(236,72,153,0.25)' }}>
+            <Brush size={19} strokeWidth={2.2} style={{ color: '#EC4899' }} />
+          </div>
+          <span style={{ fontSize: 20, fontWeight: 700, color: '#9D174D', letterSpacing: '-0.02em' }}>Arteluk</span>
         </div>
-        <p style={{ fontSize: 13, color: '#64748B', marginBottom: 24 }}>Conecta tu WhatsApp para activar el asistente</p>
+        <p style={{ fontSize: 13, color: '#B0708C', marginBottom: 24 }}>Conecta el WhatsApp de Arteluk para empezar</p>
 
         {qrPng ? (
           <>
@@ -44,7 +47,7 @@ export default function Home() {
               <img src={qrPng} alt="Código QR de WhatsApp" width={280} height={280} style={{ display: 'block', borderRadius: 6 }} />
             </div>
             <ol style={{ textAlign: 'left', fontSize: 13, color: '#334155', lineHeight: 1.7, paddingLeft: 20, margin: 0 }}>
-              <li>Abre <strong>WhatsApp</strong> en el teléfono de la clínica</li>
+              <li>Abre <strong>WhatsApp</strong> en el teléfono de Mary</li>
               <li>Toca <strong>Ajustes → Dispositivos vinculados</strong></li>
               <li>Toca <strong>Vincular un dispositivo</strong> y escanea este código</li>
             </ol>

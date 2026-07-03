@@ -77,7 +77,7 @@ export default function ConexionPage() {
                     <img src={qrPng} alt="QR de WhatsApp" width={260} height={260} style={{ display: 'block', borderRadius: 6 }} />
                   </div>
                   <ol style={{ textAlign: 'left', fontSize: 13, color: '#334155', lineHeight: 1.7, paddingLeft: 20, margin: '0 0 8px' }}>
-                    <li>Abre <strong>WhatsApp</strong> en el teléfono de la clínica</li>
+                    <li>Abre <strong>WhatsApp</strong> en el teléfono de Mary</li>
                     <li><strong>Ajustes → Dispositivos vinculados → Vincular un dispositivo</strong></li>
                     <li>Escanea este código</li>
                   </ol>
