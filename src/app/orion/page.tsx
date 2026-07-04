@@ -32,7 +32,7 @@ export default function LeadsPage() {
   const grouped = LEAD_COLUMN_ORDER.reduce<Record<LeadEstado, Lead[]>>((acc, e) => { acc[e] = leads.filter(l => l.estado === e); return acc; }, {} as Record<LeadEstado, Lead[]>);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor: '#FAD1E5' }}>

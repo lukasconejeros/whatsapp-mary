@@ -126,7 +126,7 @@ export default function CalendarioPage() {
   const monthName = capital(new Date(cursor.y, cursor.m, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }))
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="flex items-center gap-3 shrink-0" style={{ minHeight: 48, padding: '6px 20px', background: '#FFFFFF', borderBottom: '1px solid #FAD1E5', flexWrap: 'wrap' }}>
@@ -172,7 +172,7 @@ export default function CalendarioPage() {
                     const isSel = f === sel
                     const evs = eventosDe(f)
                     return (
-                      <button key={i} onClick={() => setSel(f)}
+                      <button key={i} onClick={() => setSel(f)} className="cal-cell"
                         style={{ position: 'relative', minHeight: 92, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
                           padding: '5px 5px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
                           border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #FDE7F1' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #FDE7F1' : 'none',
@@ -181,18 +181,29 @@ export default function CalendarioPage() {
                         <span style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 999, padding: '0 4px',
                           fontSize: 11, fontWeight: isHoy ? 800 : 600,
                           background: isHoy ? '#EC4899' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#374151' : '#DBAFC6' }}>{cell.getDate()}</span>
-                        {evs.slice(0, 3).map(c => {
-                          const pc = profeColor(c.profe)
-                          const label = c.nota || (c.alumnos.length ? c.alumnos.map(etiquetaAlumno).join(', ') : c.profe)
-                          return (
-                            <span key={c.id} title={`${c.hora ?? ''} ${c.profe} ${label}`.trim()}
-                              style={{ display: 'block', fontSize: 10, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                background: pc.bg, color: '#3f2a35', borderLeft: `3px solid ${pc.color}`, borderRadius: 5, padding: '2px 5px' }}>
-                              {c.hora ? <b style={{ color: pc.color }}>{c.hora}</b> : null} {label}
-                            </span>
-                          )
-                        })}
-                        {evs.length > 3 && <span style={{ fontSize: 10, color: '#B0708C', paddingLeft: 3 }}>+{evs.length - 3} más</span>}
+                        {/* Etiquetas completas (PC) */}
+                        <div className="cal-ev-full" style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                          {evs.slice(0, 3).map(c => {
+                            const pc = profeColor(c.profe)
+                            const label = c.nota || (c.alumnos.length ? c.alumnos.map(etiquetaAlumno).join(', ') : c.profe)
+                            return (
+                              <span key={c.id} title={`${c.hora ?? ''} ${c.profe} ${label}`.trim()}
+                                style={{ display: 'block', fontSize: 10, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                  background: pc.bg, color: '#3f2a35', borderLeft: `3px solid ${pc.color}`, borderRadius: 5, padding: '2px 5px' }}>
+                                {c.hora ? <b style={{ color: pc.color }}>{c.hora}</b> : null} {label}
+                              </span>
+                            )
+                          })}
+                          {evs.length > 3 && <span style={{ fontSize: 10, color: '#B0708C', paddingLeft: 3 }}>+{evs.length - 3} más</span>}
+                        </div>
+                        {/* Puntos de color (teléfono): mantiene todas las celdas de la misma altura */}
+                        {evs.length > 0 && (
+                          <div className="cal-ev-dots">
+                            {evs.slice(0, 6).map(c => (
+                              <span key={c.id} style={{ width: 6, height: 6, borderRadius: '50%', background: profeColor(c.profe).color, display: 'inline-block' }} />
+                            ))}
+                          </div>
+                        )}
                       </button>
                     )
                   })}

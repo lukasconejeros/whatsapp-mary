@@ -46,7 +46,7 @@ export default function ConfiguracionPage() {
   const tecnicas = bloques.map((b, i) => ({ b, i })).filter(x => x.b.tipo === 'seccion' && (x.b as { tecnica: boolean }).tecnica)
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center" style={{ background: '#FFF4FA' }}>
+    <div className="flex h-screen items-center justify-center" style={{ background: '#FFFFFF' }}>
       <div className="flex items-center gap-2" style={{ color: '#F7CFE1' }}>
         <RefreshCw size={13} className="spin" /><span style={{ fontSize: 13 }}>Cargando...</span>
       </div>
@@ -54,7 +54,7 @@ export default function ConfiguracionPage() {
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Topbar */}

@@ -112,7 +112,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         </span>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FFF4FA' }}>
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FFFFFF' }}>
         {loading ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:6,color:'#94A3B8' }}>
             <div style={{ width:13,height:13,border:'2px solid #FAD1E5',borderTopColor:'#EC4899',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
@@ -138,7 +138,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
                     {showName && <p style={{fontSize:11,color:'#94A3B8',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
                     <div style={{ borderRadius:12, padding:'8px 12px', fontSize:13, lineHeight:1.55,
                       ...(isOut ? { background:'#EC4899', color:'#fff', borderBottomRightRadius:4 }
-                               : { background:'#FFFFFF', color:'#0F172A', border:'1px solid #FAD1E5', borderBottomLeftRadius:4 }) }}>
+                               : { background:'#FFF4FA', color:'#0F172A', border:'1px solid #FAD1E5', borderBottomLeftRadius:4 }) }}>
                       {m.media && (
                         <div style={{ marginBottom: showText(m) ? 6 : 0 }}>
                           {/\.(ogg|opus|mp3|m4a)$/i.test(m.media)

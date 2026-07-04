@@ -41,7 +41,7 @@ export default function ConexionPage() {
       : { color: '#B45309', bg: '#FFFBEB', bd: '#FDE68A', Icon: WifiOff, label: 'Desconectado' }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="flex items-center shrink-0" style={{ height: 56, padding: '0 28px', background: '#fff', borderBottom: '1px solid #FAD1E5' }}>

@@ -78,7 +78,7 @@ export default function FinanzasPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FFF4FA' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Cabecera con selector de mes */}

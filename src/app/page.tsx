@@ -30,7 +30,7 @@ export default function Home() {
   }, [router])
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFF4FA', fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
       <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #FAD1E5', boxShadow: '0 4px 24px rgba(30,58,95,0.08)', padding: '36px 40px', maxWidth: 420, textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 6 }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fff', border: '1px solid #FAD1E5', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(236,72,153,0.25)' }}>

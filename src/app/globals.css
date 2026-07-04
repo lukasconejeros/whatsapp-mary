@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg:          #FFF4FA;
+  --color-bg:          #FFFFFF;
   --color-surface:     #FFFFFF;
   --color-border:      #FAD1E5;
   --color-border-soft: #FDE7F1;
@@ -136,10 +136,19 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .cal-detail { width: 100%; position: static; }
 }
 
+/* Puntos de color por evento (solo teléfono): mantienen las celdas del mes de
+   igual altura para que la grilla no se vea desalineada/asimétrica. */
+.cal-ev-dots { display: none; }
+@media (max-width: 767px) {
+  .cal-cell { min-height: 0 !important; height: 58px !important; padding: 4px !important; overflow: hidden; }
+  .cal-cell .cal-ev-full { display: none !important; }
+  .cal-cell .cal-ev-dots { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 2px; }
+}
+
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #FAD1E5; min-height: 0; }
-.chat-detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #FFF4FA; }
+.chat-detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #FFFFFF; }
 .chat-back { display: none; }
 
 @media (max-width: 767px) {
