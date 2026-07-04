@@ -40,6 +40,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
+  const [tip, setTip] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const ch = CHANNEL_CONFIG[conv.channel]
@@ -54,11 +55,22 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   async function suggest() {
     if (suggesting || msgs.length === 0) return
     setSuggesting(true)
+    setTip('')
+    // Días desde el último mensaje de la conversación (para detectar silencio).
+    const ultimo = msgs[msgs.length - 1]
+    const ultimoTs = ultimo ? (typeof ultimo.createdAt === 'number' ? ultimo.createdAt * 1000 : new Date(ultimo.createdAt).getTime()) : Date.now()
+    const diasSinResponder = Math.floor((Date.now() - ultimoTs) / 86400000)
     try {
       const r = await fetch('/api/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: msgs.slice(-10).map(m => ({ role: m.senderType === 'user' ? 'user' : 'assistant', content: m.content })), contactName: conv.contact.name }) })
+        body: JSON.stringify({
+          messages: msgs.slice(-10).map(m => ({ role: m.senderType === 'user' ? 'user' : 'assistant', content: m.content })),
+          contactName: conv.contact.name,
+          categoria: conv.categoria,
+          diasSinResponder,
+        }) })
       const d = await r.json()
       if (d.ok && d.suggestion) setReply(d.suggestion)
+      if (d.ok && d.tip) setTip(d.tip)
     } finally { setSuggesting(false) }
   }
 
@@ -151,10 +163,17 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       </div>
 
       <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #FDE7F1',flexShrink:0 }}>
+        {tip && (
+          <div style={{ display:'flex',alignItems:'flex-start',gap:6,padding:'7px 10px',borderRadius:9,border:'1px solid #FAD1E5',background:'#FFF7FB',color:'#9D174D',fontSize:12,lineHeight:1.45 }}>
+            <span style={{ flexShrink:0 }}>💡</span>
+            <span style={{ flex:1 }}>{tip}</span>
+            <button type="button" onClick={()=>setTip('')} title="Ocultar" style={{ flexShrink:0,background:'none',border:'none',cursor:'pointer',color:'#C0879F',fontSize:14,lineHeight:1,padding:0 }}>×</button>
+          </div>
+        )}
         {!conv.botActive && (
           <button type="button" onClick={suggest} disabled={suggesting}
             style={{ alignSelf:'flex-start',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FAD1E5',background:'#FDE7F1',color:'#EC4899',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
-            {suggesting ? '⟳ Pensando...' : '✦ Sugerir respuesta'}
+            {suggesting ? '⟳ Pensando...' : '✦ Sugerir respuesta y consejo'}
           </button>
         )}
         <div style={{ display:'flex',alignItems:'flex-end',gap:8,position:'relative' }}>
