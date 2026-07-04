@@ -30,12 +30,18 @@ export default function AppNav() {
     poll(); const t = setInterval(poll, 4000); return () => { mounted = false; clearInterval(t) }
   }, [])
 
+  // En el Asistente y en Chats hay un botón de enviar abajo a la derecha; ahí el
+  // pincel flotante lo tapaba (sobre todo en el teléfono), así que no se muestra.
+  const ocultarFab = path.startsWith('/asistente') || path.startsWith('/inbox')
+
   return (
     <>
-    {/* Botón flotante del Asistente IA: pincel brillante, siempre visible */}
-    <Link href="/asistente" className="asistente-fab" aria-label="Asistente IA" title="Asistente IA">
-      <Brush size={24} strokeWidth={2.2} />
-    </Link>
+    {/* Botón flotante del Asistente IA: pincel brillante */}
+    {!ocultarFab && (
+      <Link href="/asistente" className="asistente-fab" aria-label="Asistente IA" title="Asistente IA">
+        <Brush size={24} strokeWidth={2.2} />
+      </Link>
+    )}
 
     <nav className="app-sidebar flex flex-col h-full shrink-0"
       style={{ width: 212, background: '#FFFFFF', borderRight: '1px solid #FAD1E5' }}>
