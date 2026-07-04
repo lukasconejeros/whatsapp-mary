@@ -55,6 +55,8 @@ export interface OutboxItem {
   conversation_id: number;
   phone: string;
   content: string;
+  kind: "text" | "image"; // 'image' → content es el caption y media el archivo a enviar
+  media: string | null;   // nombre del archivo en data/media (solo para kind='image')
   sent: number;
   created_at: number;
 }
@@ -97,6 +99,8 @@ CREATE TABLE IF NOT EXISTS outbox (
   conversation_id INTEGER NOT NULL,
   phone TEXT NOT NULL,
   content TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'text',
+  media TEXT,
   sent INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
@@ -184,6 +188,22 @@ CREATE TABLE IF NOT EXISTS chat_mensajes (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_chat_mensajes_created ON chat_mensajes(created_at);
+
+-- Feedbacks/felicitaciones que Mary manda a los apoderados desde el Asistente.
+-- estado: 'borrador' (esperando confirmación) | 'ambiguo' (varios candidatos) |
+--         'sin_destinatario' (no se encontró) | 'enviado' | 'cancelado'.
+CREATE TABLE IF NOT EXISTS feedbacks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  destinatario TEXT,          -- término que Mary usó ("Amparo", "la mamá de Amparo")
+  cliente_telefono TEXT,      -- resuelto (si hay 1 match)
+  cliente_nombre TEXT,        -- nombre del apoderado resuelto
+  mensaje TEXT NOT NULL,      -- texto que se le manda al apoderado
+  fotos TEXT,                 -- JSON array de nombres de archivo en data/media
+  estado TEXT NOT NULL DEFAULT 'borrador',
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  sent_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_feedbacks_estado ON feedbacks(estado, created_at);
 `;
 
 interface Ctx {
@@ -265,6 +285,16 @@ function build(): Ctx {
   }
   db.exec("CREATE INDEX IF NOT EXISTS idx_clases_fecha ON clases(fecha)");
 
+  // micro-migración outbox: kind ('text'|'image') + media (archivo a enviar) para
+  // poder mandar FOTOS y no solo texto. Bases viejas solo tenían texto.
+  const outCols = db.prepare("PRAGMA table_info(outbox)").all() as { name: string }[];
+  if (!outCols.some((c) => c.name === "kind")) {
+    db.exec("ALTER TABLE outbox ADD COLUMN kind TEXT NOT NULL DEFAULT 'text'");
+  }
+  if (!outCols.some((c) => c.name === "media")) {
+    db.exec("ALTER TABLE outbox ADD COLUMN media TEXT");
+  }
+
   return {
     db,
     getConvByPhone: db.prepare("SELECT * FROM conversations WHERE phone = ?"),
@@ -298,10 +328,10 @@ function build(): Ctx {
       "UPDATE connection_state SET status = ?, qr_string = ?, phone = ?, updated_at = unixepoch() WHERE id = 1"
     ),
     enqueueOutboxStmt: db.prepare(
-      "INSERT INTO outbox (conversation_id, phone, content) VALUES (?, ?, ?)"
+      "INSERT INTO outbox (conversation_id, phone, content, kind, media) VALUES (?, ?, ?, ?, ?)"
     ),
     getPendingOutboxStmt: db.prepare(
-      "SELECT * FROM outbox WHERE sent = 0 ORDER BY created_at ASC LIMIT ?"
+      "SELECT * FROM outbox WHERE sent = 0 ORDER BY created_at ASC, id ASC LIMIT ?"
     ),
     markSentStmt: db.prepare("UPDATE outbox SET sent = 1 WHERE id = ?"),
     deleteMsgs: db.prepare("DELETE FROM messages WHERE conversation_id = ?"),
@@ -431,9 +461,12 @@ export function setConnectionState(input: {
 export function enqueueOutbox(
   conversationId: number,
   phone: string,
-  content: string
+  content: string,
+  opts?: { kind?: "text" | "image"; media?: string | null }
 ): number {
-  const result = ctx().enqueueOutboxStmt.run(conversationId, phone, content);
+  const kind = opts?.kind ?? "text";
+  const media = opts?.media ?? null;
+  const result = ctx().enqueueOutboxStmt.run(conversationId, phone, content, kind, media);
   return result.lastInsertRowid as number;
 }
 
@@ -829,4 +862,80 @@ export function listChatMensajes(limit = 50): ChatMensaje[] {
     .prepare("SELECT * FROM chat_mensajes ORDER BY id DESC LIMIT ?")
     .all(limit) as ChatMensaje[];
   return rows.reverse();
+}
+
+// ── Feedbacks: mensajes con fotos que Mary manda a los apoderados ──────────
+
+export type FeedbackEstado =
+  | "borrador" | "ambiguo" | "sin_destinatario" | "enviado" | "cancelado";
+
+export interface Feedback {
+  id: number;
+  destinatario: string | null;
+  cliente_telefono: string | null;
+  cliente_nombre: string | null;
+  mensaje: string;
+  fotos: string[];        // nombres de archivo en data/media
+  estado: FeedbackEstado;
+  created_at: number;
+  sent_at: number | null;
+}
+
+interface FeedbackRow extends Omit<Feedback, "fotos"> { fotos: string | null }
+function parseFeedback(r: FeedbackRow): Feedback {
+  let fotos: string[] = [];
+  if (r.fotos) { try { fotos = JSON.parse(r.fotos) as string[]; } catch { fotos = []; } }
+  return { ...r, fotos };
+}
+
+// Marca como 'cancelado' cualquier borrador pendiente (borrador/ambiguo/sin_destinatario).
+// Se llama antes de crear uno nuevo: solo hay UN feedback en preparación a la vez.
+export function cancelarBorradoresPendientes(): void {
+  ctx().db
+    .prepare("UPDATE feedbacks SET estado='cancelado' WHERE estado IN ('borrador','ambiguo','sin_destinatario')")
+    .run();
+}
+
+// El borrador en preparación más reciente (no enviado ni cancelado). null si no hay.
+export function getBorradorPendiente(): Feedback | null {
+  const r = ctx().db
+    .prepare("SELECT * FROM feedbacks WHERE estado IN ('borrador','ambiguo','sin_destinatario') ORDER BY id DESC LIMIT 1")
+    .get() as FeedbackRow | undefined;
+  return r ? parseFeedback(r) : null;
+}
+
+export function crearBorradorFeedback(d: {
+  destinatario?: string;
+  cliente_telefono?: string | null;
+  cliente_nombre?: string | null;
+  mensaje: string;
+  fotos?: string[];
+  estado?: FeedbackEstado;
+}): number {
+  const r = ctx().db
+    .prepare(`INSERT INTO feedbacks (destinatario, cliente_telefono, cliente_nombre, mensaje, fotos, estado)
+              VALUES (?,?,?,?,?,?)`)
+    .run(
+      d.destinatario ?? null,
+      d.cliente_telefono ?? null,
+      d.cliente_nombre ?? null,
+      d.mensaje,
+      JSON.stringify(d.fotos ?? []),
+      d.estado ?? "borrador"
+    );
+  return r.lastInsertRowid as number;
+}
+
+export function marcarFeedbackEnviado(id: number): void {
+  ctx().db
+    .prepare("UPDATE feedbacks SET estado='enviado', sent_at=unixepoch() WHERE id=?")
+    .run(id);
+}
+
+// Historial de feedbacks enviados (para la pantalla "lo que va enviando").
+export function listFeedbacksEnviados(limit = 100): Feedback[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM feedbacks WHERE estado='enviado' ORDER BY sent_at DESC, id DESC LIMIT ?")
+    .all(limit) as FeedbackRow[];
+  return rows.map(parseFeedback);
 }

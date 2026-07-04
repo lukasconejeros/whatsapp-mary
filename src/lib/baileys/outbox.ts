@@ -1,12 +1,17 @@
-import type { WASocket } from "@whiskeysockets/baileys";
+import type { WASocket, AnyMessageContent } from "@whiskeysockets/baileys";
 import {
   getPendingOutbox,
   getConversationById,
   markOutboxSent,
 } from "../db.js";
 import pino from "pino";
+import fs from "fs";
+import path from "path";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
+
+// Carpeta de medios (misma que usa el handler al recibir). Persiste en el volumen.
+const MEDIA_DIR = path.resolve(process.cwd(), "data/media");
 
 let outboxTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -20,9 +25,27 @@ export function startOutboxLoop(sock: WASocket): void {
         const convo = getConversationById(item.conversation_id);
         // Use stored jid to support @lid addresses; fallback to @s.whatsapp.net
         const jid = convo?.jid ?? `${item.phone}@s.whatsapp.net`;
-        await sock.sendMessage(jid, { text: item.content });
+        // kind='image' → mandar la foto (content es el caption, opcional).
+        // Cualquier otro valor (incl. 'text' o null en filas viejas) → texto.
+        let payload: AnyMessageContent;
+        if (item.kind === "image" && item.media) {
+          const file = path.join(MEDIA_DIR, item.media);
+          if (!fs.existsSync(file)) {
+            // Archivo perdido: no reintentar para siempre; marcar como enviado y seguir.
+            logger.warn({ id: item.id, media: item.media }, "Outbox: foto no encontrada, se omite");
+            markOutboxSent(item.id);
+            continue;
+          }
+          const buffer = fs.readFileSync(file);
+          payload = item.content
+            ? { image: buffer, caption: item.content }
+            : { image: buffer };
+        } else {
+          payload = { text: item.content };
+        }
+        await sock.sendMessage(jid, payload);
         markOutboxSent(item.id);
-        logger.debug({ id: item.id, jid }, "Outbox mensaje enviado");
+        logger.debug({ id: item.id, jid, kind: item.kind }, "Outbox mensaje enviado");
       } catch (err) {
         // Leave sent=0 so it retries on next tick
         logger.error({ err, id: item.id }, "Error enviando outbox item");

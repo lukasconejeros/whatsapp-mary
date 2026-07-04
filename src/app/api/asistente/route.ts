@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addChatMensaje, listChatMensajes, addIngreso, addCosto, addClase } from "@/lib/db";
 import { procesarMensaje } from "@/lib/asistente";
+import { prepararEnvio, ejecutarEnvio } from "@/lib/feedback";
 import { nowSantiago } from "@/lib/fechas";
 import { diaFromFecha } from "@/lib/calendario";
 
@@ -13,16 +14,20 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   let texto: string;
+  let fotos: string[] = [];
 
   try {
-    const b = (await req.json()) as { texto?: string; origen?: string };
-    if (!b.texto || typeof b.texto !== "string" || !b.texto.trim()) {
+    const b = (await req.json()) as { texto?: string; origen?: string; fotos?: string[] };
+    fotos = Array.isArray(b.fotos) ? b.fotos.filter((f) => typeof f === "string") : [];
+    const t = typeof b.texto === "string" ? b.texto.trim() : "";
+    // Permitir mensaje solo-fotos (sin texto): la IA preguntará a quién se lo mando.
+    if (!t && fotos.length === 0) {
       return NextResponse.json(
         { ok: false, error: "texto es requerido" },
         { status: 400 }
       );
     }
-    texto = b.texto.trim();
+    texto = t || "(te envío unas fotos)";
   } catch {
     return NextResponse.json(
       { ok: false, error: "JSON inválido" },
@@ -35,11 +40,27 @@ export async function POST(req: NextRequest) {
 
   let accion;
   try {
-    accion = await procesarMensaje(texto);
+    accion = await procesarMensaje(texto, { fotos: fotos.length });
   } catch (e) {
     const msg = "Uy, no pude pensar la respuesta ahora. Intenta de nuevo en un ratito.";
     addChatMensaje("asistente", msg);
     return NextResponse.json({ ok: false, respuesta: msg, error: String(e) }, { status: 502 });
+  }
+
+  // Feedback con fotos: preparar (resuelve el contacto) o enviar (encola fotos+texto).
+  // La respuesta se CONSTRUYE en el backend (con el nombre real del contacto), no la
+  // improvisa la IA — así Mary ve siempre a quién y qué se manda.
+  let enviado = false;
+  if (accion.accion === "preparar_envio") {
+    const r = prepararEnvio({ destinatario: accion.destinatario, mensaje: accion.mensaje, fotos });
+    addChatMensaje("asistente", r.respuesta);
+    return NextResponse.json({ ok: true, respuesta: r.respuesta, preparado: true });
+  }
+  if (accion.accion === "enviar") {
+    const r = ejecutarEnvio();
+    enviado = r.ok;
+    addChatMensaje("asistente", r.respuesta);
+    return NextResponse.json({ ok: true, respuesta: r.respuesta, enviado });
   }
 
   // Si la IA quiere registrar, va al MISMO lugar que los botones (ingresos/costos),

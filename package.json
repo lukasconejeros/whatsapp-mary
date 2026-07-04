@@ -19,6 +19,7 @@
     "pull:airtable": "tsx scripts/pull-airtable.ts",
     "import:contactos": "tsx scripts/import-contactos-arteluk.ts",
     "test:contactos": "tsx scripts/test-contactos.ts",
+    "test:feedback": "tsx scripts/test-feedback.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },

@@ -6,7 +6,7 @@ const MODEL = "claude-sonnet-4-6";
 const WHISPER_URL = "https://api.openai.com/v1/audio/transcriptions";
 
 export interface AccionIA {
-  accion: "registrar" | "responder" | "agendar";
+  accion: "registrar" | "responder" | "agendar" | "preparar_envio" | "enviar";
   tipo?: "gasto" | "ingreso";
   monto?: number;
   categoria?: string;
@@ -17,7 +17,10 @@ export interface AccionIA {
   profe?: string;   // Mary | Paula | Lusmaría
   alumnos?: string; // nombres separados por coma, o descripción de cantidad ("3 niñas")
   titulo?: string;  // taller o motivo del evento
-  respuesta: string;
+  // Campos de ENVIAR FEEDBACK a un apoderado:
+  destinatario?: string; // término a buscar ("Amparo", "la mamá de Amparo")
+  mensaje?: string;      // texto redactado para el apoderado
+  respuesta: string;     // lo que se le muestra a Mary
 }
 
 export function parseAccionIA(raw: string): AccionIA {
@@ -57,6 +60,17 @@ export function parseAccionIA(raw: string): AccionIA {
       respuesta,
     };
   }
+  if (obj.accion === "preparar_envio") {
+    return {
+      accion: "preparar_envio",
+      destinatario: typeof obj.destinatario === "string" ? obj.destinatario : undefined,
+      mensaje: typeof obj.mensaje === "string" ? obj.mensaje : undefined,
+      respuesta,
+    };
+  }
+  if (obj.accion === "enviar") {
+    return { accion: "enviar", respuesta };
+  }
   return { accion: "responder", respuesta };
 }
 
@@ -95,10 +109,16 @@ export function construirContexto(mes = monthSantiago()): string {
 
 const SYSTEM = `Eres el asistente de finanzas y calendario de Mary, que tiene una academia de arte (Arteluk) en Chile. Hablas en español chileno con tuteo, cálido y breve.
 
-Tu trabajo es TRES cosas:
+Tu trabajo es CUATRO cosas:
 1) REGISTRAR un gasto o ingreso cuando Mary te lo cuenta (ej: "gasté 5 lucas en pinturas", "me pagaron 30 mil de la clase").
 2) AGENDAR una clase o evento en el calendario cuando Mary te lo pide (ej: "el sábado Paula tiene clase con 3 niñas", "agenda óleo el 12 a las 10").
 3) RESPONDER preguntas sobre finanzas (gastos, ingresos, saldo, por categoría) y calendario (clases, profes, alumnos) usando SOLO los datos del CONTEXTO. Si el dato no está en el contexto, dilo con honestidad; nunca inventes cifras.
+4) ENVIAR UN MENSAJE (con o sin fotos) a un apoderado cuando Mary quiere felicitar o avisar algo de un niño (ej: "mándale un mensaje a la mamá de Amparo, se portó muy bien e hicimos un cuadro precioso, estas son las fotos").
+   - REDACTA un mensaje cálido, cercano y CORTO (máx 2-3 frases) para el apoderado, usando el nombre del niño. SIN EXAGERAR: nada de superlativos falsos, promesas ni "el mejor del mundo". Suena natural y honesto. 1-2 emojis suaves como mucho. Firma como "Mary de Arteluk" si queda natural.
+   - Identifica el DESTINATARIO: extrae SOLO el nombre que Mary menciona, del niño o del apoderado (ej: "la mamá de Amparo" → destinatario "Amparo"; "el papá de Diego Torres" → "Diego Torres"). Sin la palabra "mamá/papá".
+   - Primero PREPARA (accion "preparar_envio") con el destinatario y el mensaje redactado. NO lo envíes todavía.
+   - Cuando Mary confirme en su mensaje siguiente ("sí", "dale", "envíalo", "correcto"), usa accion "enviar". Si Mary corrige el texto o el destinatario, vuelve a "preparar_envio".
+   - Si Mary adjuntó fotos (te aviso con "[adjuntó N foto(s)]"), casi seguro quiere ENVIAR un mensaje con esas fotos: usa "preparar_envio". Si no dijo para quién, pregúntale con accion "responder".
 
 INTERPRETACIÓN DE MONTOS CHILENOS (en pesos CLP, número entero):
 - "5 lucas" o "5 luca" = 5000
@@ -126,9 +146,15 @@ IMPORTANTE: la "respuesta" debe ser MUY corta, máximo 1 o 2 frases. Nada de exp
 Devuelve SIEMPRE y SOLO un JSON (sin texto antes ni después), con una de estas formas:
 - Para registrar: {"accion":"registrar","tipo":"gasto"|"ingreso","monto":<entero>,"categoria":"<corta>","descripcion":"<breve>","respuesta":"<confirmación cálida y breve>"}
 - Para agendar: {"accion":"agendar","fecha":"YYYY-MM-DD","hora":"HH:MM","profe":"Mary|Paula|Lusmaría","alumnos":"<nombres separados por coma o cantidad>","titulo":"<taller o motivo>","respuesta":"<confirmación cálida y breve>"}
+- Para preparar un envío a un apoderado: {"accion":"preparar_envio","destinatario":"<nombre a buscar>","mensaje":"<mensaje redactado para el apoderado>","respuesta":"<breve, ej: 'Le escribí esto, ¿lo envío?'>"}
+- Para enviar (tras la confirmación de Mary): {"accion":"enviar","respuesta":"<confirmación breve>"}
 - Para responder: {"accion":"responder","respuesta":"<respuesta breve usando solo el contexto>"}`;
 
-export async function procesarMensaje(texto: string, mes = monthSantiago()): Promise<AccionIA> {
+export async function procesarMensaje(
+  texto: string,
+  opts: { fotos?: number; mes?: string } = {}
+): Promise<AccionIA> {
+  const mes = opts.mes ?? monthSantiago();
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("Falta ANTHROPIC_API_KEY");
   const contexto = construirContexto(mes);
@@ -144,6 +170,15 @@ export async function procesarMensaje(texto: string, mes = monthSantiago()): Pro
   }
   while (messages.length && messages[0].role === "assistant") messages.shift();
   if (messages.length === 0) messages.push({ role: "user", content: texto });
+
+  // Pista de fotos adjuntas: se la añadimos al último mensaje de Mary para que la
+  // IA sepa que probablemente quiere enviar un feedback con esas fotos.
+  if (opts.fotos && opts.fotos > 0) {
+    const last = messages[messages.length - 1];
+    const hint = ` [adjuntó ${opts.fotos} foto${opts.fotos > 1 ? "s" : ""}]`;
+    if (last && last.role === "user") last.content += hint;
+    else messages.push({ role: "user", content: texto + hint });
+  }
 
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
