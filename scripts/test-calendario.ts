@@ -12,7 +12,7 @@ console.log("\n🧪 TEST calendario\n");
 
 check("DIAS = Lun..Sab (6)", DIAS.length === 6 && DIAS[0] === "Lunes" && DIAS[5] === "Sabado");
 check("DIA_LABEL pone tilde", DIA_LABEL["Miercoles"] === "Miércoles" && DIA_LABEL["Sabado"] === "Sábado");
-check("PROFES = 3 con color", PROFES.length === 3 && PROFES.every(p => /^#/.test(p.color)));
+check("PROFES = 2 (Mary y Paula) con color", PROFES.length === 2 && PROFES.every(p => /^#/.test(p.color)));
 
 // CRUD de clases
 const cid = addClase({ dia: "Lunes", profe: "Mary", hora: "16:00", alumnos: [1, 2], nota: "x" });
