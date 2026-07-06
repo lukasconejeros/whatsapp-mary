@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
-import { enviarPush } from "@/lib/push";
 import { listPushSubs } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +15,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "no" }, { status: 401 });
   }
 
-  // ?test=push → manda una notificación de PRUEBA a los dispositivos suscritos.
+  // ?test=push → manda una notificación de PRUEBA y REPORTA el resultado real de cada
+  // envío (código de estado del servicio de push + error), para diagnosticar la entrega.
   if (req.nextUrl.searchParams.get("test") === "push") {
-    const n = listPushSubs().length;
-    await enviarPush({ titulo: "Prueba Arteluk 🎨", cuerpo: "Si ves esto, las notificaciones funcionan.", url: "/inbox" });
-    return NextResponse.json({ ok: true, enviadoA: n });
+    const subs = listPushSubs();
+    const webpush = (await import("web-push")).default;
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:x@arteluk.cl",
+      process.env.VAPID_PUBLIC_KEY || "",
+      process.env.VAPID_PRIVATE_KEY || ""
+    );
+    const payload = JSON.stringify({ titulo: "Prueba Arteluk 🎨", cuerpo: "Si ves esto, las notificaciones funcionan.", url: "/inbox" });
+    const resultados: unknown[] = [];
+    for (const s of subs) {
+      const servicio = s.endpoint.startsWith("https://web.push.apple.com") ? "apple/iOS"
+        : s.endpoint.includes("fcm") || s.endpoint.includes("google") ? "google/android"
+        : "otro";
+      try {
+        const r = await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
+        resultados.push({ ok: true, statusCode: r.statusCode, servicio });
+      } catch (e) {
+        const err = e as { statusCode?: number; body?: string; message?: string };
+        resultados.push({ ok: false, statusCode: err.statusCode ?? null, servicio, error: (err.body || err.message || "").slice(0, 200) });
+      }
+    }
+    return NextResponse.json({ ok: true, subs: subs.length, resultados });
   }
 
   const db = new Database(path.resolve(process.cwd(), "data/messages.db"), { readonly: true });
