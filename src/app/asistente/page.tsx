@@ -8,6 +8,24 @@ import { Send, Mic, Square, History, ImagePlus, X, MailCheck } from 'lucide-reac
 type Msg = { id: number; rol: 'user' | 'asistente'; texto: string; fotos?: string[] }
 type FotoAdjunta = { name: string; url: string; subiendo?: boolean }
 
+// Reconocimiento de voz nativo del navegador/teléfono (Web Speech API). No necesita
+// ninguna clave ni servicio pago: usa el motor de dictado del propio dispositivo.
+type SRResult = { transcript: string }
+type SRResultList = ArrayLike<ArrayLike<SRResult> & { isFinal: boolean }>
+type SREvent = { resultIndex: number; results: SRResultList }
+interface SpeechRec {
+  lang: string; interimResults: boolean; continuous: boolean
+  onresult: ((e: SREvent) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start: () => void; stop: () => void
+}
+function getSpeechRecognition(): (new () => SpeechRec) | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
+
 export default function AsistentePage() {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [texto, setTexto] = useState('')
@@ -15,6 +33,7 @@ export default function AsistentePage() {
   const [grabando, setGrabando] = useState(false)
   const [fotos, setFotos] = useState<FotoAdjunta[]>([])
   const recRef = useRef<MediaRecorder | null>(null)
+  const srRef = useRef<SpeechRec | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const finRef = useRef<HTMLDivElement | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -75,9 +94,49 @@ export default function AsistentePage() {
 
   async function toggleMic() {
     if (grabando) {
+      srRef.current?.stop()
       recRef.current?.stop()
       return
     }
+
+    // 1) Dictado NATIVO del teléfono (sin token, gratis). Es lo que usa el teclado
+    //    de voz. Va escribiendo en el cuadro de texto y al terminar lo envía.
+    const SR = getSpeechRecognition()
+    if (SR) {
+      try {
+        const rec = new SR()
+        rec.lang = 'es-CL'
+        rec.interimResults = true
+        rec.continuous = false
+        let finalText = ''
+        rec.onresult = (e: SREvent) => {
+          let interim = ''
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const r = e.results[i]
+            const t = r[0].transcript
+            if (r.isFinal) finalText += t
+            else interim += t
+          }
+          setTexto((finalText + interim).trim())
+        }
+        rec.onerror = () => { setGrabando(false) }
+        rec.onend = () => {
+          setGrabando(false)
+          const t = finalText.trim()
+          setTexto('')
+          if (t) enviar(t, 'audio')
+        }
+        rec.start()
+        srRef.current = rec
+        setGrabando(true)
+        return
+      } catch {
+        setGrabando(false)
+      }
+    }
+
+    // 2) Respaldo (navegadores sin dictado nativo): graba y transcribe en el servidor
+    //    (esto sí necesita GROQ_API_KEY/OPENAI_API_KEY en el entorno).
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const rec = new MediaRecorder(stream)
