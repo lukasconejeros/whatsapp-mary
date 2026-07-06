@@ -108,8 +108,8 @@ export default function FinanzasPage() {
           </div>
           )}
 
-          {/* Pestañas */}
-          <div className="flex items-center gap-2" style={{ marginBottom: 14 }}>
+          {/* Pestañas (envuelven en pantalla angosta para no salirse) */}
+          <div className="flex items-center" style={{ marginBottom: 14, gap: 8, flexWrap: 'wrap' }}>
             {(['ganancias', 'costos', 'metricas'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); setOpenTipo(null) }}
                 style={{ padding: '6px 14px', borderRadius: 9, border: '1px solid #FAD1E5', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
@@ -117,10 +117,9 @@ export default function FinanzasPage() {
                 {t === 'ganancias' ? 'Ganancias' : t === 'costos' ? 'Costos' : 'Métricas'}
               </button>
             ))}
-            <div className="flex-1" />
             {tab !== 'metricas' && (
               <button onClick={openNew} className="flex items-center gap-1.5"
-                style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(236,72,153,0.3)' }}>
+                style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(236,72,153,0.3)', whiteSpace: 'nowrap' }}>
                 <Plus size={15} /> Agregar {tab === 'ganancias' ? 'ingreso' : 'costo'}
               </button>
             )}

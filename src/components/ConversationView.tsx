@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Conversation, Message, CHANNEL_CONFIG } from '@/lib/types'
-import { Send, Smile, Mic, Square } from 'lucide-react'
+import { Send, Smile, Mic, Trash2 } from 'lucide-react'
 import { ImageNote, AudioNote, VideoNote } from './MediaContent'
 import { Avatar } from './Avatar'
 
@@ -43,8 +43,11 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [tip, setTip] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [grabando, setGrabando] = useState(false)
+  const [segundos, setSegundos] = useState(0)
   const recRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const cancelRef = useRef(false)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const ch = CHANNEL_CONFIG[conv.channel]
 
@@ -90,17 +93,21 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     finally { setSending(false) }
   }
 
-  // Grabar y enviar una NOTA DE VOZ al contacto (no necesita transcripción).
-  async function toggleMic() {
-    if (grabando) { recRef.current?.stop(); return }
+  // NOTA DE VOZ al contacto (no necesita transcripción). Muestra que se está
+  // grabando (con cronómetro), permite CANCELAR o ENVIAR al soltar.
+  async function iniciarGrabacion() {
+    if (grabando) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const rec = new MediaRecorder(stream)
       chunksRef.current = []
+      cancelRef.current = false
       rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       rec.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
-        setGrabando(false)
+        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+        setGrabando(false); setSegundos(0)
+        if (cancelRef.current) { chunksRef.current = []; return } // cancelado: no se envía
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
         if (blob.size === 0) return
         setSending(true)
@@ -117,11 +124,15 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       }
       rec.start()
       recRef.current = rec
-      setGrabando(true)
+      setGrabando(true); setSegundos(0)
+      timerRef.current = setInterval(() => setSegundos(s => s + 1), 1000)
     } catch {
       setGrabando(false)
     }
   }
+  function enviarGrabacion() { cancelRef.current = false; recRef.current?.stop() }
+  function cancelarGrabacion() { cancelRef.current = true; recRef.current?.stop() }
+  const mmss = `${Math.floor(segundos / 60)}:${String(segundos % 60).padStart(2, '0')}`
 
   const grouped: { date: string; msgs: Message[] }[] = []
   msgs.filter(m=>!m.isPrivate&&m.content).forEach(m=>{
@@ -212,6 +223,23 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             {suggesting ? '⟳ Pensando...' : '✦ Sugerir respuesta y consejo'}
           </button>
         )}
+        {grabando ? (
+          <div style={{ display:'flex',alignItems:'center',gap:10,padding:'3px 2px' }}>
+            <button type="button" onClick={cancelarGrabacion} title="Cancelar audio"
+              style={{ width:40,height:40,borderRadius:'50%',border:'none',background:'#FEE2E2',color:'#DC2626',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Trash2 size={17}/>
+            </button>
+            <div style={{ flex:1,display:'flex',alignItems:'center',gap:8,fontSize:14,fontWeight:600,color:'#DC2626' }}>
+              <span className="pulse-red" style={{ width:10,height:10,borderRadius:'50%',background:'#DC2626',display:'inline-block',flexShrink:0 }}/>
+              <span>Grabando…</span>
+              <span style={{ marginLeft:'auto',color:'#9D174D',fontVariantNumeric:'tabular-nums' }}>{mmss}</span>
+            </div>
+            <button type="button" onClick={enviarGrabacion} title="Enviar audio"
+              style={{ width:42,height:42,borderRadius:'50%',border:'none',background:'#EC4899',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 4px 12px rgba(236,72,153,0.35)' }}>
+              <Send size={16}/>
+            </button>
+          </div>
+        ) : (
         <div style={{ display:'flex',alignItems:'flex-end',gap:8,position:'relative' }}>
           {showEmoji && (
             <div style={{ position:'absolute',bottom:42,left:0,background:'#fff',border:'1px solid #FAD1E5',borderRadius:12,padding:8,boxShadow:'0 8px 24px rgba(190,24,93,0.18)',display:'grid',gridTemplateColumns:'repeat(8, 1fr)',gap:2,width:290,maxHeight:190,overflowY:'auto',zIndex:20 }}>
@@ -234,15 +262,19 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             onFocus={e=>{e.target.style.borderColor='#EC4899';e.target.style.background='#fff'}}
             onBlur={e=>{e.target.style.borderColor='#FAD1E5';e.target.style.background='#FFF4FA'}}
           />
-          <button type="button" onClick={toggleMic} title={grabando?'Detener y enviar':'Grabar nota de voz'}
-            style={{ width:34,height:34,borderRadius:8,border:'none',background:grabando?'#DC2626':'#FAD1E5',color:grabando?'#fff':'#9D174D',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-            {grabando ? <Square size={15}/> : <Mic size={16}/>}
-          </button>
-          <button type="submit" disabled={!reply.trim()||sending}
-            style={{ width:34,height:34,borderRadius:8,border:'none',background:reply.trim()&&!sending?'#EC4899':'#FAD1E5',color:'#fff',cursor:reply.trim()&&!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-            <Send size={13}/>
-          </button>
+          {reply.trim() ? (
+            <button type="submit" disabled={sending}
+              style={{ width:38,height:38,borderRadius:'50%',border:'none',background:!sending?'#EC4899':'#FAD1E5',color:'#fff',cursor:!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Send size={15}/>
+            </button>
+          ) : (
+            <button type="button" onClick={iniciarGrabacion} title="Grabar nota de voz"
+              style={{ width:38,height:38,borderRadius:'50%',border:'none',background:'#EC4899',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Mic size={17}/>
+            </button>
+          )}
         </div>
+        )}
       </form>
     </div>
   )

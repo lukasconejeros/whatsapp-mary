@@ -177,7 +177,7 @@ export default function CalendarioPage() {
                           padding: '5px 5px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
                           border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #FDE7F1' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #FDE7F1' : 'none',
                           background: isSel ? '#FDE7F1' : inMonth ? '#fff' : '#FFF9FC',
-                          boxShadow: isSel ? 'inset 0 0 0 2px #EC4899' : 'none' }}>
+                          boxShadow: isSel && !isHoy ? 'inset 0 0 0 1.5px #F9A8D4' : 'none' }}>
                         <span style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 999, padding: '0 4px',
                           fontSize: 11, fontWeight: isHoy ? 800 : 600,
                           background: isHoy ? '#EC4899' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#374151' : '#DBAFC6' }}>{cell.getDate()}</span>
