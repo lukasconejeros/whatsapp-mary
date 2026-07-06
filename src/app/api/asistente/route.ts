@@ -4,6 +4,7 @@ import { procesarMensaje } from "@/lib/asistente";
 import { prepararEnvio, ejecutarEnvio } from "@/lib/feedback";
 import { nowSantiago } from "@/lib/fechas";
 import { diaFromFecha } from "@/lib/calendario";
+import { limitar } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const rl = limitar(req, "asistente"); if (rl) return rl;
   let texto: string;
   let fotos: string[] = [];
 
@@ -44,7 +46,8 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     const msg = "Uy, no pude pensar la respuesta ahora. Intenta de nuevo en un ratito.";
     addChatMensaje("asistente", msg);
-    return NextResponse.json({ ok: false, respuesta: msg, error: String(e) }, { status: 502 });
+    console.error("asistente:", e);
+    return NextResponse.json({ ok: false, respuesta: msg }, { status: 502 });
   }
 
   // Feedback con fotos: preparar (resuelve el contacto) o enviar (encola fotos+texto).

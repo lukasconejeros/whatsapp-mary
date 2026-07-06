@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { limitar } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ type Msg = { role: string; content: string };
 // Pensado sobre todo para leads de Meta y clientes que dejaron de responder.
 // (Antes usaba OpenRouter — key placeholder en prod, se caía. Ahora Anthropic directo.)
 export async function POST(req: NextRequest) {
+  const rl = limitar(req, "suggest"); if (rl) return rl;
   let body: { messages?: Msg[]; contactName?: string; categoria?: string; diasSinResponder?: number };
   try {
     body = (await req.json()) as typeof body;
@@ -73,7 +75,7 @@ Devuelve SIEMPRE y SOLO un JSON: {"suggestion":"<respuesta>","tip":"<consejo>"}`
       } catch { /* deja el texto crudo como suggestion */ }
     }
     return NextResponse.json({ ok: true, suggestion, tip });
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, error: "No se pudo generar la sugerencia" }, { status: 500 });
   }
 }

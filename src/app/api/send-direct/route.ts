@@ -16,8 +16,13 @@ export const dynamic = "force-dynamic";
  * entorno, el header debe coincidir (obligatorio en deploy público).
  */
 export async function POST(req: NextRequest) {
+  // Secreto OBLIGATORIO: sin él, este endpoint permitiría enviar WhatsApp a números
+  // arbitrarios desde el número del negocio. Si no está configurado, queda deshabilitado.
   const secret = process.env.SEND_DIRECT_SECRET;
-  if (secret && req.headers.get("x-send-secret") !== secret) {
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: "Endpoint deshabilitado (falta SEND_DIRECT_SECRET)" }, { status: 503 });
+  }
+  if (req.headers.get("x-send-secret") !== secret) {
     return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
   }
 

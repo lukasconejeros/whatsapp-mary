@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { limitar } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ const MEDIA_DIR = path.resolve(process.cwd(), "data/media");
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 
 export async function POST(req: NextRequest) {
+  const rl = limitar(req, "foto", 40); if (rl) return rl;
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof Blob)) {
@@ -30,7 +32,8 @@ export async function POST(req: NextRequest) {
     fs.mkdirSync(MEDIA_DIR, { recursive: true });
     fs.writeFileSync(path.join(MEDIA_DIR, name), buffer);
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+    console.error("foto:", e);
+    return NextResponse.json({ ok: false, error: "No se pudo guardar la foto" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, name });
 }

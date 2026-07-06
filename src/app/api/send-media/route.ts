@@ -4,6 +4,7 @@ import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { getConversationById, insertMessage, enqueueOutbox } from "@/lib/db";
+import { limitar } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ const MEDIA_DIR = path.resolve(process.cwd(), "data/media");
 const MAX_BYTES = 16 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
+  const rl = limitar(req, "send-media", 30); if (rl) return rl;
   const form = await req.formData();
   const file = form.get("file");
   const conversationId = Number(form.get("conversationId"));
@@ -73,7 +75,8 @@ export async function POST(req: NextRequest) {
     fs.mkdirSync(MEDIA_DIR, { recursive: true });
     fs.writeFileSync(path.join(MEDIA_DIR, name), buffer);
   } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+    console.error("send-media:", e);
+    return NextResponse.json({ ok: false, error: "No se pudo guardar el archivo" }, { status: 500 });
   }
 
   const kind = esAudio ? "audio" : "image";
