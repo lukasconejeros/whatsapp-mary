@@ -5,6 +5,7 @@ import { prepararEnvio, ejecutarEnvio } from "@/lib/feedback";
 import { nowSantiago } from "@/lib/fechas";
 import { diaFromFecha } from "@/lib/calendario";
 import { limitar } from "@/lib/ratelimit";
+import { esNombreMediaSeguro } from "@/lib/media-path";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const b = (await req.json()) as { texto?: string; origen?: string; fotos?: string[] };
-    fotos = Array.isArray(b.fotos) ? b.fotos.filter((f) => typeof f === "string") : [];
+    // Sólo nombres de archivo seguros (anti path traversal: nada de "../../.env").
+    fotos = Array.isArray(b.fotos) ? b.fotos.filter(esNombreMediaSeguro) : [];
     const t = typeof b.texto === "string" ? b.texto.trim() : "";
     // Permitir mensaje solo-fotos (sin texto): la IA preguntará a quién se lo mando.
     if (!t && fotos.length === 0) {
@@ -60,6 +62,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, respuesta: r.respuesta, preparado: true });
   }
   if (accion.accion === "enviar") {
+    // Gate determinista: aunque el modelo diga "enviar", NO se manda a un cliente real
+    // sin una confirmación explícita de Mary en su propio mensaje.
+    const confirmado = /\b(s[ií]|dale|env[ií]a(lo)?|conf[ií]rm(o|ado)?|correcto|ok|ya|hazlo|m[áa]ndal[oa])\b/i.test(texto);
+    if (!confirmado) {
+      const msg = "¿Confirmas que se lo envío? Respóndeme \"sí\" para mandarlo. 💌";
+      addChatMensaje("asistente", msg);
+      return NextResponse.json({ ok: true, respuesta: msg, preparado: true });
+    }
     const r = ejecutarEnvio();
     enviado = r.ok;
     addChatMensaje("asistente", r.respuesta);

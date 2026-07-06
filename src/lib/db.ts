@@ -671,13 +671,19 @@ export function setClienteEstado(telefono: string, estado: string): boolean {
 
 // Búsqueda difusa de clientes por nombre del apoderado o del/los alumno(s),
 // ignorando acentos y mayúsculas. Usada por el flujo de feedback ("la mamá de Amparo").
+// Búsqueda por LÍMITE DE PALABRA (no substring): cada palabra de la búsqueda debe
+// coincidir con el inicio de alguna palabra del nombre/alumno. Así "Ana" NO matchea
+// "Mariana" (evita resolver al apoderado equivocado), pero "Amparo" sí matchea
+// "Amparo Coronado" y "maria ignacia" matchea "Maria Ignacia Tauler".
 export function searchClientes(term: string): Cliente[] {
   const q = normalizarTexto(term);
   if (!q) return [];
+  const qWords = q.split(/\s+/).filter(Boolean);
+  if (qWords.length === 0) return [];
   const rows = ctx().db.prepare("SELECT * FROM clientes").all() as Cliente[];
   return rows.filter((c) => {
-    const hay = normalizarTexto(`${c.nombre ?? ""} ${c.alumnos ?? ""}`);
-    return hay.includes(q);
+    const tokens = normalizarTexto(`${c.nombre ?? ""} ${c.alumnos ?? ""}`).split(/\s+/).filter(Boolean);
+    return qWords.every((qw) => tokens.some((t) => t === qw || t.startsWith(qw)));
   });
 }
 
@@ -914,9 +920,13 @@ export function cancelarBorradoresPendientes(): void {
 }
 
 // El borrador en preparación más reciente (no enviado ni cancelado). null si no hay.
+// Sólo devuelve borradores recientes (≤ 30 min). Uno viejo no debe dispararse por un
+// "sí" que en realidad confirmaba otra acción.
 export function getBorradorPendiente(): Feedback | null {
   const r = ctx().db
-    .prepare("SELECT * FROM feedbacks WHERE estado IN ('borrador','ambiguo','sin_destinatario') ORDER BY id DESC LIMIT 1")
+    .prepare(
+      "SELECT * FROM feedbacks WHERE estado IN ('borrador','ambiguo','sin_destinatario') AND created_at >= unixepoch() - 1800 ORDER BY id DESC LIMIT 1"
+    )
     .get() as FeedbackRow | undefined;
   return r ? parseFeedback(r) : null;
 }

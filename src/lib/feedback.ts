@@ -11,7 +11,22 @@ import {
   getOrCreateConversation,
   enqueueOutbox,
   insertMessage,
+  normalizarTexto,
+  type Feedback,
 } from "./db";
+import { esNombreMediaSeguro } from "./media-path";
+
+// ¿Deben heredarse las fotos del borrador previo a este turno? Sólo si el turno no
+// trae fotos nuevas y se refiere al MISMO apoderado (o el previo aún no tenía
+// destinatario = fotos adjuntas esperando nombre). Evita mandar fotos de un niño al
+// apoderado de otro.
+function debeHeredarFotos(prev: Feedback | null, destinatarioNuevo: string): boolean {
+  if (!prev || prev.fotos.length === 0) return false;
+  const prevDest = normalizarTexto(prev.destinatario ?? "");
+  const nuevo = normalizarTexto(destinatarioNuevo);
+  if (!prevDest || !nuevo) return true; // continuación (aclaración sin nombre nuevo)
+  return prevDest.includes(nuevo) || nuevo.includes(prevDest);
+}
 
 // Paso 1: preparar el envío. Resuelve el destinatario y deja un borrador listo
 // para confirmar. Devuelve el texto que se le muestra a Mary.
@@ -23,10 +38,13 @@ export function prepararEnvio(input: {
   const destinatario = (input.destinatario ?? "").trim();
   const mensaje = (input.mensaje ?? "").trim();
 
-  // Heredar fotos del borrador anterior si este turno no trae fotos (p.ej. cuando
-  // Mary aclara el nombre en un segundo mensaje sin volver a adjuntar).
+  // Fotos entrantes: sólo nombres de archivo seguros (anti path traversal).
+  const fotosEntrantes = (input.fotos ?? []).filter(esNombreMediaSeguro);
+  // Herencia: sólo si el turno no trae fotos nuevas Y se refiere al mismo apoderado.
   const prev = getBorradorPendiente();
-  const fotos = input.fotos && input.fotos.length ? input.fotos : prev?.fotos ?? [];
+  const fotos = fotosEntrantes.length
+    ? fotosEntrantes
+    : debeHeredarFotos(prev, destinatario) ? prev!.fotos : [];
   cancelarBorradoresPendientes();
 
   const fotosTxt = fotos.length ? `${fotos.length} foto${fotos.length > 1 ? "s" : ""}` : "";

@@ -9,6 +9,7 @@ import {
 import pino from "pino";
 import fs from "fs";
 import path from "path";
+import { esNombreMediaSeguro } from "../media-path.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
 
@@ -55,6 +56,12 @@ async function procesarPendientes(sock: WASocket): Promise<void> {
         // Cualquier otro valor (incl. 'text' o null en filas viejas) → texto.
         let payload: AnyMessageContent;
         if ((item.kind === "image" || item.kind === "audio") && item.media) {
+          if (!esNombreMediaSeguro(item.media)) {
+            // Nombre inseguro (path traversal): nunca leer fuera de data/media.
+            logger.error({ id: item.id, media: item.media }, "Outbox: nombre de media inseguro, descartado");
+            markOutboxSent(item.id);
+            continue;
+          }
           const file = path.join(MEDIA_DIR, item.media);
           if (!fs.existsSync(file)) {
             // Archivo perdido: no reintentar para siempre; marcar como enviado y seguir.

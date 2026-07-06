@@ -100,9 +100,10 @@ export function construirContexto(mes = monthSantiago()): string {
     lineas.push(`- ${cl.dia} ${cl.profe} ${cl.hora ?? ""} alumnos:${cl.alumnos.join(", ")} ${cl.nota ?? ""}`.trim());
   }
   lineas.push("");
-  lineas.push("CLIENTES:");
+  lineas.push("CLIENTES (sin teléfono a propósito; el envío resuelve el número por su cuenta):");
   for (const cliente of clientes) {
-    lineas.push(`- ${cliente.nombre ?? "(sin nombre)"} tel:${cliente.telefono} horario:${cliente.horario.join(", ")}`);
+    const horario = cliente.horario.length ? ` horario:${cliente.horario.join(", ")}` : "";
+    lineas.push(`- ${cliente.nombre ?? "(sin nombre)"}${horario}`);
   }
   return lineas.join("\n");
 }

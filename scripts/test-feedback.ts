@@ -6,6 +6,7 @@ import {
   getPendingOutbox,
   getOrCreateConversation,
   cancelarBorradoresPendientes,
+  searchClientes,
 } from "../src/lib/db.js";
 
 let pass = 0, fail = 0;
@@ -62,6 +63,29 @@ cancelarBorradoresPendientes();
 const p4 = prepararEnvio({ destinatario: "Diego", mensaje: "Buen trabajo" });
 check("ambiguo lista opciones", /encontré varios/i.test(p4.respuesta), p4.respuesta);
 check("ambiguo no permite enviar aún", ejecutarEnvio().ok === false);
+
+// 6) Herencia CRUZADA bloqueada: borrador con fotos para un apoderado + nuevo turno
+//    para OTRO apoderado sin fotos → NO hereda las fotos del primero.
+upsertCliente({ nombre: "Ximenaxq Uno", telefono: "+56990007001", alumnos: "Ninoxq Uno", estado: "activo" });
+upsertCliente({ nombre: "Yolandaxq Dos", telefono: "+56990007002", alumnos: "Otroxq Dos", estado: "activo" });
+cancelarBorradoresPendientes();
+prepararEnvio({ destinatario: "Ninoxq", mensaje: "Se portó lindo", fotos: ["px1.jpg", "px2.jpg"] }); // borrador Ximena con 2 fotos
+const p6 = prepararEnvio({ destinatario: "Otroxq", mensaje: "Buen día" }); // otro apoderado, sin fotos
+const b6 = getBorradorPendiente();
+check("no hereda fotos a un destinatario distinto", (b6?.fotos.length ?? -1) === 0, JSON.stringify(b6?.fotos));
+check("resuelve al apoderado correcto (Yolanda)", b6?.cliente_telefono === "56990007002", p6.respuesta);
+
+// 7) Path traversal: un nombre de archivo malicioso se descarta.
+cancelarBorradoresPendientes();
+prepararEnvio({ destinatario: "Ximenaxq", mensaje: "hola", fotos: ["../../.env", "ok1.jpg"] });
+const b7 = getBorradorPendiente();
+check("descarta foto con path traversal, deja la segura", JSON.stringify(b7?.fotos) === JSON.stringify(["ok1.jpg"]), JSON.stringify(b7?.fotos));
+
+// 8) Búsqueda por límite de palabra: "Ana" NO matchea "Mariana".
+upsertCliente({ nombre: "Marianaxz Prueba", telefono: "+56990007003", alumnos: "Hijoxz", estado: "activo" });
+check("'Anaxz' no matchea 'Marianaxz'", !searchClientes("Anaxz").some(c => c.telefono === "56990007003"));
+check("'Marianaxz' sí matchea", searchClientes("Marianaxz").some(c => c.telefono === "56990007003"));
+check("prefijo 'Marianax' matchea", searchClientes("Marianax").some(c => c.telefono === "56990007003"));
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);
