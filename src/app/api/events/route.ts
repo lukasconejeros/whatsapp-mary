@@ -36,7 +36,21 @@ export async function GET() {
         try {
           const row = db.prepare("SELECT MAX(COALESCE(last_message_at, created_at)) as ts FROM conversations").get() as { ts: number | null };
           const ts = row?.ts ?? 0;
-          if (ts > lastTs) { lastTs = ts; send("update", String(ts)); }
+          if (ts > lastTs) {
+            lastTs = ts;
+            // Datos del último mensaje para el aviso in-app (sonido/notificación).
+            const conv = db.prepare(`
+              SELECT c.name, c.phone, c.categoria,
+                (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1) AS preview
+              FROM conversations c ORDER BY COALESCE(c.last_message_at, c.created_at) DESC LIMIT 1
+            `).get() as { name: string | null; phone: string; categoria: string; preview: string | null } | undefined;
+            send("update", JSON.stringify({
+              ts,
+              categoria: conv?.categoria ?? "",
+              nombre: conv?.name ?? conv?.phone ?? "",
+              preview: conv?.preview ?? "",
+            }));
+          }
           send("ping", String(Date.now()));
         } catch { cleanup(); }
       }, 1000);

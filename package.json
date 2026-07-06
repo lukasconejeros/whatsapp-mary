@@ -23,6 +23,7 @@
     "test:outbox": "tsx scripts/test-outbox.ts",
     "test:media-path": "tsx scripts/test-media-path.ts",
     "test:db": "tsx scripts/test-db-integridad.ts",
+    "test:push": "tsx scripts/test-push.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },
@@ -46,7 +47,8 @@
     "qrcode-terminal": "^0.12.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
@@ -56,6 +58,7 @@
     "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/web-push": "^3.6.4",
     "rimraf": "^6.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"

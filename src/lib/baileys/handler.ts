@@ -13,6 +13,7 @@ import {
 import { describirImagen, transcribirAudio } from "../media.js";
 import { generateReply } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
+import { enviarPush } from "../push.js";
 import pino from "pino";
 import fs from "fs";
 import path from "path";
@@ -225,6 +226,19 @@ export async function handleIncomingMessages(
     }
 
     const fresh = getConversationById(convo.id);
+
+    // Notificación push a Mary por mensajes ENTRANTES de Arteluk o Meta (antes del
+    // check de modo, para avisar también de las conversaciones en HUMAN). Fire-and-forget.
+    if (fresh && (fresh.categoria === "arteluk" || fresh.categoria === "potencial")) {
+      const nombre = fresh.name || fresh.phone;
+      const preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
+      enviarPush({
+        titulo: fresh.categoria === "potencial" ? `Nuevo lead de Meta: ${nombre}` : nombre,
+        cuerpo: preview,
+        url: "/inbox",
+      }).catch(() => { /* nunca rompe el flujo del bot */ });
+    }
+
     if (!fresh || fresh.mode !== "AI") {
       logger.debug({ phone, mode: fresh?.mode }, "Mensaje en modo HUMAN — omitido");
       continue;

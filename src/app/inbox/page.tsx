@@ -5,7 +5,8 @@ import AppNav from '@/components/AppNav'
 import ConversationView from '@/components/ConversationView'
 import { Avatar } from '@/components/Avatar'
 import { Conversation, CATEGORIA_CONFIG, Categoria } from '@/lib/types'
-import { RefreshCw, Search, X, ArrowLeft, MessageCircle } from 'lucide-react'
+import { RefreshCw, Search, X, ArrowLeft, MessageCircle, Bell, BellRing, BellOff } from 'lucide-react'
+import { activarNotificaciones, estadoNotificaciones, sonarAviso, type EstadoNoti } from '@/lib/push-client'
 
 function timeAgo(ts: string | number): string {
   if (!ts) return ''
@@ -34,6 +35,19 @@ export default function InboxPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'todas' | Categoria>('todas')
+  const [noti, setNoti] = useState<EstadoNoti>('inactivas')
+  const [activando, setActivando] = useState(false)
+
+  useEffect(() => { estadoNotificaciones().then(setNoti) }, [])
+
+  async function onActivarNoti() {
+    if (activando) return
+    setActivando(true)
+    const r = await activarNotificaciones()
+    if (r.ok) { setNoti('activadas') }
+    else { alert(r.error || 'No se pudo activar'); setNoti(await estadoNotificaciones()) }
+    setActivando(false)
+  }
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true)
@@ -49,7 +63,21 @@ export default function InboxPage() {
   // al primer error y la lista dejaba de actualizarse hasta recargar la página).
   useEffect(() => {
     const es = new EventSource('/api/events')
-    es.addEventListener('update', () => load(true))
+    es.addEventListener('update', (e: MessageEvent) => {
+      load(true)
+      // Aviso in-app: sólo Arteluk/Meta y sólo si la app NO está enfocada (para no
+      // sonar por lo que Mary misma está viendo/enviando).
+      try {
+        const d = JSON.parse(e.data) as { categoria?: string; nombre?: string; preview?: string }
+        if ((d.categoria === 'arteluk' || d.categoria === 'potencial') && typeof document !== 'undefined' && !document.hasFocus()) {
+          sonarAviso()
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const titulo = d.categoria === 'potencial' ? `Nuevo lead: ${d.nombre || ''}`.trim() : (d.nombre || 'Arteluk')
+            new Notification(titulo, { body: d.preview || 'Mensaje nuevo', icon: '/icon.svg' })
+          }
+        }
+      } catch { /* payload viejo, ignorar */ }
+    })
     return () => es.close()
   }, [load])
 
@@ -94,6 +122,16 @@ export default function InboxPage() {
           <span style={{ fontSize: 14, fontWeight: 700, color: '#9D174D' }}>Chats</span>
           <span style={{ fontSize: 12, color: '#C0879F' }}>{conversations.length}</span>
           <div className="flex-1" />
+          <button onClick={noti === 'activadas' ? undefined : onActivarNoti} disabled={activando || noti === 'activadas'}
+            title="Avisos cuando escribe un cliente de Arteluk o un lead de Meta" className="flex items-center gap-1.5"
+            style={{ height: 30, padding: '0 10px', borderRadius: 8,
+              border: '1px solid ' + (noti === 'activadas' ? '#BBF7D0' : '#FAD1E5'),
+              background: noti === 'activadas' ? '#DCFCE7' : '#FFFFFF', fontSize: 12,
+              color: noti === 'activadas' ? '#15803D' : noti === 'bloqueadas' ? '#C2410C' : '#EC4899',
+              cursor: noti === 'activadas' ? 'default' : 'pointer', fontFamily: 'inherit', opacity: activando ? 0.5 : 1 }}>
+            {noti === 'activadas' ? <BellRing size={12} /> : noti === 'bloqueadas' ? <BellOff size={12} /> : <Bell size={12} />}
+            {noti === 'activadas' ? 'Avisos ✓' : noti === 'bloqueadas' ? 'Bloqueados' : activando ? 'Activando…' : 'Activar avisos'}
+          </button>
           <button onClick={() => load(true)} disabled={refreshing} className="flex items-center gap-1.5"
             style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid #FAD1E5', background: '#FFFFFF', fontSize: 12, color: '#EC4899', cursor: 'pointer', fontFamily: 'inherit', opacity: refreshing ? 0.5 : 1 }}>
             <RefreshCw size={11} className={refreshing ? 'spin' : ''} />

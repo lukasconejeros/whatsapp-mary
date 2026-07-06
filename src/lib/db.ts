@@ -205,6 +205,15 @@ CREATE TABLE IF NOT EXISTS feedbacks (
   sent_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_feedbacks_estado ON feedbacks(estado, created_at);
+
+-- Suscripciones de Web Push (a qué dispositivos avisar).
+CREATE TABLE IF NOT EXISTS push_subs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  endpoint TEXT UNIQUE NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
 `;
 
 interface Ctx {
@@ -977,4 +986,24 @@ export function listFeedbacksEnviados(limit = 100): Feedback[] {
     .prepare("SELECT * FROM feedbacks WHERE estado='enviado' ORDER BY sent_at DESC, id DESC LIMIT ?")
     .all(limit) as FeedbackRow[];
   return rows.map(parseFeedback);
+}
+
+// ── Web Push: suscripciones de dispositivos ───────────────────────────────
+
+export interface PushSub { endpoint: string; p256dh: string; auth: string }
+
+export function addPushSub(s: PushSub): void {
+  ctx()
+    .db.prepare(
+      "INSERT INTO push_subs (endpoint, p256dh, auth) VALUES (?,?,?) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth"
+    )
+    .run(s.endpoint, s.p256dh, s.auth);
+}
+
+export function listPushSubs(): PushSub[] {
+  return ctx().db.prepare("SELECT endpoint, p256dh, auth FROM push_subs").all() as PushSub[];
+}
+
+export function deletePushSub(endpoint: string): void {
+  ctx().db.prepare("DELETE FROM push_subs WHERE endpoint = ?").run(endpoint);
 }

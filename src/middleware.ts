@@ -28,6 +28,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  // Todo salvo estáticos e íconos.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon|manifest.webmanifest).*)"],
+  // Todo salvo estáticos, íconos, el manifest y el service worker (deben ser públicos).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon|manifest.webmanifest|sw.js).*)"],
 };
