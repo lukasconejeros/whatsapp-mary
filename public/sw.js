@@ -13,7 +13,8 @@ self.addEventListener('push', (event) => {
       icon: '/icon.svg',
       badge: '/icon.svg',
       data: { url },
-      tag: 'arteluk-msg',
+      // Un tag por conversación: avisos de clientes distintos NO se reemplazan.
+      tag: data.tag || ('arteluk-' + Math.random().toString(36).slice(2)),
       renotify: true,
     })
   );

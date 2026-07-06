@@ -236,6 +236,7 @@ export async function handleIncomingMessages(
         titulo: fresh.categoria === "potencial" ? `Nuevo lead de Meta: ${nombre}` : nombre,
         cuerpo: preview,
         url: "/inbox",
+        tag: `arteluk-${fresh.id}`, // un aviso por conversación (no se pisan entre clientes)
       }).catch(() => { /* nunca rompe el flujo del bot */ });
     }
 

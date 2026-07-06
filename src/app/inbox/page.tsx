@@ -43,10 +43,15 @@ export default function InboxPage() {
   async function onActivarNoti() {
     if (activando) return
     setActivando(true)
-    const r = await activarNotificaciones()
-    if (r.ok) { setNoti('activadas') }
-    else { alert(r.error || 'No se pudo activar'); setNoti(await estadoNotificaciones()) }
-    setActivando(false)
+    try {
+      const r = await activarNotificaciones()
+      if (r.ok) { setNoti('activadas') }
+      else { alert(r.error || 'No se pudo activar'); setNoti(await estadoNotificaciones()) }
+    } catch {
+      alert('No se pudo activar. Reintenta.')
+    } finally {
+      setActivando(false) // nunca dejar el botón trabado en "Activando…"
+    }
   }
 
   const load = useCallback(async (silent = false) => {
@@ -68,8 +73,9 @@ export default function InboxPage() {
       // Aviso in-app: sólo Arteluk/Meta y sólo si la app NO está enfocada (para no
       // sonar por lo que Mary misma está viendo/enviando).
       try {
-        const d = JSON.parse(e.data) as { categoria?: string; nombre?: string; preview?: string }
-        if ((d.categoria === 'arteluk' || d.categoria === 'potencial') && typeof document !== 'undefined' && !document.hasFocus()) {
+        const d = JSON.parse(e.data) as { categoria?: string; nombre?: string; preview?: string; role?: string }
+        // Solo si el último mensaje es ENTRANTE (role 'user'); nunca por lo que Mary/el bot/n8n envían.
+        if (d.role === 'user' && (d.categoria === 'arteluk' || d.categoria === 'potencial') && typeof document !== 'undefined' && !document.hasFocus()) {
           sonarAviso()
           if ('Notification' in window && Notification.permission === 'granted') {
             const titulo = d.categoria === 'potencial' ? `Nuevo lead: ${d.nombre || ''}`.trim() : (d.nombre || 'Arteluk')

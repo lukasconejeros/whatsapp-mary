@@ -41,25 +41,31 @@ export async function activarNotificaciones(): Promise<{ ok: boolean; error?: st
   if (perm !== "granted") {
     return { ok: false, error: "No diste permiso. Actívalo en los ajustes del teléfono para esta app." };
   }
-  const reg = await navigator.serviceWorker.register("/sw.js");
-  await navigator.serviceWorker.ready;
-  const { publicKey } = await fetch("/api/push/vapid").then((r) => r.json());
-  if (!publicKey) {
-    return { ok: false, error: "Faltan las claves del servidor (VAPID). Avísale a Lukas." };
+  // El flujo de suscripción Push es frágil (sobre todo en iOS Safari): cualquier paso
+  // puede fallar. Todo va en try/catch para no dejar el botón trabado ni sin mensaje.
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const { publicKey } = await fetch("/api/push/vapid").then((r) => r.json());
+    if (!publicKey) {
+      return { ok: false, error: "Faltan las claves del servidor (VAPID). Avísale a Lukas." };
+    }
+    const sub =
+      (await reg.pushManager.getSubscription()) ??
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64ToUint8Array(publicKey) as BufferSource,
+      }));
+    const json = sub.toJSON();
+    const r = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(json),
+    }).then((x) => x.json());
+    return r.ok ? { ok: true } : { ok: false, error: "No se pudo guardar la suscripción." };
+  } catch {
+    return { ok: false, error: "No se pudo activar (el teléfono rechazó la suscripción). Reintenta." };
   }
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: base64ToUint8Array(publicKey) as BufferSource,
-    }));
-  const json = sub.toJSON();
-  const r = await fetch("/api/push/subscribe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(json),
-  }).then((x) => x.json());
-  return r.ok ? { ok: true } : { ok: false, error: "No se pudo guardar la suscripción." };
 }
 
 // Aviso sonoro corto (con la app abierta). Sin archivos: un beep con Web Audio.

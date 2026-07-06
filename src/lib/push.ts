@@ -25,12 +25,13 @@ export function pushConfigurado(): boolean {
   return configurar();
 }
 
-export async function enviarPush(data: { titulo: string; cuerpo: string; url?: string }): Promise<void> {
+export async function enviarPush(data: { titulo: string; cuerpo: string; url?: string; tag?: string }): Promise<void> {
   if (!configurar()) return; // sin VAPID → no-op silencioso
   const payload = JSON.stringify({
     titulo: data.titulo,
     cuerpo: data.cuerpo,
     url: data.url ?? "/inbox",
+    tag: data.tag, // un tag por conversación evita que un aviso pise al de otro cliente
   });
   const subs = listPushSubs();
   await Promise.all(

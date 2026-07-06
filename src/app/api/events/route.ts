@@ -41,14 +41,16 @@ export async function GET() {
             // Datos del último mensaje para el aviso in-app (sonido/notificación).
             const conv = db.prepare(`
               SELECT c.name, c.phone, c.categoria,
-                (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1) AS preview
+                (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1) AS preview,
+                (SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1) AS role
               FROM conversations c ORDER BY COALESCE(c.last_message_at, c.created_at) DESC LIMIT 1
-            `).get() as { name: string | null; phone: string; categoria: string; preview: string | null } | undefined;
+            `).get() as { name: string | null; phone: string; categoria: string; preview: string | null; role: string | null } | undefined;
             send("update", JSON.stringify({
               ts,
               categoria: conv?.categoria ?? "",
               nombre: conv?.name ?? conv?.phone ?? "",
               preview: conv?.preview ?? "",
+              role: conv?.role ?? "",
             }));
           }
           send("ping", String(Date.now()));
