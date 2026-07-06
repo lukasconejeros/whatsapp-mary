@@ -20,6 +20,7 @@
     "import:contactos": "tsx scripts/import-contactos-arteluk.ts",
     "test:contactos": "tsx scripts/test-contactos.ts",
     "test:feedback": "tsx scripts/test-feedback.ts",
+    "test:outbox": "tsx scripts/test-outbox.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },

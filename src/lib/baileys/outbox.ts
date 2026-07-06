@@ -3,6 +3,8 @@ import {
   getPendingOutbox,
   getConversationById,
   markOutboxSent,
+  bumpOutboxAttempt,
+  markOutboxFailed,
 } from "../db.js";
 import pino from "pino";
 import fs from "fs";
@@ -13,16 +15,40 @@ const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
 // Carpeta de medios (misma que usa el handler al recibir). Persiste en el volumen.
 const MEDIA_DIR = path.resolve(process.cwd(), "data/media");
 
-let outboxTimer: ReturnType<typeof setInterval> | null = null;
+let outboxTimer: ReturnType<typeof setTimeout> | null = null;
+let corriendo = false;
 
+const INTERVALO_MS = 2000;
+
+// Loop del outbox con BACKPRESSURE: cada pasada se reprograma con setTimeout SÓLO
+// después de terminar la anterior. Antes era setInterval, que disparaba cada 2 s sin
+// esperar; con envíos > 2 s (audio/foto) el siguiente tick releía los mismos items
+// sent=0 y los reenviaba → el cliente recibía el mensaje 2-3 veces. El flag `corriendo`
+// es un candado extra de reentrada.
 export function startOutboxLoop(sock: WASocket): void {
-  if (outboxTimer) return;
+  if (outboxTimer || corriendo) return;
 
-  outboxTimer = setInterval(async () => {
-    const pending = getPendingOutbox(20);
-    for (const item of pending) {
-      try {
-        const convo = getConversationById(item.conversation_id);
+  const tick = async () => {
+    corriendo = true;
+    try {
+      await procesarPendientes(sock);
+    } catch (err) {
+      logger.error({ err }, "Outbox: error inesperado en la pasada");
+    } finally {
+      corriendo = false;
+      // Reprograma DESPUÉS de terminar (nunca dos pasadas solapadas).
+      outboxTimer = setTimeout(tick, INTERVALO_MS);
+    }
+  };
+
+  outboxTimer = setTimeout(tick, 0);
+}
+
+async function procesarPendientes(sock: WASocket): Promise<void> {
+  const pending = getPendingOutbox(20);
+  for (const item of pending) {
+    try {
+      const convo = getConversationById(item.conversation_id);
         // Use stored jid to support @lid addresses; fallback to @s.whatsapp.net
         const jid = convo?.jid ?? `${item.phone}@s.whatsapp.net`;
         // kind='image' → mandar la foto (content es el caption, opcional).
@@ -59,16 +85,22 @@ export function startOutboxLoop(sock: WASocket): void {
         markOutboxSent(item.id);
         logger.debug({ id: item.id, jid, kind: item.kind }, "Outbox mensaje enviado");
       } catch (err) {
-        // Leave sent=0 so it retries on next tick
-        logger.error({ err, id: item.id }, "Error enviando outbox item");
+        // Reintenta hasta 5 veces; luego descarta el item para no bloquear la cola
+        // (un poison-pill a la cabeza del ORDER BY dejaba sin salir a los mensajes nuevos).
+        const n = bumpOutboxAttempt(item.id);
+        if (n >= 5) {
+          markOutboxFailed(item.id);
+          logger.error({ id: item.id, n }, "Outbox: item descartado tras 5 intentos fallidos");
+        } else {
+          logger.error({ err, id: item.id, n }, "Error enviando outbox item; se reintentará");
+        }
       }
     }
-  }, 2000);
 }
 
 export function stopOutboxLoop(): void {
   if (outboxTimer) {
-    clearInterval(outboxTimer);
+    clearTimeout(outboxTimer);
     outboxTimer = null;
   }
 }

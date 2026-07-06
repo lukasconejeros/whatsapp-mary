@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS outbox (
   content TEXT NOT NULL,
   kind TEXT NOT NULL DEFAULT 'text',
   media TEXT,
-  sent INTEGER NOT NULL DEFAULT 0,
+  sent INTEGER NOT NULL DEFAULT 0,   -- 0=pendiente, 1=enviado, 2=fallido (descartado)
+  attempts INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(sent, created_at);
@@ -294,6 +295,9 @@ function build(): Ctx {
   if (!outCols.some((c) => c.name === "media")) {
     db.exec("ALTER TABLE outbox ADD COLUMN media TEXT");
   }
+  if (!outCols.some((c) => c.name === "attempts")) {
+    db.exec("ALTER TABLE outbox ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
+  }
 
   return {
     db,
@@ -476,6 +480,19 @@ export function getPendingOutbox(limit = 20): OutboxItem[] {
 
 export function markOutboxSent(id: number): void {
   ctx().markSentStmt.run(id);
+}
+
+// Suma 1 al contador de intentos y devuelve el nuevo total (para descartar poison-pills).
+export function bumpOutboxAttempt(id: number): number {
+  const r = ctx()
+    .db.prepare("UPDATE outbox SET attempts = attempts + 1 WHERE id = ? RETURNING attempts")
+    .get(id) as { attempts: number } | undefined;
+  return r?.attempts ?? 0;
+}
+
+// Marca un item como fallido/descartado (sent=2) para sacarlo de la cola.
+export function markOutboxFailed(id: number): void {
+  ctx().db.prepare("UPDATE outbox SET sent = 2 WHERE id = ?").run(id);
 }
 
 export function deleteConversation(conversationId: number): void {
