@@ -1,4 +1,10 @@
-import { upsertCliente, listContactos, setClienteEstado } from "./db";
+import {
+  upsertCliente,
+  listContactos,
+  setClienteEstado,
+  getOrCreateConversation,
+  setCategoria,
+} from "./db";
 import { normalizeChilePhone } from "./phone";
 
 // Lista de apoderados/alumnos de Arteluk entregada por Mary.
@@ -69,13 +75,16 @@ export const CONTACTOS_ARTELUK: [string, string, string][] = [
   ["Kasandra Rivera", "Diego Montoya", "+56962189102"],
 ];
 
-export interface SeedResult { ok: number; invalidos: string[]; defaulted: number; total: number }
+export interface SeedResult { ok: number; conversaciones: number; invalidos: string[]; defaulted: number; total: number }
 
-// Carga los contactos en la tabla `clientes`. Idempotente (upsert por teléfono):
-// correrlo muchas veces no duplica ni pisa la etiqueta activo/inactivo que Mary
-// haya puesto. Los nuevos quedan 'activo' por defecto.
+// Carga los contactos: (1) como clientes (para el CRM y la búsqueda del feedback)
+// y (2) como CONVERSACIONES VACÍAS en Chats, categoría Arteluk, para que Mary
+// pueda empezar ella la conversación con cada apoderado. Idempotente: correrlo
+// muchas veces no duplica, no pisa la etiqueta activo/inactivo ni una categoría
+// que Mary haya movido a mano, y NO agrega mensajes (las conversaciones quedan vacías).
 export function seedContactosArteluk(): SeedResult {
   let ok = 0;
+  let conversaciones = 0;
   const invalidos: string[] = [];
   const importados = new Set<string>();
 
@@ -86,6 +95,13 @@ export function seedContactosArteluk(): SeedResult {
       continue;
     }
     upsertCliente({ nombre: apoderado.trim(), telefono: norm, alumnos: alumno.trim() });
+
+    // Conversación vacía en Chats (sin mensajes) marcada como cliente Arteluk.
+    const conv = getOrCreateConversation(norm, apoderado.trim());
+    if (!conv.categoria_manual && conv.categoria !== "arteluk") {
+      setCategoria(conv.id, "arteluk", false);
+    }
+    conversaciones++;
     importados.add(norm);
     ok++;
   }
@@ -98,5 +114,5 @@ export function seedContactosArteluk(): SeedResult {
     }
   }
 
-  return { ok, invalidos, defaulted, total: listContactos().length };
+  return { ok, conversaciones, invalidos, defaulted, total: listContactos().length };
 }

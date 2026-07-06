@@ -82,7 +82,7 @@ export default function ContactosPage() {
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="shrink-0" style={{ padding: '16px 20px', borderBottom: '1px solid #FAD1E5', background: '#FFFFFF' }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#9D174D', margin: 0 }}>Contactos</h1>
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#9D174D', margin: 0 }}>CRM</h1>
           <p style={{ fontSize: 12, color: '#B0708C', margin: '4px 0 12px' }}>
             Tus apoderados de Arteluk. Toca la etiqueta para marcarlos activos o no activos.
           </p>

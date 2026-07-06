@@ -7,7 +7,7 @@ import { MessagesSquare, Users, Wallet, CalendarDays, Plug, Brush } from 'lucide
 
 const items = [
   { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
-  { href: '/contactos',  Icon: Users,         label: 'Contactos'  },
+  { href: '/contactos',  Icon: Users,         label: 'CRM'        },
   { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
   { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
   { href: '/conexion',   Icon: Plug,          label: 'Conexión'   },

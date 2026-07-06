@@ -7,7 +7,7 @@ export async function register() {
   try {
     const { seedContactosArteluk } = await import("./lib/seed-contactos");
     const r = seedContactosArteluk();
-    console.log(`[seed] contactos Arteluk cargados: ${r.ok} ok, ${r.defaulted} nuevos activos, total ${r.total}`);
+    console.log(`[seed] Arteluk: ${r.ok} contactos, ${r.conversaciones} conversaciones en Chats, ${r.defaulted} nuevos activos, total ${r.total}`);
   } catch (e) {
     console.error("[seed] no se pudieron cargar los contactos:", e);
   }
