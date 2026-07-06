@@ -1,9 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { getConversationById, insertMessage, enqueueOutbox } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+const execFileP = promisify(execFile);
+const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
+
+// Convierte cualquier audio (webm/mp4/m4a…) a ogg/opus mono 48kHz, que es lo que
+// WhatsApp necesita para reproducir una nota de voz. Devuelve el nombre del .ogg
+// o null si falla (ffmpeg ausente, etc.).
+async function aOggOpus(srcName: string): Promise<string | null> {
+  const inPath = path.join(MEDIA_DIR, srcName);
+  const oggName = srcName.replace(/\.[^.]+$/, "") + "_voz.ogg";
+  const outPath = path.join(MEDIA_DIR, oggName);
+  try {
+    await execFileP(FFMPEG, ["-y", "-i", inPath, "-vn", "-c:a", "libopus", "-b:a", "32k", "-ar", "48000", "-ac", "1", "-f", "ogg", outPath]);
+    if (fs.existsSync(outPath) && fs.statSync(outPath).size > 0) return oggName;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 // Envía una nota de voz o una foto a un contacto desde el chat.
 // Multipart: conversationId + file. Guarda el archivo en data/media, lo registra
@@ -46,9 +67,17 @@ export async function POST(req: NextRequest) {
 
   const kind = esAudio ? "audio" : "image";
   const placeholder = esAudio ? "🎤 Audio" : "📷 Foto";
-  // Se registra en el chat (role human) y se encola para el envío real por WhatsApp.
+  // En el chat se guarda el archivo ORIGINAL (se escucha bien en el navegador).
   insertMessage(conv.id, "human", placeholder, name);
-  enqueueOutbox(conv.id, conv.phone, esImagen ? "" : "", { kind, media: name });
 
-  return NextResponse.json({ ok: true, media: name, kind });
+  // Para WhatsApp, el audio se manda como ogg/opus (si ffmpeg está disponible);
+  // si la conversión falla, se manda el original como último recurso.
+  let outMedia = name;
+  if (esAudio) {
+    const ogg = await aOggOpus(name);
+    if (ogg) outMedia = ogg;
+  }
+  enqueueOutbox(conv.id, conv.phone, "", { kind, media: outMedia });
+
+  return NextResponse.json({ ok: true, media: name, kind, enviado: outMedia });
 }

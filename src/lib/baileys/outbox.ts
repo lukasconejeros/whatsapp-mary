@@ -38,11 +38,15 @@ export function startOutboxLoop(sock: WASocket): void {
           }
           const buffer = fs.readFileSync(file);
           if (item.kind === "audio") {
-            // Nota de voz (push-to-talk). El opus dentro de webm/ogg es compatible;
-            // los .m4a/.mp4 (iPhone) van como audio/mp4.
             const ext = path.extname(item.media).toLowerCase();
-            const mimetype = ext === ".m4a" || ext === ".mp4" ? "audio/mp4" : "audio/ogg; codecs=opus";
-            payload = { audio: buffer, ptt: true, mimetype };
+            if (ext === ".ogg" || ext === ".opus") {
+              // Nota de voz real (push-to-talk) en opus/ogg — la reproduce WhatsApp.
+              payload = { audio: buffer, ptt: true, mimetype: "audio/ogg; codecs=opus" };
+            } else {
+              // Fallback (no se pudo transcodificar): audio normal, sin ptt, más compatible.
+              const mimetype = ext === ".mp3" ? "audio/mpeg" : "audio/mp4";
+              payload = { audio: buffer, mimetype };
+            }
           } else {
             payload = item.content ? { image: buffer, caption: item.content } : { image: buffer };
           }
