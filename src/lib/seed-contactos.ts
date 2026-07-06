@@ -1,9 +1,10 @@
 import {
-  upsertCliente,
+  insertClienteNuevo,
+  defaultEstadoActivoSiVacio,
   listContactos,
-  setClienteEstado,
   getOrCreateConversation,
   setCategoria,
+  withTransaction,
 } from "./db";
 import { normalizeChilePhone } from "./phone";
 
@@ -86,33 +87,29 @@ export function seedContactosArteluk(): SeedResult {
   let ok = 0;
   let conversaciones = 0;
   const invalidos: string[] = [];
-  const importados = new Set<string>();
 
-  for (const [apoderado, alumno, tel] of CONTACTOS_ARTELUK) {
-    const norm = normalizeChilePhone(tel);
-    if (!norm) {
-      invalidos.push(`${apoderado} (${alumno}) — teléfono "${tel || "vacío"}"`);
-      continue;
+  // TODO el seed en UNA transacción: rápido y consistente (no queda a medias por
+  // contención con el otro proceso). insertClienteNuevo NO pisa nombre/alumnos que
+  // Mary haya editado a mano (sólo inserta los que no existen).
+  withTransaction(() => {
+    for (const [apoderado, alumno, tel] of CONTACTOS_ARTELUK) {
+      const norm = normalizeChilePhone(tel);
+      if (!norm) {
+        invalidos.push(`${apoderado} (${alumno}) — teléfono "${tel || "vacío"}"`);
+        continue;
+      }
+      insertClienteNuevo({ telefono: norm, nombre: apoderado.trim(), alumnos: alumno.trim() });
+      defaultEstadoActivoSiVacio(norm); // clientes viejos de Airtable sin estado
+
+      // Conversación vacía en Chats (sin mensajes) marcada como cliente Arteluk.
+      const conv = getOrCreateConversation(norm, apoderado.trim());
+      if (!conv.categoria_manual && conv.categoria !== "arteluk") {
+        setCategoria(conv.id, "arteluk", false);
+      }
+      conversaciones++;
+      ok++;
     }
-    upsertCliente({ nombre: apoderado.trim(), telefono: norm, alumnos: alumno.trim() });
+  });
 
-    // Conversación vacía en Chats (sin mensajes) marcada como cliente Arteluk.
-    const conv = getOrCreateConversation(norm, apoderado.trim());
-    if (!conv.categoria_manual && conv.categoria !== "arteluk") {
-      setCategoria(conv.id, "arteluk", false);
-    }
-    conversaciones++;
-    importados.add(norm);
-    ok++;
-  }
-
-  let defaulted = 0;
-  for (const c of listContactos()) {
-    if (importados.has(c.telefono) && (!c.estado || !c.estado.trim())) {
-      setClienteEstado(c.telefono, "activo");
-      defaulted++;
-    }
-  }
-
-  return { ok, conversaciones, invalidos, defaulted, total: listContactos().length };
+  return { ok, conversaciones, invalidos, defaulted: 0, total: listContactos().length };
 }

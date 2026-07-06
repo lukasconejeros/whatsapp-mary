@@ -236,6 +236,23 @@ function ctx(): Ctx {
   return _ctx;
 }
 
+// Agrega una columna sólo si falta, ignorando el error de "columna duplicada" que
+// ocurre si otro proceso la agregó a la vez (deploy con arranque simultáneo de bot y web).
+function addColumnaSiFalta(
+  db: InstanceType<typeof Database>,
+  tabla: string,
+  col: string,
+  definicion: string
+): void {
+  const cols = db.prepare(`PRAGMA table_info(${tabla})`).all() as { name: string }[];
+  if (cols.some((c) => c.name === col)) return;
+  try {
+    db.exec(`ALTER TABLE ${tabla} ADD COLUMN ${col} ${definicion}`);
+  } catch (e) {
+    if (!String(e).toLowerCase().includes("duplicate column")) throw e;
+  }
+}
+
 function build(): Ctx {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const db = new Database(DB_PATH);
@@ -244,60 +261,21 @@ function build(): Ctx {
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
 
-  // micro-migración: añadir columnas que no existan
-  const cols = db.prepare("PRAGMA table_info(conversations)").all() as { name: string }[];
-  if (!cols.some((c) => c.name === "jid")) {
-    db.exec("ALTER TABLE conversations ADD COLUMN jid TEXT");
-  }
-  if (!cols.some((c) => c.name === "estado")) {
-    db.exec("ALTER TABLE conversations ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'");
-  }
-  if (!cols.some((c) => c.name === "categoria")) {
-    db.exec("ALTER TABLE conversations ADD COLUMN categoria TEXT NOT NULL DEFAULT 'mary'");
-  }
-  if (!cols.some((c) => c.name === "categoria_manual")) {
-    db.exec("ALTER TABLE conversations ADD COLUMN categoria_manual INTEGER NOT NULL DEFAULT 0");
-  }
-  if (!cols.some((c) => c.name === "ctwa_referral")) {
-    db.exec("ALTER TABLE conversations ADD COLUMN ctwa_referral TEXT");
-  }
-  // photo: foto de perfil del contacto (nombre de archivo en data/media/<name> o URL).
-  // Vacío = avatar gris tipo WhatsApp.
-  if (!cols.some((c) => c.name === "photo")) {
-    db.exec("ALTER TABLE conversations ADD COLUMN photo TEXT");
-  }
-  // messages.media: nombre del archivo de foto/audio guardado (data/media/<name>), si lo hay.
-  const mcols = db.prepare("PRAGMA table_info(messages)").all() as { name: string }[];
-  if (!mcols.some((c) => c.name === "media")) {
-    db.exec("ALTER TABLE messages ADD COLUMN media TEXT");
-  }
-  // micro-migración clientes: columnas nuevas (email/estado/horario/alumnos)
-  const cliCols = db.prepare("PRAGMA table_info(clientes)").all() as { name: string }[];
-  for (const col of ["email", "estado", "horario", "alumnos"]) {
-    if (!cliCols.some((c) => c.name === col)) {
-      db.exec(`ALTER TABLE clientes ADD COLUMN ${col} TEXT`);
-    }
-  }
-  // micro-migración clases: columna fecha (YYYY-MM-DD) para eventos con fecha exacta.
-  // Las clases antiguas sin fecha siguen guardadas por 'dia'; el calendario mensual usa 'fecha'.
-  const claseCols = db.prepare("PRAGMA table_info(clases)").all() as { name: string }[];
-  if (!claseCols.some((c) => c.name === "fecha")) {
-    db.exec("ALTER TABLE clases ADD COLUMN fecha TEXT");
-  }
+  // micro-migraciones IDEMPOTENTES y a prueba de doble arranque (bot + web contra la
+  // misma DB tras un deploy): cada ALTER se ignora si la columna ya existe.
+  addColumnaSiFalta(db, "conversations", "jid", "TEXT");
+  addColumnaSiFalta(db, "conversations", "estado", "TEXT NOT NULL DEFAULT 'activo'");
+  addColumnaSiFalta(db, "conversations", "categoria", "TEXT NOT NULL DEFAULT 'mary'");
+  addColumnaSiFalta(db, "conversations", "categoria_manual", "INTEGER NOT NULL DEFAULT 0");
+  addColumnaSiFalta(db, "conversations", "ctwa_referral", "TEXT");
+  addColumnaSiFalta(db, "conversations", "photo", "TEXT");
+  addColumnaSiFalta(db, "messages", "media", "TEXT");
+  for (const col of ["email", "estado", "horario", "alumnos"]) addColumnaSiFalta(db, "clientes", col, "TEXT");
+  addColumnaSiFalta(db, "clases", "fecha", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS idx_clases_fecha ON clases(fecha)");
-
-  // micro-migración outbox: kind ('text'|'image') + media (archivo a enviar) para
-  // poder mandar FOTOS y no solo texto. Bases viejas solo tenían texto.
-  const outCols = db.prepare("PRAGMA table_info(outbox)").all() as { name: string }[];
-  if (!outCols.some((c) => c.name === "kind")) {
-    db.exec("ALTER TABLE outbox ADD COLUMN kind TEXT NOT NULL DEFAULT 'text'");
-  }
-  if (!outCols.some((c) => c.name === "media")) {
-    db.exec("ALTER TABLE outbox ADD COLUMN media TEXT");
-  }
-  if (!outCols.some((c) => c.name === "attempts")) {
-    db.exec("ALTER TABLE outbox ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
-  }
+  addColumnaSiFalta(db, "outbox", "kind", "TEXT NOT NULL DEFAULT 'text'");
+  addColumnaSiFalta(db, "outbox", "media", "TEXT");
+  addColumnaSiFalta(db, "outbox", "attempts", "INTEGER NOT NULL DEFAULT 0");
 
   return {
     db,
@@ -325,7 +303,7 @@ function build(): Ctx {
       "UPDATE conversations SET last_message_at = unixepoch() WHERE id = ?"
     ),
     getMsgs: db.prepare(
-      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC LIMIT ?"
+      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC LIMIT ?"
     ),
     getConnState: db.prepare("SELECT * FROM connection_state WHERE id = 1"),
     upsertConnState: db.prepare(
@@ -381,17 +359,22 @@ export function getOrCreateConversation(
     return c.getConvById.get(byPhone.id) as Conversation;
   }
 
-  // 2. No existe por phone. Si el nombre es dedupable, buscar una conversación
-  //    existente del MISMO contacto que llegó antes con otro identificador
-  //    (LID vs número real). Esto evita el duplicado sin mapeo de Baileys.
+  // 2. No existe por phone. Fusión por nombre SÓLO para el caso real @lid↔número:
+  //    uno de los dos identificadores es @lid (mismo contacto, dos IDs). Dos personas
+  //    DISTINTAS con el mismo pushName pero ambas con número real NO se fusionan
+  //    (antes se mezclaban y las respuestas iban al número equivocado).
   if (nameIsDedupable(name)) {
     const byName = c.db
       .prepare("SELECT * FROM conversations WHERE name = ? ORDER BY id ASC LIMIT 1")
       .get(name.trim()) as Conversation | undefined;
     if (byName) {
-      const newJid = preferRealJid(byName.jid, jid);
-      if (newJid && newJid !== byName.jid) c.updateConvJid.run(newJid, byName.id);
-      return c.getConvById.get(byName.id) as Conversation;
+      const incomingEsLid = !!jid && jid.endsWith("@lid");
+      const existenteEsLid = !!byName.jid && byName.jid.endsWith("@lid");
+      if (incomingEsLid || existenteEsLid) {
+        const newJid = preferRealJid(byName.jid, jid);
+        if (newJid && newJid !== byName.jid) c.updateConvJid.run(newJid, byName.id);
+        return c.getConvById.get(byName.id) as Conversation;
+      }
     }
   }
 
@@ -439,7 +422,7 @@ export function getRecentHistory(conversationId: number, limit = 20): Message[] 
   const c = ctx();
   const rows = c.db
     .prepare(
-      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?"
+      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT ?"
     )
     .all(conversationId, limit) as Message[];
   return rows.reverse();
@@ -500,6 +483,9 @@ export function deleteConversation(conversationId: number): void {
   const del = c.db.transaction(() => {
     c.deleteMsgs.run(conversationId);
     c.deleteOutbox.run(conversationId);
+    // leads tiene FK a conversations (RESTRICT): hay que borrarlo antes o el DELETE
+    // de la conversación falla con SQLITE_CONSTRAINT y el borrado nunca se completa.
+    c.db.prepare("DELETE FROM leads WHERE conversation_id = ?").run(conversationId);
     c.deleteConv.run(conversationId);
   });
   del();
@@ -635,6 +621,32 @@ export function upsertCliente(data: {
       data.estado ?? null, data.horario ? JSON.stringify(data.horario) : null, data.alumnos ?? null
     );
   return true;
+}
+
+// Inserta un cliente SÓLO si no existe (no pisa nombre/alumnos editados a mano).
+// Los nuevos quedan 'activo'. Usado por el seed que corre en cada arranque.
+export function insertClienteNuevo(data: { telefono: string; nombre?: string; alumnos?: string }): void {
+  const tel = normalizeChilePhone(data.telefono);
+  if (!tel) return;
+  ctx()
+    .db.prepare(
+      "INSERT INTO clientes (telefono, nombre, alumnos, estado) VALUES (?, ?, ?, 'activo') ON CONFLICT(telefono) DO NOTHING"
+    )
+    .run(tel, data.nombre ?? null, data.alumnos ?? null);
+}
+
+// Rellena estado='activo' sólo si estaba vacío (para clientes viejos sin estado).
+export function defaultEstadoActivoSiVacio(telefono: string): void {
+  const tel = normalizeChilePhone(telefono);
+  if (!tel) return;
+  ctx()
+    .db.prepare("UPDATE clientes SET estado='activo' WHERE telefono=? AND (estado IS NULL OR estado='')")
+    .run(tel);
+}
+
+// Ejecuta fn dentro de UNA sola transacción (para lotes como el seed).
+export function withTransaction(fn: () => void): void {
+  ctx().db.transaction(fn)();
 }
 
 export function getClienteByPhone(phone: string): Cliente | null {

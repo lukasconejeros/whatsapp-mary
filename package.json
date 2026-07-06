@@ -22,6 +22,7 @@
     "test:feedback": "tsx scripts/test-feedback.ts",
     "test:outbox": "tsx scripts/test-outbox.ts",
     "test:media-path": "tsx scripts/test-media-path.ts",
+    "test:db": "tsx scripts/test-db-integridad.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },
