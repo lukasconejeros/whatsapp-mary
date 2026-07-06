@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 const execFileP = promisify(execFile);
 const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
+const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
 
 // Convierte cualquier audio (webm/mp4/m4a…) a ogg/opus mono 48kHz, que es lo que
 // WhatsApp necesita para reproducir una nota de voz. Devuelve el nombre del .ogg
@@ -23,6 +24,16 @@ async function aOggOpus(srcName: string): Promise<string | null> {
     return null;
   } catch {
     return null;
+  }
+}
+
+// Duración en segundos (entera) de un archivo de audio, con ffprobe. 0 si falla.
+async function duracionSeg(name: string): Promise<number> {
+  try {
+    const { stdout } = await execFileP(FFPROBE, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path.join(MEDIA_DIR, name)]);
+    return Math.max(0, Math.round(parseFloat(stdout.trim()) || 0));
+  } catch {
+    return 0;
   }
 }
 
@@ -71,13 +82,17 @@ export async function POST(req: NextRequest) {
   insertMessage(conv.id, "human", placeholder, name);
 
   // Para WhatsApp, el audio se manda como ogg/opus (si ffmpeg está disponible);
-  // si la conversión falla, se manda el original como último recurso.
+  // si la conversión falla, se manda el original como último recurso. Guardamos la
+  // duración en 'content' para pasarla como 'seconds' a WhatsApp (si no, marca 0:00).
   let outMedia = name;
+  let contentMeta = "";
   if (esAudio) {
     const ogg = await aOggOpus(name);
     if (ogg) outMedia = ogg;
+    const secs = await duracionSeg(outMedia);
+    contentMeta = secs > 0 ? String(secs) : "";
   }
-  enqueueOutbox(conv.id, conv.phone, "", { kind, media: outMedia });
+  enqueueOutbox(conv.id, conv.phone, contentMeta, { kind, media: outMedia });
 
-  return NextResponse.json({ ok: true, media: name, kind, enviado: outMedia });
+  return NextResponse.json({ ok: true, media: name, kind, enviado: outMedia, seg: contentMeta });
 }

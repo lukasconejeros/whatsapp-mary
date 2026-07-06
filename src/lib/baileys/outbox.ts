@@ -39,13 +39,15 @@ export function startOutboxLoop(sock: WASocket): void {
           const buffer = fs.readFileSync(file);
           if (item.kind === "audio") {
             const ext = path.extname(item.media).toLowerCase();
+            // 'content' guarda la duración en segundos (para que WhatsApp no marque 0:00).
+            const seconds = parseInt(item.content || "0", 10) || undefined;
             if (ext === ".ogg" || ext === ".opus") {
               // Nota de voz real (push-to-talk) en opus/ogg — la reproduce WhatsApp.
-              payload = { audio: buffer, ptt: true, mimetype: "audio/ogg; codecs=opus" };
+              payload = { audio: buffer, ptt: true, mimetype: "audio/ogg; codecs=opus", seconds };
             } else {
               // Fallback (no se pudo transcodificar): audio normal, sin ptt, más compatible.
               const mimetype = ext === ".mp3" ? "audio/mpeg" : "audio/mp4";
-              payload = { audio: buffer, mimetype };
+              payload = { audio: buffer, mimetype, seconds };
             }
           } else {
             payload = item.content ? { image: buffer, caption: item.content } : { image: buffer };

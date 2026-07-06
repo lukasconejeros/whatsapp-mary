@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
@@ -62,4 +62,38 @@ export async function GET() {
   }
 
   return NextResponse.json(out);
+}
+
+// Transcodifica el audio subido igual que el envío real y devuelve el análisis
+// (códec/duración/canales) del original y del ogg resultante. NO envía nada.
+async function probe(file: string) {
+  try {
+    const { stdout } = await execFileP(FP, ["-v", "error", "-show_entries", "stream=codec_name,channels,sample_rate:format=duration", "-of", "json", file]);
+    return JSON.parse(stdout);
+  } catch (e) {
+    return { error: String(e).slice(0, 150) };
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const form = await req.formData();
+  const f = form.get("file");
+  if (!(f instanceof Blob)) return NextResponse.json({ error: "falta file" }, { status: 400 });
+  const buf = Buffer.from(await f.arrayBuffer());
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+  const inName = path.join(MEDIA_DIR, `probe_${Date.now()}_in`);
+  const outName = path.join(MEDIA_DIR, `probe_${Date.now()}_out.ogg`);
+  fs.writeFileSync(inName, buf);
+  const res: Record<string, unknown> = { inputType: f.type, inputSize: buf.length };
+  res.inputProbe = await probe(inName);
+  try {
+    await execFileP(FF, ["-y", "-i", inName, "-vn", "-c:a", "libopus", "-b:a", "32k", "-ar", "48000", "-ac", "1", "-f", "ogg", outName]);
+    res.outSize = fs.existsSync(outName) ? fs.statSync(outName).size : 0;
+    res.outProbe = await probe(outName);
+  } catch (e) {
+    res.transcodeError = String(e).slice(0, 250);
+  }
+  try { fs.unlinkSync(inName); } catch {}
+  try { fs.unlinkSync(outName); } catch {}
+  return NextResponse.json(res);
 }
