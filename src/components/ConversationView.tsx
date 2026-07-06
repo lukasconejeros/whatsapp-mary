@@ -44,16 +44,35 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [showEmoji, setShowEmoji] = useState(false)
   const [grabando, setGrabando] = useState(false)
   const [segundos, setSegundos] = useState(0)
+  const [sendError, setSendError] = useState('')
   const recRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const cancelRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+
+  // Al desmontar (cambiar de chat/volver), soltar micrófono, grabación y cronómetro
+  // para que el micro no quede ENCENDIDO si Mary cambia de chat mientras graba.
+  useEffect(() => () => {
+    try { recRef.current?.stop() } catch { /* noop */ }
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    if (timerRef.current) clearInterval(timerRef.current)
+  }, [])
   const ch = CHANNEL_CONFIG[conv.channel]
 
   useEffect(() => {
     setLoading(true); setMsgs([])
     fetch(`/api/conversations/${conv.id}`).then(r=>r.json()).then(d=>{ if(d.ok) setMsgs(d.messages) }).finally(()=>setLoading(false))
+  }, [conv.id])
+
+  // Chat EN VIVO: refresca los mensajes cada 7s para ver lo que responde el apoderado
+  // sin tener que cerrar y reabrir el chat.
+  useEffect(() => {
+    const t = setInterval(() => {
+      fetch(`/api/conversations/${conv.id}`).then(r=>r.json()).then(d=>{ if(d.ok) setMsgs(d.messages) }).catch(()=>{})
+    }, 7000)
+    return () => clearInterval(t)
   }, [conv.id])
 
   useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
@@ -88,8 +107,9 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     setMsgs(p=>[...p,tmp])
     try {
       const r = await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversationId:conv.id,message:text})})
-      if(!r.ok){setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text)}
-    } catch { setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text) }
+      if(!r.ok){setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text);setSendError('No se pudo enviar, reintenta.')}
+      else setSendError('')
+    } catch { setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text);setSendError('No se pudo enviar. Revisa tu internet.') }
     finally { setSending(false) }
   }
 
@@ -99,6 +119,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     if (grabando) return
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
       const rec = new MediaRecorder(stream)
       chunksRef.current = []
       cancelRef.current = false
@@ -117,9 +138,14 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           form.append('file', blob, 'nota-voz.webm')
           const d = await fetch('/api/send-media', { method: 'POST', body: form }).then(r => r.json())
           if (d.ok) {
+            setSendError('')
             const tmp: Message = { id: Date.now(), content: '🎤 Audio', media: d.media, messageType: 1, senderName: 'Tú', senderType: 'human', createdAt: Date.now() / 1000, isPrivate: false }
             setMsgs(p => [...p, tmp])
+          } else {
+            setSendError('No se pudo enviar el audio, reintenta.')
           }
+        } catch {
+          setSendError('No se pudo enviar el audio, reintenta.')
         } finally { setSending(false) }
       }
       rec.start()
@@ -215,6 +241,13 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             <span style={{ flexShrink:0 }}>💡</span>
             <span style={{ flex:1 }}>{tip}</span>
             <button type="button" onClick={()=>setTip('')} title="Ocultar" style={{ flexShrink:0,background:'none',border:'none',cursor:'pointer',color:'#C0879F',fontSize:14,lineHeight:1,padding:0 }}>×</button>
+          </div>
+        )}
+        {sendError && (
+          <div style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 10px',borderRadius:9,border:'1px solid #FCA5A5',background:'#FEF2F2',color:'#DC2626',fontSize:12 }}>
+            <span style={{ flexShrink:0 }}>⚠</span>
+            <span style={{ flex:1 }}>{sendError}</span>
+            <button type="button" onClick={()=>setSendError('')} title="Ocultar" style={{ flexShrink:0,background:'none',border:'none',cursor:'pointer',color:'#DC2626',fontSize:14,lineHeight:1,padding:0 }}>×</button>
           </div>
         )}
         {!conv.botActive && (

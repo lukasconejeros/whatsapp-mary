@@ -44,11 +44,12 @@ export default function InboxPage() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  // Real-time: recarga la lista cuando llega un mensaje nuevo
+  // Real-time: recarga la lista cuando llega un mensaje nuevo. NO cerramos en onerror:
+  // así EventSource reconecta solo tras un corte de red (antes se apagaba para siempre
+  // al primer error y la lista dejaba de actualizarse hasta recargar la página).
   useEffect(() => {
     const es = new EventSource('/api/events')
     es.addEventListener('update', () => load(true))
-    es.onerror = () => es.close()
     return () => es.close()
   }, [load])
 

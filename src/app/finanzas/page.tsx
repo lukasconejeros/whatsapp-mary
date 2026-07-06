@@ -18,6 +18,7 @@ export default function FinanzasPage() {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0, 10), tipo: '', monto: '', detalle: '' })
+  const [guardando, setGuardando] = useState(false)
 
   function openNew() {
     setEditId(null)
@@ -61,20 +62,30 @@ export default function FinanzasPage() {
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault()
+    if (guardando) return // evita doble registro por doble toque
     const monto = parseInt(form.monto.replace(/\D/g, ''), 10)
     if (!form.fecha || !monto) return
-    const baseUrl = tab === 'ganancias' ? '/api/ingresos' : '/api/costos'
-    const url = editId ? `${baseUrl}/${editId}` : baseUrl
-    const body = tab === 'ganancias'
-      ? { fecha: form.fecha, tipo: form.tipo, monto, detalle: form.detalle }
-      : { fecha: form.fecha, tipo: form.tipo, valor: monto, notas: form.detalle }
-    const r = await fetch(url, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if ((await r.json()).ok) { closeForm(); load() }
+    setGuardando(true)
+    try {
+      const baseUrl = tab === 'ganancias' ? '/api/ingresos' : '/api/costos'
+      const url = editId ? `${baseUrl}/${editId}` : baseUrl
+      const body = tab === 'ganancias'
+        ? { fecha: form.fecha, tipo: form.tipo, monto, detalle: form.detalle }
+        : { fecha: form.fecha, tipo: form.tipo, valor: monto, notas: form.detalle }
+      const r = await fetch(url, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if ((await r.json()).ok) { closeForm(); load() }
+      else alert('No se pudo guardar. Reintenta.')
+    } catch { alert('No se pudo guardar. Revisa tu internet.') }
+    finally { setGuardando(false) }
   }
 
   async function del(r: Mov) {
+    if (!confirm('¿Borrar este registro? No se puede deshacer.')) return
     const url = tab === 'ganancias' ? `/api/ingresos/${r.id}` : `/api/costos/${r.id}`
-    if ((await fetch(url, { method: 'DELETE' }).then(x => x.json())).ok) load()
+    try {
+      if ((await fetch(url, { method: 'DELETE' }).then(x => x.json())).ok) load()
+      else alert('No se pudo borrar. Reintenta.')
+    } catch { alert('No se pudo borrar. Revisa tu internet.') }
   }
 
   return (
@@ -179,7 +190,7 @@ export default function FinanzasPage() {
             <label style={{ fontSize: 12, color: '#B0708C' }}>Detalle</label>
             <input value={form.detalle} onChange={e => setForm({ ...form, detalle: e.target.value })} placeholder="opcional"
               style={{ width: '100%', margin: '4px 0 16px', padding: '8px 10px', borderRadius: 8, border: '1px solid #FAD1E5', fontFamily: 'inherit', fontSize: 13 }} />
-            <button type="submit" style={{ width: '100%', padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Guardar</button>
+            <button type="submit" disabled={guardando} style={{ width: '100%', padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
           </form>
         </div>
       )}

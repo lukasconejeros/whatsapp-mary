@@ -47,6 +47,12 @@ export default function AsistentePage() {
   }, [])
   useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, pensando, fotos])
 
+  // Al salir del Asistente, cortar dictado/grabación para no dejar el micrófono abierto.
+  useEffect(() => () => {
+    try { srRef.current?.stop() } catch { /* noop */ }
+    try { recRef.current?.stop() } catch { /* noop */ }
+  }, [])
+
   async function subirFotos(files: FileList | null) {
     if (!files || files.length === 0) return
     const nuevas = Array.from(files).slice(0, 5)
@@ -66,6 +72,7 @@ export default function AsistentePage() {
   }
 
   function quitarFoto(url: string) {
+    try { URL.revokeObjectURL(url) } catch { /* noop */ }
     setFotos(f => f.filter(x => x.url !== url))
   }
 

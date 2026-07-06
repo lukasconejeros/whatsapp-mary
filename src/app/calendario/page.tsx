@@ -33,6 +33,7 @@ export default function CalendarioPage() {
   const [filtro, setFiltro] = useState<string>('Todas')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [guardando, setGuardando] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<Form>({ fecha: hoy, profe: 'Mary', hora: '16:00', alumnos: [], alumnosExtra: [], nota: '' })
   const [search, setSearch] = useState('')
@@ -88,20 +89,30 @@ export default function CalendarioPage() {
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault()
-    const url = editId ? `/api/clases/${editId}` : '/api/clases'
-    const body = {
-      fecha: form.fecha,
-      dia: diaFromFecha(form.fecha),
-      profe: form.profe,
-      hora: form.hora || undefined,
-      alumnos: [...form.alumnos, ...form.alumnosExtra],
-      nota: form.nota.trim() || undefined,
-    }
-    const r = await fetch(url, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if ((await r.json()).ok) { closeForm(); load(desde, hasta) }
+    if (guardando) return // evita doble registro por doble toque
+    setGuardando(true)
+    try {
+      const url = editId ? `/api/clases/${editId}` : '/api/clases'
+      const body = {
+        fecha: form.fecha,
+        dia: diaFromFecha(form.fecha),
+        profe: form.profe,
+        hora: form.hora || undefined,
+        alumnos: [...form.alumnos, ...form.alumnosExtra],
+        nota: form.nota.trim() || undefined,
+      }
+      const r = await fetch(url, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if ((await r.json()).ok) { closeForm(); load(desde, hasta) }
+      else alert('No se pudo guardar. Reintenta.')
+    } catch { alert('No se pudo guardar. Revisa tu internet.') }
+    finally { setGuardando(false) }
   }
   async function del(c: Clase) {
-    if ((await fetch(`/api/clases/${c.id}`, { method: 'DELETE' }).then(x => x.json())).ok) load(desde, hasta)
+    if (!confirm('¿Borrar esta clase? No se puede deshacer.')) return
+    try {
+      if ((await fetch(`/api/clases/${c.id}`, { method: 'DELETE' }).then(x => x.json())).ok) load(desde, hasta)
+      else alert('No se pudo borrar. Reintenta.')
+    } catch { alert('No se pudo borrar. Revisa tu internet.') }
   }
 
   const nombreCliente = (id: number) => clientes.find(c => c.id === id)?.nombre || `#${id}`
@@ -312,7 +323,7 @@ export default function CalendarioPage() {
               {clientesOrdenados.length === 0 && <p style={{ fontSize: 12, color: '#DBAFC6', textAlign: 'center', padding: '14px 0' }}>Sin clientes</p>}
             </div>
 
-            <button type="submit" style={{ width: '100%', marginTop: 16, padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Guardar</button>
+            <button type="submit" disabled={guardando} style={{ width: '100%', marginTop: 16, padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
           </form>
         </div>
       )}
