@@ -125,7 +125,15 @@ function scheduleReconnect(code: number | undefined): void {
     reconnectTimer = null;
     handle?.sock.end(undefined); // clean up old socket listeners
     handle = null;
-    await start();
+    try {
+      await start();
+    } catch (err) {
+      // Sin este try/catch, un fallo de start() dejaba la promesa sin capturar
+      // (unhandledRejection → cae el proceso) y NADIE reprogramaba: bot muerto para
+      // siempre. Ahora se reintenta.
+      logger.error({ err }, "Fallo al reconectar; reintentando");
+      scheduleReconnect(code);
+    }
   }, delay);
 }
 

@@ -8,6 +8,7 @@ import {
   setCategoria,
   setCtwaReferral,
   setConversationPhoto,
+  enqueueOutbox,
 } from "../db.js";
 import { describirImagen, transcribirAudio } from "../media.js";
 import { generateReply } from "../ai.js";
@@ -126,22 +127,32 @@ async function procesarMedia(
   }
 }
 
-// Debounce: espera N segundos desde el último mensaje antes de responder
-const DEBOUNCE_MS = parseInt(process.env.REPLY_DEBOUNCE_MS ?? "25000", 10);
+// Lee un número de env con fallback si viene mal (NaN). Antes, un env mal escrito
+// (ej "25s") daba NaN → setTimeout(fn, NaN)=0 → el bot respondía al instante sin
+// debounce ni delay humano; NaN en quiet-hours lo desactivaba.
+function numEnv(name: string, def: number): number {
+  const v = parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(v) ? v : def;
+}
+
+// Debounce: espera N segundos desde el último mensaje antes de responder.
+// Indexado por conversationId (no por phone) para no responder DOBLE cuando el mismo
+// contacto llega bajo @lid y bajo número real (misma conversación deduplicada).
+const DEBOUNCE_MS = numEnv("REPLY_DEBOUNCE_MS", 25000);
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // Delay aleatorio para simular tipeo humano
 function humanDelay(): Promise<void> {
-  const min = parseInt(process.env.REPLY_DELAY_MIN ?? "1000", 10);
-  const max = parseInt(process.env.REPLY_DELAY_MAX ?? "3500", 10);
+  const min = numEnv("REPLY_DELAY_MIN", 1000);
+  const max = numEnv("REPLY_DELAY_MAX", 3500);
   const ms = min + Math.random() * (max - min);
   return new Promise((r) => setTimeout(r, ms));
 }
 
 // Silencio nocturno según hora de Chile (UTC-3/-4 DST)
 function isQuietHour(): boolean {
-  const start = parseInt(process.env.QUIET_HOUR_START ?? "22", 10);
-  const end = parseInt(process.env.QUIET_HOUR_END ?? "8", 10);
+  const start = numEnv("QUIET_HOUR_START", 22);
+  const end = numEnv("QUIET_HOUR_END", 8);
   const hChile = parseInt(
     new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Santiago",
@@ -219,43 +230,42 @@ export async function handleIncomingMessages(
       continue;
     }
 
-    // Silencio nocturno: guardar mensaje pero no responder
+    // Silencio nocturno: el mensaje queda guardado (Mary lo ve y responde); la
+    // auto-respuesta AI no se dispara de noche. (La app trabaja en modo HUMAN, así
+    // que este camino AI casi no se usa.)
     if (isQuietHour()) {
-      logger.info({ phone }, "Silencio nocturno — respuesta diferida");
+      logger.info({ phone }, "Silencio nocturno — sin auto-respuesta");
       continue;
     }
 
-    // Debounce: cancelar timer anterior y arrancar uno nuevo
-    // Si el cliente manda otro mensaje antes de que expire, se reinicia
-    const existingTimer = debounceTimers.get(phone);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-      logger.debug({ phone, debounceMs: DEBOUNCE_MS }, "Debounce reiniciado");
-    }
+    // Debounce por conversationId (no por phone): evita DOBLE respuesta cuando el
+    // mismo contacto llega bajo @lid y bajo número real (misma conversación).
+    const claveDebounce = String(convo.id);
+    const existingTimer = debounceTimers.get(claveDebounce);
+    if (existingTimer) clearTimeout(existingTimer);
 
-    const convId  = convo.id;
-    const jid     = remoteJid;
+    const convId = convo.id;
 
     debounceTimers.set(
-      phone,
+      claveDebounce,
       setTimeout(async () => {
-        debounceTimers.delete(phone);
-
-        await humanDelay();
-
-        const fresh2 = getConversationById(convId);
-        if (!fresh2 || fresh2.mode !== "AI") return;
-
-        const history = getRecentHistory(convId, 20);
-
+        debounceTimers.delete(claveDebounce);
+        // TODAS las lecturas de DB dentro del try: si la web tiene la DB ocupada,
+        // un SQLITE_BUSY aquí (callback async huérfano) tumbaba el proceso del bot.
         try {
+          await humanDelay();
+          const fresh2 = getConversationById(convId);
+          if (!fresh2 || fresh2.mode !== "AI") return;
+          const history = getRecentHistory(convId, 20);
           const reply = await generateReply({ history, conversationId: convId, phone });
           if (!reply) return;
+          // La respuesta sale por el OUTBOX (reintentos + socket vigente tras
+          // reconexión), no por sock.sendMessage directo. Se registra junto al encolado.
           insertMessage(convId, "assistant", reply);
-          await sock.sendMessage(jid, { text: reply });
-          logger.debug({ phone, replyLength: reply.length }, "Respuesta enviada");
+          enqueueOutbox(convId, fresh2.phone, reply);
+          logger.debug({ convId, replyLength: reply.length }, "Respuesta encolada");
         } catch (err) {
-          logger.error({ phone, err }, "Error generando respuesta");
+          logger.error({ convId, err }, "Error generando respuesta");
         }
       }, DEBOUNCE_MS)
     );
