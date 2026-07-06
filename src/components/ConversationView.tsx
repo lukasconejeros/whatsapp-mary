@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Conversation, Message, CHANNEL_CONFIG } from '@/lib/types'
-import { Send, Smile } from 'lucide-react'
+import { Send, Smile, Mic, Square } from 'lucide-react'
 import { ImageNote, AudioNote, VideoNote } from './MediaContent'
 import { Avatar } from './Avatar'
 
@@ -42,6 +42,9 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [suggesting, setSuggesting] = useState(false)
   const [tip, setTip] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
+  const [grabando, setGrabando] = useState(false)
+  const recRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
   const ref = useRef<HTMLDivElement>(null)
   const ch = CHANNEL_CONFIG[conv.channel]
 
@@ -85,6 +88,39 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       if(!r.ok){setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text)}
     } catch { setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text) }
     finally { setSending(false) }
+  }
+
+  // Grabar y enviar una NOTA DE VOZ al contacto (no necesita transcripción).
+  async function toggleMic() {
+    if (grabando) { recRef.current?.stop(); return }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setGrabando(false)
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        if (blob.size === 0) return
+        setSending(true)
+        try {
+          const form = new FormData()
+          form.append('conversationId', String(conv.id))
+          form.append('file', blob, 'nota-voz.webm')
+          const d = await fetch('/api/send-media', { method: 'POST', body: form }).then(r => r.json())
+          if (d.ok) {
+            const tmp: Message = { id: Date.now(), content: '🎤 Audio', media: d.media, messageType: 1, senderName: 'Tú', senderType: 'human', createdAt: Date.now() / 1000, isPrivate: false }
+            setMsgs(p => [...p, tmp])
+          }
+        } finally { setSending(false) }
+      }
+      rec.start()
+      recRef.current = rec
+      setGrabando(true)
+    } catch {
+      setGrabando(false)
+    }
   }
 
   const grouped: { date: string; msgs: Message[] }[] = []
@@ -198,6 +234,10 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             onFocus={e=>{e.target.style.borderColor='#EC4899';e.target.style.background='#fff'}}
             onBlur={e=>{e.target.style.borderColor='#FAD1E5';e.target.style.background='#FFF4FA'}}
           />
+          <button type="button" onClick={toggleMic} title={grabando?'Detener y enviar':'Grabar nota de voz'}
+            style={{ width:34,height:34,borderRadius:8,border:'none',background:grabando?'#DC2626':'#FAD1E5',color:grabando?'#fff':'#9D174D',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            {grabando ? <Square size={15}/> : <Mic size={16}/>}
+          </button>
           <button type="submit" disabled={!reply.trim()||sending}
             style={{ width:34,height:34,borderRadius:8,border:'none',background:reply.trim()&&!sending?'#EC4899':'#FAD1E5',color:'#fff',cursor:reply.trim()&&!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
             <Send size={13}/>

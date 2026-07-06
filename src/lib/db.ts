@@ -55,8 +55,8 @@ export interface OutboxItem {
   conversation_id: number;
   phone: string;
   content: string;
-  kind: "text" | "image"; // 'image' → content es el caption y media el archivo a enviar
-  media: string | null;   // nombre del archivo en data/media (solo para kind='image')
+  kind: "text" | "image" | "audio"; // image/audio → media es el archivo a enviar
+  media: string | null;   // nombre del archivo en data/media (para image/audio)
   sent: number;
   created_at: number;
 }
@@ -462,7 +462,7 @@ export function enqueueOutbox(
   conversationId: number,
   phone: string,
   content: string,
-  opts?: { kind?: "text" | "image"; media?: string | null }
+  opts?: { kind?: "text" | "image" | "audio"; media?: string | null }
 ): number {
   const kind = opts?.kind ?? "text";
   const media = opts?.media ?? null;

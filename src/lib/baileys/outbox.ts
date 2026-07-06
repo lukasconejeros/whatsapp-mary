@@ -28,18 +28,24 @@ export function startOutboxLoop(sock: WASocket): void {
         // kind='image' → mandar la foto (content es el caption, opcional).
         // Cualquier otro valor (incl. 'text' o null en filas viejas) → texto.
         let payload: AnyMessageContent;
-        if (item.kind === "image" && item.media) {
+        if ((item.kind === "image" || item.kind === "audio") && item.media) {
           const file = path.join(MEDIA_DIR, item.media);
           if (!fs.existsSync(file)) {
             // Archivo perdido: no reintentar para siempre; marcar como enviado y seguir.
-            logger.warn({ id: item.id, media: item.media }, "Outbox: foto no encontrada, se omite");
+            logger.warn({ id: item.id, media: item.media }, "Outbox: archivo no encontrado, se omite");
             markOutboxSent(item.id);
             continue;
           }
           const buffer = fs.readFileSync(file);
-          payload = item.content
-            ? { image: buffer, caption: item.content }
-            : { image: buffer };
+          if (item.kind === "audio") {
+            // Nota de voz (push-to-talk). El opus dentro de webm/ogg es compatible;
+            // los .m4a/.mp4 (iPhone) van como audio/mp4.
+            const ext = path.extname(item.media).toLowerCase();
+            const mimetype = ext === ".m4a" || ext === ".mp4" ? "audio/mp4" : "audio/ogg; codecs=opus";
+            payload = { audio: buffer, ptt: true, mimetype };
+          } else {
+            payload = item.content ? { image: buffer, caption: item.content } : { image: buffer };
+          }
         } else {
           payload = { text: item.content };
         }
