@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { enviarPush } from "@/lib/push";
+import { listPushSubs } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,14 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get("t") !== TOKEN) {
     return NextResponse.json({ ok: false, error: "no" }, { status: 401 });
   }
+
+  // ?test=push → manda una notificación de PRUEBA a los dispositivos suscritos.
+  if (req.nextUrl.searchParams.get("test") === "push") {
+    const n = listPushSubs().length;
+    await enviarPush({ titulo: "Prueba Arteluk 🎨", cuerpo: "Si ves esto, las notificaciones funcionan.", url: "/inbox" });
+    return NextResponse.json({ ok: true, enviadoA: n });
+  }
+
   const db = new Database(path.resolve(process.cwd(), "data/messages.db"), { readonly: true });
   try {
     const conn = db.prepare("SELECT status, updated_at FROM connection_state WHERE id=1").get() as
