@@ -19,8 +19,7 @@ function timeAgo(ts: string | number): string {
   return `${Math.floor(s / 86400)}d`
 }
 
-const FILTERS: { key: 'todas' | Categoria; label: string }[] = [
-  { key: 'todas', label: 'Todas' },
+const FILTERS: { key: Categoria; label: string }[] = [
   { key: 'mary', label: 'Mary' },
   { key: 'arteluk', label: 'Arteluk' },
   { key: 'potencial', label: 'Meta' },
@@ -34,7 +33,7 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'todas' | Categoria>('todas')
+  const [filter, setFilter] = useState<Categoria>('arteluk')
   const [noti, setNoti] = useState<EstadoNoti>('inactivas')
   const [activando, setActivando] = useState(false)
 
@@ -89,7 +88,7 @@ export default function InboxPage() {
 
   const filtered = useMemo(() => {
     let list = conversations
-    if (filter !== 'todas') list = list.filter(c => (c.categoria ?? 'mary') === filter)
+    list = list.filter(c => (c.categoria ?? 'mary') === filter)
     const q = search.trim().toLowerCase()
     if (q) list = list.filter(c =>
       c.contact.name.toLowerCase().includes(q) ||

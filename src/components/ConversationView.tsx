@@ -40,6 +40,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
+  const [redactando, setRedactando] = useState(false)
   const [tip, setTip] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [grabando, setGrabando] = useState(false)
@@ -97,6 +98,26 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       if (d.ok && d.suggestion) setReply(d.suggestion)
       if (d.ok && d.tip) setTip(d.tip)
     } finally { setSuggesting(false) }
+  }
+
+  // Toma la nota que Mary escribió en la caja y la convierte en un mensaje bonito
+  // (con el nombre del apoderado y del niño). Deja el resultado en la caja, editable.
+  async function redactarBonito() {
+    const base = reply.trim()
+    if (redactando) return
+    if (!base) { setSendError('Primero escribe qué quieres decir (ej: "hoy hizo un cuadro precioso").'); return }
+    setRedactando(true); setSendError('')
+    try {
+      const r = await fetch('/api/redactar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conv.id, texto: base }) })
+      const d = await r.json()
+      if (d.ok && d.mensaje) setReply(d.mensaje)
+      else setSendError(d.error || 'No se pudo redactar')
+    } catch {
+      setSendError('No se pudo redactar. Revisa tu internet.')
+    } finally {
+      setRedactando(false)
+    }
   }
 
   async function send(e: React.FormEvent) {
@@ -251,10 +272,17 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           </div>
         )}
         {!conv.botActive && (
-          <button type="button" onClick={suggest} disabled={suggesting}
-            style={{ alignSelf:'flex-start',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FAD1E5',background:'#FDE7F1',color:'#EC4899',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
-            {suggesting ? '⟳ Pensando...' : '✦ Sugerir respuesta y consejo'}
-          </button>
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
+            <button type="button" onClick={redactarBonito} disabled={redactando}
+              title="Escribe tu nota arriba y esto la convierte en un mensaje bonito con el nombre"
+              style={{ display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#BE185D',fontSize:11,fontWeight:600,cursor:redactando?'wait':'pointer',opacity:redactando?0.6:1,fontFamily:'inherit' }}>
+              {redactando ? '⟳ Redactando…' : '✨ Redactar bonito'}
+            </button>
+            <button type="button" onClick={suggest} disabled={suggesting}
+              style={{ display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FAD1E5',background:'#FDE7F1',color:'#EC4899',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
+              {suggesting ? '⟳ Pensando…' : '✦ Sugerir respuesta'}
+            </button>
+          </div>
         )}
         {grabando ? (
           <div style={{ display:'flex',alignItems:'center',gap:10,padding:'3px 2px' }}>
