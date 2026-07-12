@@ -20,3 +20,7 @@ export function todaySantiago(): string {
 export function monthSantiago(): string {
   return partsSantiago().date.slice(0, 7);
 }
+// Hora del día (0-23) en Santiago. Para ventanas horarias (ej. no mandar de noche).
+export function hourSantiago(): number {
+  return parseInt(partsSantiago().time.slice(0, 2), 10) || 0;
+}

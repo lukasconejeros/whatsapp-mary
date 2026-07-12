@@ -109,6 +109,21 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(sent, created_at);
 
+-- Cola de CAMPAÑA de seguimiento (Fase 3). Separada del outbox: el bot la drena de a
+-- uno, con pausas largas y tope diario (anti-baneo). estado: pendiente|enviado|omitido.
+CREATE TABLE IF NOT EXISTS seguimientos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  phone TEXT NOT NULL,
+  estado TEXT NOT NULL DEFAULT 'pendiente',
+  mensaje TEXT,                 -- se llena al enviar (redacción IA por contacto)
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  sent_at INTEGER,
+  sent_day TEXT                 -- 'YYYY-MM-DD' Santiago del envío (para el tope diario)
+);
+CREATE INDEX IF NOT EXISTS idx_seguimientos_estado ON seguimientos(estado, created_at);
+CREATE INDEX IF NOT EXISTS idx_seguimientos_conv ON seguimientos(conversation_id);
+
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER REFERENCES conversations(id),
@@ -408,6 +423,96 @@ export function setEstado(conversationId: number, estado: ConversationEstado): v
 // seguimiento masivo (Fase 3) y se ven atenuados en la lista.
 export function setCerrado(conversationId: number, cerrado: boolean): void {
   ctx().db.prepare("UPDATE conversations SET cerrado = ? WHERE id = ?").run(cerrado ? 1 : 0, conversationId);
+}
+
+// ── Cola de campaña de seguimiento (Fase 3) ──────────────────────────────────
+export interface SeguimientoLead { id: number; phone: string; name: string | null; }
+
+// Leads de Meta (potencial) NO cerrados = candidatos al seguimiento masivo.
+export function getLeadsParaSeguimiento(): SeguimientoLead[] {
+  return ctx().db
+    .prepare(
+      "SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 0 ORDER BY COALESCE(last_message_at, created_at) DESC"
+    )
+    .all() as SeguimientoLead[];
+}
+
+// Encola seguimientos para los leads dados, SALTANDO a quien ya tiene uno pendiente o
+// ya enviado (nunca se re-mensajea al mismo). Devuelve cuántos se agregaron.
+export function enqueueSeguimientos(items: { id: number; phone: string }[]): number {
+  const c = ctx();
+  const yaTiene = c.db.prepare(
+    "SELECT 1 FROM seguimientos WHERE conversation_id = ? AND estado IN ('pendiente','enviado') LIMIT 1"
+  );
+  const ins = c.db.prepare("INSERT INTO seguimientos (conversation_id, phone) VALUES (?, ?)");
+  const tx = c.db.transaction(() => {
+    let n = 0;
+    for (const it of items) {
+      if (yaTiene.get(it.id)) continue;
+      ins.run(it.id, it.phone);
+      n++;
+    }
+    return n;
+  });
+  return tx();
+}
+
+// Encola UNA prueba para una conversación concreta, SIN dedup (para poder probar el
+// envío real a un número propio antes de soltar el masivo, cuantas veces haga falta).
+export function enqueueSeguimientoTest(conversationId: number, phone: string): void {
+  ctx().db.prepare("INSERT INTO seguimientos (conversation_id, phone) VALUES (?, ?)").run(conversationId, phone);
+}
+
+export interface SeguimientoPendiente { id: number; conversation_id: number; phone: string; }
+
+// El seguimiento pendiente más antiguo (el bot los envía de a uno).
+export function getSeguimientoPendiente(): SeguimientoPendiente | null {
+  return (
+    (ctx().db
+      .prepare(
+        "SELECT id, conversation_id, phone FROM seguimientos WHERE estado = 'pendiente' ORDER BY created_at ASC, id ASC LIMIT 1"
+      )
+      .get() as SeguimientoPendiente | undefined) ?? null
+  );
+}
+
+// Cuántos se enviaron en un día Santiago dado (para el tope diario anti-baneo).
+export function countSeguimientosEnviadosDia(dia: string): number {
+  const r = ctx().db
+    .prepare("SELECT COUNT(*) AS n FROM seguimientos WHERE estado = 'enviado' AND sent_day = ?")
+    .get(dia) as { n: number };
+  return r.n;
+}
+
+export function markSeguimientoEnviado(id: number, mensaje: string, dia: string): void {
+  ctx().db
+    .prepare(
+      "UPDATE seguimientos SET estado = 'enviado', mensaje = ?, sent_at = unixepoch(), sent_day = ? WHERE id = ?"
+    )
+    .run(mensaje, dia, id);
+}
+
+export function markSeguimientoOmitido(id: number): void {
+  ctx().db.prepare("UPDATE seguimientos SET estado = 'omitido' WHERE id = ?").run(id);
+}
+
+// Detener campaña: todos los pendientes pasan a omitido. Devuelve cuántos se detuvieron.
+export function omitirSeguimientosPendientes(): number {
+  const r = ctx().db.prepare("UPDATE seguimientos SET estado = 'omitido' WHERE estado = 'pendiente'").run();
+  return r.changes as number;
+}
+
+export interface SeguimientoStats {
+  pendientes: number;
+  enviados: number;
+  omitidos: number;
+  enviadosHoy: number;
+}
+export function getSeguimientoStats(dia: string): SeguimientoStats {
+  const db = ctx().db;
+  const g = (estado: string) =>
+    (db.prepare("SELECT COUNT(*) AS n FROM seguimientos WHERE estado = ?").get(estado) as { n: number }).n;
+  return { pendientes: g("pendiente"), enviados: g("enviado"), omitidos: g("omitido"), enviadosHoy: countSeguimientosEnviadosDia(dia) };
 }
 
 export function getConversationById(id: number): Conversation | null {

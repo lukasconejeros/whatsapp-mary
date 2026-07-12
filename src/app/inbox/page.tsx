@@ -36,8 +36,55 @@ export default function InboxPage() {
   const [filter, setFilter] = useState<Categoria>('arteluk')
   const [noti, setNoti] = useState<EstadoNoti>('inactivas')
   const [activando, setActivando] = useState(false)
+  const [segStats, setSegStats] = useState<{ pendientes: number; enviados: number; omitidos: number; enviadosHoy: number } | null>(null)
+  const [segCand, setSegCand] = useState(0)
+  const [segBusy, setSegBusy] = useState(false)
 
   useEffect(() => { estadoNotificaciones().then(setNoti) }, [])
+
+  // Progreso de la campaña de seguimiento (solo importa en la vista Meta).
+  const cargarSeguimiento = useCallback(async () => {
+    try {
+      const d = await fetch('/api/seguimiento').then(r => r.json())
+      if (d.ok) { setSegStats(d.stats); setSegCand(d.candidatos) }
+    } catch { /* sin conexión: no romper la vista */ }
+  }, [])
+
+  async function iniciarSeguimiento() {
+    if (segBusy) return
+    if (!confirm(`¿Enviar el mensaje de seguimiento a ${segCand} lead(s) de Meta?\n\nSe mandan de a poco, con pausas, para no arriesgar el número (tope diario). Los que marcaste como "Cerrado" quedan fuera.`)) return
+    setSegBusy(true)
+    try {
+      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'iniciar' }) }).then(r => r.json())
+      if (d.ok) { setSegStats(d.stats); await cargarSeguimiento(); alert(`Listo: ${d.agregados} en cola. Se irán enviando solos, de a poco.`) }
+      else alert(d.error || 'No se pudo iniciar')
+    } catch { alert('No se pudo iniciar. Revisa tu internet.') }
+    finally { setSegBusy(false) }
+  }
+
+  async function detenerSeguimiento() {
+    if (segBusy) return
+    if (!confirm('¿Detener la campaña? Los que faltan por enviar se cancelan (los ya enviados quedan).')) return
+    setSegBusy(true)
+    try {
+      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'detener' }) }).then(r => r.json())
+      if (d.ok) { setSegStats(d.stats); await cargarSeguimiento() }
+    } catch { /* la próxima recarga refleja el estado real */ }
+    finally { setSegBusy(false) }
+  }
+
+  // Envía UN seguimiento de prueba a este contacto (para verificar con tu propio número).
+  async function probarSeguimiento(id: number) {
+    if (segBusy) return
+    if (!confirm('¿Enviar UN seguimiento de prueba a este contacto?\n\nÚsalo con tu propio número para verificar que llega bien antes del envío masivo.')) return
+    setSegBusy(true)
+    try {
+      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test', conversationId: id }) }).then(r => r.json())
+      if (d.ok) { alert('En cola. El bot lo enviará en menos de un minuto.'); cargarSeguimiento() }
+      else alert(d.error || 'No se pudo enviar la prueba')
+    } catch { alert('No se pudo. Revisa tu internet.') }
+    finally { setSegBusy(false) }
+  }
 
   async function onActivarNoti() {
     if (activando) return
@@ -85,6 +132,14 @@ export default function InboxPage() {
     })
     return () => es.close()
   }, [load])
+
+  // En la vista Meta, carga el progreso y lo refresca cada 6 s (se ve avanzar la campaña).
+  useEffect(() => {
+    if (filter !== 'potencial') return
+    cargarSeguimiento()
+    const t = setInterval(cargarSeguimiento, 6000)
+    return () => clearInterval(t)
+  }, [filter, cargarSeguimiento])
 
   const filtered = useMemo(() => {
     let list = conversations
@@ -182,6 +237,37 @@ export default function InboxPage() {
               </div>
             </div>
 
+            {filter === 'potencial' && (
+              <div style={{ padding: '10px 12px', borderBottom: '1px solid #FDE7F1', background: '#FFF9FC' }}>
+                <div className="flex items-center" style={{ gap: 8, marginBottom: (segStats && segStats.pendientes > 0) ? 8 : 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#9D174D' }}>Seguimiento a leads</p>
+                    <p style={{ fontSize: 11, color: '#B0708C', marginTop: 1 }}>
+                      {segStats && segStats.pendientes > 0
+                        ? `Enviando… ${segStats.enviados} enviados · ${segStats.pendientes} en cola`
+                        : `${segCand} lead(s) sin cerrar · clase de prueba $18.000`}
+                    </p>
+                  </div>
+                  {segStats && segStats.pendientes > 0 ? (
+                    <button onClick={detenerSeguimiento} disabled={segBusy}
+                      style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 8, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FCA5A5', background: '#fff', color: '#DC2626', flexShrink: 0, opacity: segBusy ? 0.5 : 1 }}>
+                      Detener
+                    </button>
+                  ) : (
+                    <button onClick={iniciarSeguimiento} disabled={segBusy || segCand === 0}
+                      style={{ fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 8, cursor: (segBusy || segCand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || segCand === 0) ? '#F7CFE1' : '#EC4899', color: '#fff', flexShrink: 0 }}>
+                      {segBusy ? 'Enviando…' : 'Enviar seguimiento'}
+                    </button>
+                  )}
+                </div>
+                {segStats && segStats.pendientes > 0 && (
+                  <div style={{ height: 5, borderRadius: 999, background: '#FDE7F1', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 999, background: '#EC4899', width: `${Math.round((segStats.enviados / Math.max(1, segStats.enviados + segStats.pendientes)) * 100)}%`, transition: 'width 0.4s' }} />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p style={{ fontSize: 12, color: '#DBAFC6', textAlign: 'center', padding: '30px 16px' }}>
@@ -239,14 +325,20 @@ export default function InboxPage() {
                       </button>
                     )
                   })}
-                  {/* Cerrar lead: solo para los de Meta (potencial). Excluye del seguimiento masivo. */}
+                  {/* Solo para los de Meta (potencial): probar 1 envío + cerrar el lead. */}
                   {(selected.categoria ?? 'mary') === 'potencial' && (
-                    <button onClick={() => marcarCerrado(selected.id, !selected.cerrado)} title={selected.cerrado ? 'Reabrir este lead' : 'Marcar como cerrado (fuera del seguimiento)'}
-                      className="flex items-center" style={{ marginLeft: 'auto', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
-                        border: selected.cerrado ? '1px solid #9CA3AF' : '1px solid #FAD1E5', background: selected.cerrado ? '#6B7280' : '#fff', color: selected.cerrado ? '#fff' : '#B0708C' }}>
-                      {selected.cerrado ? <CheckCircle2 size={13} /> : <Circle size={13} />}
-                      {selected.cerrado ? 'Cerrado' : 'Cerrar'}
-                    </button>
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                      <button onClick={() => probarSeguimiento(selected.id)} disabled={segBusy} title="Enviar UN seguimiento de prueba a este contacto (úsalo con tu número)"
+                        style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C', opacity: segBusy ? 0.5 : 1 }}>
+                        Probar
+                      </button>
+                      <button onClick={() => marcarCerrado(selected.id, !selected.cerrado)} title={selected.cerrado ? 'Reabrir este lead' : 'Marcar como cerrado (fuera del seguimiento)'}
+                        className="flex items-center" style={{ gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                          border: selected.cerrado ? '1px solid #9CA3AF' : '1px solid #FAD1E5', background: selected.cerrado ? '#6B7280' : '#fff', color: selected.cerrado ? '#fff' : '#B0708C' }}>
+                        {selected.cerrado ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                        {selected.cerrado ? 'Cerrado' : 'Cerrar'}
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
