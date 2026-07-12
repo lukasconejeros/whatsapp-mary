@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listMovimientos, listIngresos, listCostos, listClases, listClientes } from "@/lib/db";
 import { monthSantiago } from "@/lib/fechas";
+import { autorizadoMaquina } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
-// Contexto que usa el asistente de Telegram para responder preguntas
-// sobre finanzas y calendario. Protegido con el mismo token de movimientos.
+// Contexto que usa el asistente de Telegram para responder preguntas sobre finanzas
+// y calendario. Devuelve datos personales de apoderados → FAIL-CLOSED (sesión o clave).
 export async function GET(req: NextRequest) {
-  const key = process.env.MOVIMIENTOS_API_KEY;
-  if (key && key.trim() && req.headers.get("x-api-key") !== key) {
+  if (!(await autorizadoMaquina(req))) {
     return NextResponse.json({ ok: false, error: "no autorizado" }, { status: 401 });
   }
   const mes = req.nextUrl.searchParams.get("mes") || monthSantiago();

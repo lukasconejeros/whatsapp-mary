@@ -26,7 +26,14 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { font-size: 14px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* En el teléfono agrandamos los campos de formulario para que sean legibles y fáciles
+   de tocar (Mary usa iPhone). Se mantiene la pantalla estática (sin zoom con los dedos,
+   como se pidió); esto sube tamaño sin necesitar zoom. */
+@media (max-width: 767px) {
+  input, textarea, select { font-size: 16px !important; }
+}
 
 body {
   background: var(--color-bg);
@@ -98,8 +105,8 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
     align-items: center !important;
     justify-content: center;
     gap: 3px !important;
-    padding: 7px 2px !important;
-    font-size: 10px !important;
+    padding: 9px 2px !important;
+    font-size: 12px !important;
     text-align: center;
     box-shadow: none !important;
     background: transparent !important;

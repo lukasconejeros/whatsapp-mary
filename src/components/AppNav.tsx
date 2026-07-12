@@ -75,7 +75,7 @@ export default function AppNav() {
                 textDecoration: 'none' }}
               onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
-              <Icon size={15} strokeWidth={active ? 2.2 : 1.7} style={{ color: active ? '#EC4899' : '#CE8AAE' }} />
+              <Icon size={22} strokeWidth={active ? 2.2 : 1.7} style={{ color: active ? '#EC4899' : '#CE8AAE' }} />
               <span style={{ flex: 1 }}>{label}</span>
               {isConexion && dotColor && (
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor,

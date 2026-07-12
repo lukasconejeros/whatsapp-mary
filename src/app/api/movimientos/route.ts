@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addMovimiento, listMovimientos } from "@/lib/db";
 import { nowSantiago, monthSantiago } from "@/lib/fechas";
+import { autorizadoMaquina } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const key = process.env.MOVIMIENTOS_API_KEY;
-  if (key && key.trim() && req.headers.get("x-api-key") !== key) {
+  if (!(await autorizadoMaquina(req))) {
     return NextResponse.json({ ok: false, error: "no autorizado" }, { status: 401 });
   }
   const b = await req.json() as {
@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  if (!(await autorizadoMaquina(req))) {
+    return NextResponse.json({ ok: false, error: "no autorizado" }, { status: 401 });
+  }
   const mes = req.nextUrl.searchParams.get("mes") || monthSantiago();
   if (!/^\d{4}-\d{2}$/.test(mes)) {
     return NextResponse.json({ ok: false, error: "mes inválido (YYYY-MM)" }, { status: 400 });

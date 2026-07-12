@@ -218,15 +218,15 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #FDE7F1', background:'#fff', flexShrink:0 }}>
-        <Avatar src={conv.contact.avatar} size={32} />
+        <Avatar src={conv.contact.avatar} size={38} />
         <div style={{ flex:1, minWidth:0 }}>
-          <p style={{ fontSize:13,fontWeight:600,color:'#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{conv.contact.name}</p>
+          <p style={{ fontSize:15,fontWeight:600,color:'#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{conv.contact.name}</p>
           <div style={{ display:'flex',alignItems:'center',gap:6,marginTop:2 }}>
-            <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontSize:11,color:'#94A3B8' }}>
+            <span style={{ display:'inline-flex',alignItems:'center',gap:4,fontSize:12,color:'#94A3B8' }}>
               <span style={{width:5,height:5,borderRadius:'50%',background:CHANNEL_DOT[conv.channel] ?? ch.dot,display:'inline-block'}}/>
               {ch.label}
             </span>
-            {conv.contact.phone && <span style={{fontSize:11,color:'#94A3B8'}}>{conv.contact.phone}</span>}
+            {conv.contact.phone && <span style={{fontSize:12,color:'#94A3B8'}}>{conv.contact.phone}</span>}
           </div>
         </div>
         <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #FAD1E5',color: conv.botActive ? '#EC4899' : '#94A3B8',background:'#FFF4FA',flexShrink:0 }}>
@@ -248,7 +248,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           <div key={g.date}>
             <div style={{ display:'flex',alignItems:'center',gap:8,margin:'14px 0 10px' }}>
               <div style={{flex:1,height:1,background:'#FDE7F1'}}/>
-              <span style={{fontSize:11,color:'#94A3B8',fontWeight:500}}>{g.date}</span>
+              <span style={{fontSize:12,color:'#94A3B8',fontWeight:500}}>{g.date}</span>
               <div style={{flex:1,height:1,background:'#FDE7F1'}}/>
             </div>
             {g.msgs.map((m,i)=>{
@@ -257,8 +257,8 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
               return (
                 <div key={m.id} style={{ display:'flex', justifyContent: isOut?'flex-end':'flex-start', marginBottom:3 }}>
                   <div style={{ maxWidth:'76%' }}>
-                    {showName && <p style={{fontSize:11,color:'#94A3B8',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
-                    <div style={{ borderRadius:12, padding:'8px 12px', fontSize:13, lineHeight:1.55,
+                    {showName && <p style={{fontSize:12,color:'#94A3B8',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
+                    <div style={{ borderRadius:12, padding:'9px 13px', fontSize:15, lineHeight:1.5,
                       ...(isOut ? { background:'#EC4899', color:'#fff', borderBottomRightRadius:4 }
                                : { background:'#FFF4FA', color:'#0F172A', border:'1px solid #FAD1E5', borderBottomLeftRadius:4 }) }}>
                       {m.media && (
@@ -272,7 +272,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
                       )}
                       {showText(m) && <span style={{ whiteSpace:'pre-wrap' }}>{m.content}</span>}
                     </div>
-                    <p style={{fontSize:10,color:'#E9A9CC',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
+                    <p style={{fontSize:11.5,color:'#E9A9CC',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
                       {fmt(m.createdAt)}{isOut&&m.senderName&&m.senderName!=='Tú'&&` · ${m.senderName}`}
                     </p>
                   </div>
@@ -296,7 +296,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
             <button type="button" onClick={redactarBonito} disabled={redactando}
               title="Escribe tu nota arriba y esto la convierte en un mensaje bonito con el nombre"
-              style={{ display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#BE185D',fontSize:11,fontWeight:600,cursor:redactando?'wait':'pointer',opacity:redactando?0.6:1,fontFamily:'inherit' }}>
+              style={{ display:'flex',alignItems:'center',gap:5,padding:'7px 13px',borderRadius:9,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#BE185D',fontSize:13,fontWeight:600,cursor:redactando?'wait':'pointer',opacity:redactando?0.6:1,fontFamily:'inherit' }}>
               {redactando ? '⟳ Redactando…' : '✨ Redactar bonito'}
             </button>
           </div>
@@ -320,7 +320,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         ) : (
         <div style={{ display:'flex',alignItems:'flex-end',gap:8,position:'relative' }}>
           {showEmoji && (
-            <div style={{ position:'absolute',bottom:42,left:0,background:'#fff',border:'1px solid #FAD1E5',borderRadius:12,padding:8,boxShadow:'0 8px 24px rgba(190,24,93,0.18)',display:'grid',gridTemplateColumns:'repeat(8, 1fr)',gap:2,width:290,maxHeight:190,overflowY:'auto',zIndex:20 }}>
+            <div style={{ position:'absolute',bottom:52,left:0,background:'#fff',border:'1px solid #FAD1E5',borderRadius:12,padding:8,boxShadow:'0 8px 24px rgba(190,24,93,0.18)',display:'grid',gridTemplateColumns:'repeat(8, 1fr)',gap:2,width:290,maxHeight:190,overflowY:'auto',zIndex:20 }}>
               {EMOJIS.map(em => (
                 <button key={em} type="button" onClick={()=>{setReply(r=>r+em)}}
                   style={{ fontSize:20,lineHeight:1.4,padding:2,background:'none',border:'none',cursor:'pointer',borderRadius:6 }}
@@ -330,30 +330,30 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             </div>
           )}
           <button type="button" onClick={()=>setShowEmoji(s=>!s)} title="Emojis"
-            style={{ width:34,height:34,borderRadius:8,border:'1px solid #FAD1E5',background: showEmoji?'#FDE7F1':'#FFF4FA',color:'#EC4899',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-            <Smile size={17}/>
+            style={{ width:44,height:44,borderRadius:10,border:'1px solid #FAD1E5',background: showEmoji?'#FDE7F1':'#FFF4FA',color:'#EC4899',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            <Smile size={22}/>
           </button>
           <input ref={fotoInputRef} type="file" accept="image/*" onChange={enviarFoto} style={{ display:'none' }} />
           <button type="button" onClick={()=>fotoInputRef.current?.click()} disabled={sending} title="Enviar foto"
-            style={{ width:34,height:34,borderRadius:8,border:'1px solid #FAD1E5',background:'#FFF4FA',color: sending?'#F7CFE1':'#EC4899',cursor: sending?'default':'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-            <ImageIcon size={17}/>
+            style={{ width:44,height:44,borderRadius:10,border:'1px solid #FAD1E5',background:'#FFF4FA',color: sending?'#F7CFE1':'#EC4899',cursor: sending?'default':'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            <ImageIcon size={22}/>
           </button>
           <textarea value={reply} onChange={e=>setReply(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e as unknown as React.FormEvent)}}}
             placeholder="Escribe un mensaje..." rows={2}
-            style={{ flex:1,resize:'none',borderRadius:8,padding:'8px 11px',fontSize:13,border:'1px solid #FAD1E5',background:'#FFF4FA',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
+            style={{ flex:1,resize:'none',borderRadius:10,padding:'10px 13px',fontSize:15,border:'1px solid #FAD1E5',background:'#FFF4FA',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
             onFocus={e=>{e.target.style.borderColor='#EC4899';e.target.style.background='#fff'}}
             onBlur={e=>{e.target.style.borderColor='#FAD1E5';e.target.style.background='#FFF4FA'}}
           />
           {reply.trim() ? (
             <button type="submit" disabled={sending}
-              style={{ width:38,height:38,borderRadius:'50%',border:'none',background:!sending?'#EC4899':'#FAD1E5',color:'#fff',cursor:!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-              <Send size={15}/>
+              style={{ width:44,height:44,borderRadius:'50%',border:'none',background:!sending?'#EC4899':'#FAD1E5',color:'#fff',cursor:!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Send size={20}/>
             </button>
           ) : (
             <button type="button" onClick={iniciarGrabacion} title="Grabar nota de voz"
-              style={{ width:38,height:38,borderRadius:'50%',border:'none',background:'#EC4899',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-              <Mic size={17}/>
+              style={{ width:44,height:44,borderRadius:'50%',border:'none',background:'#EC4899',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Mic size={22}/>
             </button>
           )}
         </div>

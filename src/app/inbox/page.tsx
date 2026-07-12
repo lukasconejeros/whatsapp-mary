@@ -292,7 +292,7 @@ export default function InboxPage() {
                     const on = (selected.categoria ?? 'mary') === cat
                     return (
                       <button key={cat} onClick={() => cambiarCategoria(selected.id, cat)} title={CATEGORIA_CONFIG[cat].label}
-                        style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 9px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                        style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
                           border: on ? '1px solid #EC4899' : '1px solid #FAD1E5', background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
                         {CAT_SHORT[cat]}
                       </button>

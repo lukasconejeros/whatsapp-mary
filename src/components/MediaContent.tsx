@@ -1,7 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Play, Pause } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Play, Pause, X } from 'lucide-react'
 
 const fmt = (s: number) => {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -19,7 +19,10 @@ export function AudioNote({ src }: { src: string }) {
   function toggle() {
     const a = ref.current
     if (!a) return
-    if (a.paused) { a.play(); setPlaying(true) } else { a.pause(); setPlaying(false) }
+    // play() devuelve promesa; si el códec no está soportado (ej. ogg/opus en iOS)
+    // o el navegador la bloquea, NO dejar la UI mostrando "pausar" como si sonara.
+    if (a.paused) { a.play().then(() => setPlaying(true)).catch(() => setPlaying(false)) }
+    else { a.pause(); setPlaying(false) }
   }
   function seek(e: React.MouseEvent<HTMLDivElement>) {
     const a = ref.current
@@ -30,16 +33,16 @@ export function AudioNote({ src }: { src: string }) {
   const pct = isFinite(dur) && dur > 0 ? (cur / dur) * 100 : 0
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 190, padding: '2px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 200, padding: '2px 0' }}>
       <button onClick={toggle} aria-label={playing ? 'Pausar' : 'Reproducir'}
-        style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        {playing ? <Pause size={15} /> : <Play size={15} style={{ marginLeft: 2 }} />}
+        style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {playing ? <Pause size={19} /> : <Play size={19} style={{ marginLeft: 2 }} />}
       </button>
       <div style={{ flex: 1 }}>
-        <div onClick={seek} style={{ height: 4, background: '#CBD5E1', borderRadius: 2, cursor: 'pointer', position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: '#EC4899', borderRadius: 2 }} />
+        <div onClick={seek} style={{ height: 7, background: '#CBD5E1', borderRadius: 4, cursor: 'pointer', position: 'relative' }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: '#EC4899', borderRadius: 4 }} />
         </div>
-        <div style={{ fontSize: 10, color: '#64748B', marginTop: 4 }}>{fmt(cur)} / {fmt(dur)}</div>
+        <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{fmt(cur)} / {fmt(dur)}</div>
       </div>
       <audio ref={ref} src={src} preload="metadata"
         onLoadedMetadata={e => setDur((e.target as HTMLAudioElement).duration)}
@@ -49,11 +52,37 @@ export function AudioNote({ src }: { src: string }) {
   )
 }
 
-// Miniatura de imagen: tamaño acotado, esquinas redondeadas, clic para abrir grande.
+// Miniatura de imagen: al tocarla abre un VISOR PROPIO a pantalla completa con botón
+// de cerrar grande. Antes hacía window.open, que en la app instalada (PWA sin barra
+// del navegador) dejaba la foto abierta SIN forma de volver.
 export function ImageNote({ src }: { src: string }) {
+  const [abierta, setAbierta] = useState(false)
+
+  useEffect(() => {
+    if (!abierta) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierta(false) }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden' // no scrollear el chat detrás del visor
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [abierta])
+
   return (
-    <img src={src} alt="foto" onClick={() => window.open(src, '_blank')}
-      style={{ display: 'block', maxWidth: 220, maxHeight: 260, borderRadius: 8, cursor: 'zoom-in' }} />
+    <>
+      <img src={src} alt="foto" onClick={() => setAbierta(true)}
+        style={{ display: 'block', maxWidth: 220, maxHeight: 260, borderRadius: 8, cursor: 'zoom-in' }} />
+      {abierta && (
+        <div onClick={() => setAbierta(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+          <button onClick={(e) => { e.stopPropagation(); setAbierta(false) }} aria-label="Cerrar"
+            style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', right: 14, width: 48, height: 48, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.18)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+            <X size={26} />
+          </button>
+          <img src={src} alt="foto" onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '96%', maxHeight: '90%', objectFit: 'contain', borderRadius: 8 }} />
+        </div>
+      )}
+    </>
   )
 }
 
