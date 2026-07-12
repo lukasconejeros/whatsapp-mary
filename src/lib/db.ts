@@ -32,6 +32,7 @@ export interface Conversation {
 
 export interface ConversationListItem extends Conversation {
   last_message_preview: string | null;
+  last_message_role: string | null; // 'user' (entrante) | 'human' (Mary) | 'assistant' (bot)
 }
 
 export interface Message {
@@ -322,8 +323,10 @@ function build(): Ctx {
     getConvById: db.prepare("SELECT * FROM conversations WHERE id = ?"),
     listConvs: db.prepare(`
       SELECT c.*, (
-        SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
-      ) AS last_message_preview
+        SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1
+      ) AS last_message_preview, (
+        SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1
+      ) AS last_message_role
       FROM conversations c
       ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
     `),

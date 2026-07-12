@@ -18,7 +18,8 @@ export async function GET() {
     lastMessage: {
       content:   c.last_message_preview ?? '',
       createdAt: c.last_message_at ?? c.created_at ?? 0,
-      fromHuman: false,
+      // 'human' = lo mandó Mary, 'assistant' = lo mandó el bot → en la lista se ve "Tú:".
+      fromHuman: c.last_message_role === 'human' || c.last_message_role === 'assistant',
     },
     createdAt: c.created_at ?? 0,
     updatedAt: c.last_message_at ?? c.created_at ?? 0,

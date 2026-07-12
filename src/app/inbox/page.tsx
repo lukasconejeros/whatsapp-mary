@@ -274,7 +274,6 @@ export default function InboxPage() {
                   {conversations.length === 0 ? 'Aún no hay conversaciones. Conecta WhatsApp para empezar a recibirlas.' : 'Nada por aquí con ese filtro.'}
                 </p>
               ) : filtered.map(conv => {
-                const cat = (conv.categoria ?? 'mary') as Categoria
                 const active = selectedId === conv.id
                 const cerrado = !!conv.cerrado
                 return (
@@ -284,9 +283,8 @@ export default function InboxPage() {
                       background: active ? '#FDE7F1' : 'transparent' }}
                     onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
                       <Avatar src={conv.contact.avatar} size={46} />
-                      <span title={CATEGORIA_CONFIG[cat].label} style={{ position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: '50%', background: CATEGORIA_CONFIG[cat].dot, border: '2px solid #fff' }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -295,7 +293,10 @@ export default function InboxPage() {
                       </div>
                       <p style={{ fontSize: 12.5, color: '#B0708C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
                         {cerrado && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#9CA3AF', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>CERRADO</span>}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.lastMessage?.content || '—'}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#C68BAA' }}>Tú: </span> : null}
+                          {conv.lastMessage?.content || '—'}
+                        </span>
                       </p>
                     </div>
                   </button>
