@@ -8,7 +8,7 @@ const PUBLICAS = ["/login"];
 const API_PUBLICAS = ["/api/login", "/api/push/vapid"];
 // Endpoints "máquina" (n8n, calendario web): validan su PROPIO secreto por header,
 // no la cookie de Mary. Se dejan pasar aquí y se autogestionan en su route.
-const API_MAQUINA = ["/api/send-direct", "/api/contexto", "/api/movimientos", "/api/media-selftest"];
+const API_MAQUINA = ["/api/send-direct", "/api/contexto", "/api/movimientos"];
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
