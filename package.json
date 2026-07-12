@@ -25,6 +25,7 @@
     "test:db": "tsx scripts/test-db-integridad.ts",
     "test:push": "tsx scripts/test-push.ts",
     "test:cartola": "tsx scripts/test-cartola.ts",
+    "test:audio": "tsx scripts/test-audio.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },

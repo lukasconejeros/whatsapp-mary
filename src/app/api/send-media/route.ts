@@ -1,42 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { execFile } from "child_process";
-import { promisify } from "util";
 import { getConversationById, insertMessage, enqueueOutbox } from "@/lib/db";
 import { limitar } from "@/lib/ratelimit";
+import { prepararNotaVoz } from "@/lib/audio";
 
 export const dynamic = "force-dynamic";
-
-const execFileP = promisify(execFile);
-const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
-const FFPROBE = process.env.FFPROBE_PATH || "ffprobe";
-
-// Convierte cualquier audio (webm/mp4/m4a…) a ogg/opus mono 48kHz, que es lo que
-// WhatsApp necesita para reproducir una nota de voz. Devuelve el nombre del .ogg
-// o null si falla (ffmpeg ausente, etc.).
-async function aOggOpus(srcName: string): Promise<string | null> {
-  const inPath = path.join(MEDIA_DIR, srcName);
-  const oggName = srcName.replace(/\.[^.]+$/, "") + "_voz.ogg";
-  const outPath = path.join(MEDIA_DIR, oggName);
-  try {
-    await execFileP(FFMPEG, ["-y", "-i", inPath, "-vn", "-c:a", "libopus", "-b:a", "32k", "-ar", "48000", "-ac", "1", "-f", "ogg", outPath]);
-    if (fs.existsSync(outPath) && fs.statSync(outPath).size > 0) return oggName;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// Duración en segundos (entera) de un archivo de audio, con ffprobe. 0 si falla.
-async function duracionSeg(name: string): Promise<number> {
-  try {
-    const { stdout } = await execFileP(FFPROBE, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path.join(MEDIA_DIR, name)]);
-    return Math.max(0, Math.round(parseFloat(stdout.trim()) || 0));
-  } catch {
-    return 0;
-  }
-}
 
 // Envía una nota de voz o una foto a un contacto desde el chat.
 // Multipart: conversationId + file. Guarda el archivo en data/media, lo registra
@@ -49,6 +18,9 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const file = form.get("file");
   const conversationId = Number(form.get("conversationId"));
+  // Pista de duración: el cliente cuenta los segundos mientras graba. Se usa como
+  // último recurso si ffprobe no logra sacar la duración (mp4 fragmentado de Safari).
+  const hintSeg = Math.max(0, Math.round(Number(form.get("segundos")) || 0));
   if (!conversationId || !(file instanceof Blob)) {
     return NextResponse.json({ ok: false, error: "Faltan datos (conversationId, file)" }, { status: 400 });
   }
@@ -90,10 +62,10 @@ export async function POST(req: NextRequest) {
   let outMedia = name;
   let contentMeta = "";
   if (esAudio) {
-    const ogg = await aOggOpus(name);
-    if (ogg) outMedia = ogg;
-    const secs = await duracionSeg(outMedia);
-    contentMeta = secs > 0 ? String(secs) : "";
+    const { outName, seconds, ffmpegOk } = await prepararNotaVoz(MEDIA_DIR, name, hintSeg);
+    outMedia = outName;
+    contentMeta = seconds > 0 ? String(seconds) : "";
+    console.log(`send-media audio: mime=${mime} ffmpegOk=${ffmpegOk} seconds=${seconds} hint=${hintSeg} out=${outName}`);
   }
   enqueueOutbox(conv.id, conv.phone, contentMeta, { kind, media: outMedia });
 

@@ -2,11 +2,28 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Conversation, Message, CHANNEL_CONFIG } from '@/lib/types'
-import { Send, Smile, Mic, Trash2 } from 'lucide-react'
+import { Send, Smile, Mic, Trash2, Image as ImageIcon } from 'lucide-react'
 import { ImageNote, AudioNote, VideoNote } from './MediaContent'
 import { Avatar } from './Avatar'
 
 const EMOJIS = ['😀','😃','😄','😁','😊','🙂','😉','😍','🥰','😘','😅','😂','🤣','😌','😎','🤩','🥳','😇','🤗','🤔','🙃','😢','😭','👍','👎','👏','🙏','💪','🎉','✨','🔥','❤️','💕','💖','💐','🌸','🎨','🖌️','👋','🙌','✅','❌','📅','📸','💬','⭐','😴','🤝']
+
+// Elige un formato de grabación SOPORTADO por el navegador. Safari iOS (el de Mary)
+// NO soporta webm: graba audio/mp4. Chrome/Android prefieren webm/opus. Devolver ''
+// deja que el navegador elija su default.
+function pickAudioMime(): string {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return ''
+  for (const c of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/mpeg']) {
+    if (MediaRecorder.isTypeSupported(c)) return c
+  }
+  return ''
+}
+function extDeMime(mt: string): string {
+  if (mt.includes('mp4') || mt.includes('m4a') || mt.includes('aac')) return 'm4a'
+  if (mt.includes('mpeg')) return 'mp3'
+  if (mt.includes('ogg')) return 'ogg'
+  return 'webm'
+}
 
 function fmt(ts: number | string) {
   const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts)
@@ -51,6 +68,8 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const chunksRef = useRef<Blob[]>([])
   const cancelRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const startedAtRef = useRef(0)
+  const fotoInputRef = useRef<HTMLInputElement | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   // Al desmontar (cambiar de chat/volver), soltar micrófono, grabación y cronómetro
@@ -141,22 +160,29 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      const rec = new MediaRecorder(stream)
+      const mime = pickAudioMime()
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
       chunksRef.current = []
       cancelRef.current = false
       rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       rec.onstop = async () => {
         stream.getTracks().forEach(t => t.stop())
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+        // Duración REAL medida por reloj (no por el estado, que puede ir atrasado).
+        // Es la red de seguridad contra el "0:00": el servidor la usa si ffprobe falla
+        // (típico con el mp4 fragmentado de Safari iOS).
+        const durSeg = Math.max(1, Math.round((Date.now() - (startedAtRef.current || Date.now())) / 1000))
         setGrabando(false); setSegundos(0)
         if (cancelRef.current) { chunksRef.current = []; return } // cancelado: no se envía
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        const tipo = rec.mimeType || mime || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: tipo })
         if (blob.size === 0) return
         setSending(true)
         try {
           const form = new FormData()
           form.append('conversationId', String(conv.id))
-          form.append('file', blob, 'nota-voz.webm')
+          form.append('file', blob, `nota-voz.${extDeMime(tipo)}`)
+          form.append('segundos', String(durSeg))
           const d = await fetch('/api/send-media', { method: 'POST', body: form }).then(r => r.json())
           if (d.ok) {
             setSendError('')
@@ -171,11 +197,36 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       }
       rec.start()
       recRef.current = rec
+      startedAtRef.current = Date.now()
       setGrabando(true); setSegundos(0)
       timerRef.current = setInterval(() => setSegundos(s => s + 1), 1000)
     } catch {
       setGrabando(false)
     }
+  }
+
+  // Enviar una FOTO al contacto desde el chat. Reusa /api/send-media (rama imagen).
+  async function enviarFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite volver a elegir la misma foto
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setSendError('Eso no es una imagen.'); return }
+    setSending(true)
+    try {
+      const form = new FormData()
+      form.append('conversationId', String(conv.id))
+      form.append('file', file, file.name || 'foto.jpg')
+      const d = await fetch('/api/send-media', { method: 'POST', body: form }).then(r => r.json())
+      if (d.ok) {
+        setSendError('')
+        const tmp: Message = { id: Date.now(), content: '📷 Foto', media: d.media, messageType: 1, senderName: 'Tú', senderType: 'human', createdAt: Date.now() / 1000, isPrivate: false }
+        setMsgs(p => [...p, tmp])
+      } else {
+        setSendError('No se pudo enviar la foto, reintenta.')
+      }
+    } catch {
+      setSendError('No se pudo enviar la foto, reintenta.')
+    } finally { setSending(false) }
   }
   function enviarGrabacion() { cancelRef.current = false; recRef.current?.stop() }
   function cancelarGrabacion() { cancelRef.current = true; recRef.current?.stop() }
@@ -315,6 +366,11 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           <button type="button" onClick={()=>setShowEmoji(s=>!s)} title="Emojis"
             style={{ width:34,height:34,borderRadius:8,border:'1px solid #FAD1E5',background: showEmoji?'#FDE7F1':'#FFF4FA',color:'#EC4899',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
             <Smile size={17}/>
+          </button>
+          <input ref={fotoInputRef} type="file" accept="image/*" onChange={enviarFoto} style={{ display:'none' }} />
+          <button type="button" onClick={()=>fotoInputRef.current?.click()} disabled={sending} title="Enviar foto"
+            style={{ width:34,height:34,borderRadius:8,border:'1px solid #FAD1E5',background:'#FFF4FA',color: sending?'#F7CFE1':'#EC4899',cursor: sending?'default':'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+            <ImageIcon size={17}/>
           </button>
           <textarea value={reply} onChange={e=>setReply(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e as unknown as React.FormEvent)}}}
