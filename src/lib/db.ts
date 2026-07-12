@@ -125,6 +125,12 @@ CREATE TABLE IF NOT EXISTS seguimientos (
 CREATE INDEX IF NOT EXISTS idx_seguimientos_estado ON seguimientos(estado, created_at);
 CREATE INDEX IF NOT EXISTS idx_seguimientos_conv ON seguimientos(conversation_id);
 
+-- Config simple clave→valor (ej. la plantilla EDITABLE del mensaje de seguimiento).
+CREATE TABLE IF NOT EXISTS config (
+  clave TEXT PRIMARY KEY,
+  valor TEXT
+);
+
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER REFERENCES conversations(id),
@@ -428,14 +434,24 @@ export function setCerrado(conversationId: number, cerrado: boolean): void {
   ctx().db.prepare("UPDATE conversations SET cerrado = ? WHERE id = ?").run(cerrado ? 1 : 0, conversationId);
 }
 
+// ── Config clave→valor (plantilla editable, etc.) ────────────────────────────
+export function getConfig(clave: string, def = ""): string {
+  const r = ctx().db.prepare("SELECT valor FROM config WHERE clave = ?").get(clave) as { valor: string } | undefined;
+  return r?.valor ?? def;
+}
+export function setConfig(clave: string, valor: string): void {
+  ctx().db.prepare("INSERT INTO config (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor").run(clave, valor);
+}
+
 // ── Cola de campaña de seguimiento (Fase 3) ──────────────────────────────────
 export interface SeguimientoLead { id: number; phone: string; name: string | null; }
 
-// Leads de Meta (potencial) NO cerrados = candidatos al seguimiento masivo.
+// El seguimiento se manda a los leads de Meta marcados como CERRADO (los que Mary
+// movió a la pestaña Seguimiento). Antes eran los NO cerrados; el flujo cambió.
 export function getLeadsParaSeguimiento(): SeguimientoLead[] {
   return ctx().db
     .prepare(
-      "SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 0 ORDER BY COALESCE(last_message_at, created_at) DESC"
+      "SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 1 ORDER BY COALESCE(last_message_at, created_at) DESC"
     )
     .all() as SeguimientoLead[];
 }

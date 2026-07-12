@@ -12,9 +12,10 @@ import {
   enqueueOutbox,
   insertMessage,
   getConnectionState,
+  getConfig,
 } from "./db.js";
 import { todaySantiago, hourSantiago } from "./fechas.js";
-import { CAMPANA, redactarSeguimiento } from "./seguimiento.js";
+import { CAMPANA, SEGUIMIENTO_MSG_KEY, MENSAJE_SEGUIMIENTO_DEFAULT, personalizarMensaje } from "./seguimiento.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
 
@@ -44,7 +45,8 @@ async function tick(): Promise<number> {
   if (!conv) { markSeguimientoOmitido(pend.id); return 2_000; } // conversación borrada: saltar
 
   const cli = getClienteByPhone(conv.phone);
-  const mensaje = await redactarSeguimiento(conv.name, cli?.alumnos ?? null);
+  const template = getConfig(SEGUIMIENTO_MSG_KEY, MENSAJE_SEGUIMIENTO_DEFAULT);
+  const mensaje = personalizarMensaje(template, conv.name, cli?.alumnos ?? null);
   // Reclamo ATÓMICO: si dejó de estar pendiente mientras redactaba la IA (Mary tocó
   // "Detener"), no se envía. Sólo tras reclamar se encola y se muestra en el chat.
   if (!markSeguimientoEnviado(pend.id, mensaje, hoy)) return 2_000;

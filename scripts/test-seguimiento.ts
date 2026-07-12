@@ -15,7 +15,7 @@ import {
   deleteConversation,
 } from "../src/lib/db.js";
 import { todaySantiago } from "../src/lib/fechas.js";
-import { mensajeSeguimientoFallback } from "../src/lib/seguimiento.js";
+import { personalizarMensaje, MENSAJE_SEGUIMIENTO_DEFAULT } from "../src/lib/seguimiento.js";
 
 let pass = 0, fail = 0;
 function check(n: string, c: boolean, e = "") { if (c) { console.log(`  ✅ ${n}`); pass++; } else { console.log(`  ❌ ${n} ${e}`); fail++; } }
@@ -25,21 +25,22 @@ console.log("\n🧪 TEST campaña de seguimiento (cola + tope + anti-baneo)\n");
 const raw = new Database(path.resolve(process.cwd(), "data/messages.db"));
 const hoy = todaySantiago();
 
-// 3 leads de prueba: A y B = Meta abiertos (candidatos), C = Meta cerrado (excluido).
+// 3 leads de prueba: A y B = CERRADOS (en Seguimiento, candidatos), C = abierto (Meta).
 const A = getOrCreateConversation("56900000SEGA", "Lead A");
 const B = getOrCreateConversation("56900000SEGB", "Lead B");
 const C = getOrCreateConversation("56900000SEGC", "Lead C");
 for (const c of [A, B, C]) setCategoria(c.id, "potencial", true);
-setCerrado(C.id, true);
+setCerrado(A.id, true);
+setCerrado(B.id, true);
 const ids = [A.id, B.id, C.id];
 raw.prepare(`DELETE FROM seguimientos WHERE conversation_id IN (${ids.join(",")})`).run();
 const baseEnviadosHoy = countSeguimientosEnviadosDia(hoy);
 
-// 1) Candidatos: incluye A y B (Meta abiertos), excluye C (cerrado).
+// 1) Candidatos: incluye A y B (cerrados = en Seguimiento), excluye C (abierto = Meta).
 const cand = getLeadsParaSeguimiento().map(l => l.id);
-check("candidato incluye lead abierto A", cand.includes(A.id));
-check("candidato incluye lead abierto B", cand.includes(B.id));
-check("candidato EXCLUYE lead cerrado C", !cand.includes(C.id));
+check("candidato incluye lead cerrado A", cand.includes(A.id));
+check("candidato incluye lead cerrado B", cand.includes(B.id));
+check("candidato EXCLUYE lead abierto C", !cand.includes(C.id));
 
 // 2) Encolar: agrega A y B (2), no C.
 const items = getLeadsParaSeguimiento().filter(l => ids.includes(l.id)).map(l => ({ id: l.id, phone: l.phone }));
@@ -70,12 +71,13 @@ const stats = getSeguimientoStats(hoy);
 check("stats.enviados ≥ 1", stats.enviados >= 1, String(stats.enviados));
 check("stats.omitidos ≥ 1", stats.omitidos >= 1, String(stats.omitidos));
 
-// 8) Mensaje fallback lleva la promo y la marca.
-const m = mensajeSeguimientoFallback("Ana", "Sofía");
+// 8) Plantilla editable personaliza tokens y lleva la promo.
+const m = personalizarMensaje(MENSAJE_SEGUIMIENTO_DEFAULT, "Ana", "Sofía");
 check("mensaje menciona $18.000", m.includes("$18.000"));
 check("mensaje menciona antes $25.000", m.includes("$25.000"));
 check("mensaje personaliza (Ana y Sofía)", m.includes("Ana") && m.includes("Sofía"));
 check("mensaje firma Arteluk", m.includes("Arteluk"));
+check("no quedan tokens sin reemplazar", !m.includes("{nombre}") && !m.includes("{alumno}"));
 
 // Limpieza: borra seguimientos de prueba y las conversaciones.
 raw.prepare(`DELETE FROM seguimientos WHERE conversation_id IN (${ids.join(",")})`).run();

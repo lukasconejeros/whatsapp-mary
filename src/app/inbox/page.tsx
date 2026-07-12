@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import ConversationView from '@/components/ConversationView'
 import { Avatar } from '@/components/Avatar'
 import { Conversation, CATEGORIA_CONFIG, Categoria } from '@/lib/types'
-import { RefreshCw, Search, X, ArrowLeft, MessageCircle, CheckCircle2, Circle } from 'lucide-react'
+import { RefreshCw, Search, X, ArrowLeft, MessageCircle } from 'lucide-react'
 import { sonarAviso } from '@/lib/push-client'
 
 function timeAgo(ts: string | number): string {
@@ -19,12 +19,17 @@ function timeAgo(ts: string | number): string {
   return `${Math.floor(s / 86400)}d`
 }
 
-const FILTERS: { key: Categoria; label: string }[] = [
-  { key: 'mary', label: 'Mary' },
+// Pestañas del inbox. Meta = leads de Meta sin cerrar; Seguimiento = leads cerrados
+// (los que Mary movió con el botón "Cerrado", listos para la campaña de seguimiento).
+type Tab = 'todos' | 'arteluk' | 'meta' | 'seguimiento'
+const FILTERS: { key: Tab; label: string }[] = [
+  { key: 'todos', label: 'Todos' },
   { key: 'arteluk', label: 'Arteluk' },
-  { key: 'potencial', label: 'Meta' },
+  { key: 'meta', label: 'Meta' },
+  { key: 'seguimiento', label: 'Seguimiento' },
 ]
 
+// Chips para RECLASIFICAR una conversación de categoría (dentro del chat).
 const CATS: Categoria[] = ['mary', 'arteluk', 'potencial']
 const CAT_SHORT: Record<Categoria, string> = { mary: 'Mary', arteluk: 'Arteluk', potencial: 'Meta' }
 
@@ -34,22 +39,42 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<Categoria>('arteluk')
+  const [filter, setFilter] = useState<Tab>('todos')
   const [segStats, setSegStats] = useState<{ pendientes: number; enviados: number; omitidos: number; enviadosHoy: number } | null>(null)
   const [segCand, setSegCand] = useState(0)
   const [segBusy, setSegBusy] = useState(false)
+  const [segMsg, setSegMsg] = useState('')
+  const [msgDirty, setMsgDirty] = useState(false)
+  const [savingMsg, setSavingMsg] = useState(false)
+  const msgLoadedRef = useRef(false)
 
-  // Progreso de la campaña de seguimiento (solo importa en la vista Meta).
+  // Progreso de la campaña + plantilla editable. La plantilla se carga UNA vez (no la
+  // pisamos en cada refresco para no borrar lo que Mary está escribiendo).
   const cargarSeguimiento = useCallback(async () => {
     try {
       const d = await fetch('/api/seguimiento').then(r => r.json())
-      if (d.ok) { setSegStats(d.stats); setSegCand(d.candidatos) }
+      if (d.ok) {
+        setSegStats(d.stats); setSegCand(d.candidatos)
+        if (!msgLoadedRef.current && typeof d.mensaje === 'string') { setSegMsg(d.mensaje); msgLoadedRef.current = true }
+      }
     } catch { /* sin conexión: no romper la vista */ }
   }, [])
 
+  async function guardarMensaje() {
+    if (savingMsg || !segMsg.trim()) return
+    setSavingMsg(true)
+    try {
+      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'guardar', mensaje: segMsg }) }).then(r => r.json())
+      if (d.ok) setMsgDirty(false)
+      else alert(d.error || 'No se pudo guardar el mensaje')
+    } catch { alert('No se pudo guardar. Revisa tu internet.') }
+    finally { setSavingMsg(false) }
+  }
+
   async function iniciarSeguimiento() {
     if (segBusy) return
-    if (!confirm(`¿Enviar el mensaje de seguimiento a ${segCand} lead(s) de Meta?\n\nSe mandan de a poco, con pausas, para no arriesgar el número (tope diario). Los que marcaste como "Cerrado" quedan fuera.`)) return
+    if (msgDirty && !confirm('Tienes cambios sin guardar en el mensaje. ¿Enviar igual con el mensaje guardado anterior?')) return
+    if (!confirm(`¿Enviar el seguimiento a ${segCand} lead(s) en Seguimiento?\n\nSe mandan de a poco, con pausas y tope diario, para no arriesgar el número.`)) return
     setSegBusy(true)
     try {
       const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'iniciar' }) }).then(r => r.json())
@@ -93,17 +118,13 @@ export default function InboxPage() {
   useEffect(() => { load() }, [load])
 
   // Real-time: recarga la lista cuando llega un mensaje nuevo. NO cerramos en onerror:
-  // así EventSource reconecta solo tras un corte de red (antes se apagaba para siempre
-  // al primer error y la lista dejaba de actualizarse hasta recargar la página).
+  // así EventSource reconecta solo tras un corte de red.
   useEffect(() => {
     const es = new EventSource('/api/events')
     es.addEventListener('update', (e: MessageEvent) => {
       load(true)
-      // Aviso in-app: sólo Arteluk/Meta y sólo si la app NO está enfocada (para no
-      // sonar por lo que Mary misma está viendo/enviando).
       try {
         const d = JSON.parse(e.data) as { categoria?: string; nombre?: string; preview?: string; role?: string }
-        // Solo si el último mensaje es ENTRANTE (role 'user'); nunca por lo que Mary/el bot/n8n envían.
         if (d.role === 'user' && (d.categoria === 'arteluk' || d.categoria === 'potencial') && typeof document !== 'undefined' && !document.hasFocus()) {
           sonarAviso()
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -116,17 +137,24 @@ export default function InboxPage() {
     return () => es.close()
   }, [load])
 
-  // En la vista Meta, carga el progreso y lo refresca cada 6 s (se ve avanzar la campaña).
+  // En la pestaña Seguimiento, carga el progreso y lo refresca cada 6 s.
   useEffect(() => {
-    if (filter !== 'potencial') return
+    if (filter !== 'seguimiento') return
     cargarSeguimiento()
     const t = setInterval(cargarSeguimiento, 6000)
     return () => clearInterval(t)
   }, [filter, cargarSeguimiento])
 
   const filtered = useMemo(() => {
-    let list = conversations
-    list = list.filter(c => (c.categoria ?? 'mary') === filter)
+    let list = conversations.filter(c => {
+      const cat = (c.categoria ?? 'mary') as Categoria
+      const cerrado = !!c.cerrado
+      if (filter === 'todos') return true
+      if (filter === 'arteluk') return cat === 'arteluk'
+      if (filter === 'meta') return cat === 'potencial' && !cerrado
+      if (filter === 'seguimiento') return cat === 'potencial' && cerrado
+      return true
+    })
     const q = search.trim().toLowerCase()
     if (q) list = list.filter(c =>
       c.contact.name.toLowerCase().includes(q) ||
@@ -147,9 +175,11 @@ export default function InboxPage() {
     } catch { /* la UI ya se actualizó de forma optimista */ }
   }
 
-  // Marca/desmarca un lead de Meta como CERRADO (queda fuera del seguimiento masivo).
+  // "Cerrado": mueve el lead a Seguimiento (y lleva la vista ahí). "Reabrir": lo devuelve
+  // a Meta. Es el flujo pedido: Meta → Cerrado → Seguimiento.
   async function marcarCerrado(id: number, cerrado: boolean) {
     setConversations(p => p.map(c => c.id === id ? { ...c, cerrado } : c))
+    setFilter(cerrado ? 'seguimiento' : 'meta')
     try {
       await fetch(`/api/cerrado/${id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -166,6 +196,8 @@ export default function InboxPage() {
       </div>
     </div>
   )
+
+  const enviando = !!(segStats && segStats.pendientes > 0)
 
   return (
     <div className={`flex h-screen overflow-hidden ${selected ? 'chat-open' : ''}`} style={{ background: '#FFFFFF' }}>
@@ -190,17 +222,17 @@ export default function InboxPage() {
               <div className="relative flex items-center" style={{ marginBottom: 8 }}>
                 <Search size={13} style={{ position: 'absolute', left: 10, color: '#C0879F', pointerEvents: 'none' }} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar chat o mensaje..."
-                  style={{ width: '100%', paddingLeft: 31, paddingRight: search ? 30 : 12, height: 34, fontSize: 13, borderRadius: 10, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#9D174D', outline: 'none', fontFamily: 'inherit' }}
+                  style={{ width: '100%', paddingLeft: 31, paddingRight: search ? 30 : 12, height: 38, fontSize: 14, borderRadius: 10, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#9D174D', outline: 'none', fontFamily: 'inherit' }}
                   onFocus={e => { e.target.style.borderColor = '#EC4899'; e.target.style.background = '#fff' }}
                   onBlur={e => { e.target.style.borderColor = '#FAD1E5'; e.target.style.background = '#FFF4FA' }} />
-                {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 9, cursor: 'pointer', color: '#C0879F', background: 'none', border: 'none', display: 'flex' }}><X size={12} /></button>}
+                {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 9, cursor: 'pointer', color: '#C0879F', background: 'none', border: 'none', display: 'flex' }}><X size={13} /></button>}
               </div>
               <div className="flex" style={{ gap: 6, flexWrap: 'wrap' }}>
                 {FILTERS.map(f => {
                   const on = filter === f.key
                   return (
                     <button key={f.key} onClick={() => setFilter(f.key)}
-                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                      style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
                         border: on ? '1px solid #EC4899' : '1px solid #FAD1E5',
                         background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
                       {f.label}
@@ -210,32 +242,42 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {filter === 'potencial' && (
-              <div style={{ padding: '10px 12px', borderBottom: '1px solid #FDE7F1', background: '#FFF9FC' }}>
-                <div className="flex items-center" style={{ gap: 8, marginBottom: (segStats && segStats.pendientes > 0) ? 8 : 0 }}>
+            {/* Panel de Seguimiento: mensaje EDITABLE + enviar/detener + progreso. */}
+            {filter === 'seguimiento' && (
+              <div style={{ padding: '12px', borderBottom: '1px solid #FDE7F1', background: '#FFF9FC' }}>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: '#9D174D', marginBottom: 6 }}>Mensaje de seguimiento</p>
+                <textarea value={segMsg} onChange={e => { setSegMsg(e.target.value); setMsgDirty(true) }}
+                  rows={5} placeholder="Escribe el mensaje que se enviará…"
+                  style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #FAD1E5', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#0F172A', outline: 'none', fontFamily: 'inherit' }} />
+                <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
+                  <span style={{ fontSize: 11, color: '#B0708C', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
+                  <button onClick={guardarMensaje} disabled={savingMsg || !msgDirty}
+                    style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !msgDirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: msgDirty ? '#fff' : '#F9F0F5', color: msgDirty ? '#BE185D' : '#C0879F' }}>
+                    {savingMsg ? 'Guardando…' : msgDirty ? 'Guardar' : 'Guardado ✓'}
+                  </button>
+                </div>
+
+                <div className="flex items-center" style={{ gap: 8, marginTop: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#9D174D' }}>Seguimiento a leads</p>
-                    <p style={{ fontSize: 11, color: '#B0708C', marginTop: 1 }}>
-                      {segStats && segStats.pendientes > 0
-                        ? `Enviando… ${segStats.enviados} enviados · ${segStats.pendientes} en cola`
-                        : `${segCand} lead(s) sin cerrar · clase de prueba $18.000`}
+                    <p style={{ fontSize: 12.5, color: '#B0708C' }}>
+                      {enviando ? `Enviando… ${segStats!.enviados} enviados · ${segStats!.pendientes} en cola` : `${segCand} lead(s) en seguimiento`}
                     </p>
                   </div>
-                  {segStats && segStats.pendientes > 0 ? (
+                  {enviando ? (
                     <button onClick={detenerSeguimiento} disabled={segBusy}
-                      style={{ fontSize: 11, fontWeight: 600, padding: '6px 12px', borderRadius: 8, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FCA5A5', background: '#fff', color: '#DC2626', flexShrink: 0, opacity: segBusy ? 0.5 : 1 }}>
+                      style={{ fontSize: 12.5, fontWeight: 600, padding: '7px 14px', borderRadius: 8, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FCA5A5', background: '#fff', color: '#DC2626', flexShrink: 0, opacity: segBusy ? 0.5 : 1 }}>
                       Detener
                     </button>
                   ) : (
                     <button onClick={iniciarSeguimiento} disabled={segBusy || segCand === 0}
-                      style={{ fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 8, cursor: (segBusy || segCand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || segCand === 0) ? '#F7CFE1' : '#EC4899', color: '#fff', flexShrink: 0 }}>
+                      style={{ fontSize: 12.5, fontWeight: 700, padding: '7px 14px', borderRadius: 8, cursor: (segBusy || segCand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || segCand === 0) ? '#F7CFE1' : '#EC4899', color: '#fff', flexShrink: 0 }}>
                       {segBusy ? 'Enviando…' : 'Enviar seguimiento'}
                     </button>
                   )}
                 </div>
-                {segStats && segStats.pendientes > 0 && (
-                  <div style={{ height: 5, borderRadius: 999, background: '#FDE7F1', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 999, background: '#EC4899', width: `${Math.round((segStats.enviados / Math.max(1, segStats.enviados + segStats.pendientes)) * 100)}%`, transition: 'width 0.4s' }} />
+                {enviando && (
+                  <div style={{ height: 5, borderRadius: 999, background: '#FDE7F1', overflow: 'hidden', marginTop: 8 }}>
+                    <div style={{ height: '100%', borderRadius: 999, background: '#EC4899', width: `${Math.round((segStats!.enviados / Math.max(1, segStats!.enviados + segStats!.pendientes)) * 100)}%`, transition: 'width 0.4s' }} />
                   </div>
                 )}
               </div>
@@ -243,16 +285,16 @@ export default function InboxPage() {
 
             <div className="flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
-                <p style={{ fontSize: 12, color: '#DBAFC6', textAlign: 'center', padding: '30px 16px' }}>
-                  {conversations.length === 0 ? 'Aún no hay conversaciones. Conecta WhatsApp para empezar a recibirlas.' : 'Nada por aquí con ese filtro.'}
+                <p style={{ fontSize: 13, color: '#DBAFC6', textAlign: 'center', padding: '30px 16px' }}>
+                  {conversations.length === 0 ? 'Aún no hay conversaciones. Conecta WhatsApp para empezar a recibirlas.'
+                    : filter === 'seguimiento' ? 'Sin leads en seguimiento. Marca un lead de Meta como "Cerrado" para que aparezca aquí.'
+                    : 'Nada por aquí con ese filtro.'}
                 </p>
               ) : filtered.map(conv => {
                 const active = selectedId === conv.id
-                const cerrado = !!conv.cerrado
                 return (
                   <button key={conv.id} onClick={() => setSelectedId(conv.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: '1px solid #FBEAF2', cursor: 'pointer', fontFamily: 'inherit',
-                      opacity: cerrado ? 0.55 : 1,
                       background: active ? '#FDE7F1' : 'transparent' }}
                     onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
@@ -261,15 +303,12 @@ export default function InboxPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#6E2547', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
-                        <span style={{ fontSize: 11, color: '#CE8AAE', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#6E2547', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
+                        <span style={{ fontSize: 11.5, color: '#CE8AAE', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
                       </div>
-                      <p style={{ fontSize: 12.5, color: '#B0708C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {cerrado && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#9CA3AF', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>CERRADO</span>}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#C68BAA' }}>Tú: </span> : null}
-                          {conv.lastMessage?.content || '—'}
-                        </span>
+                      <p style={{ fontSize: 13.5, color: '#B0708C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                        {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#C68BAA' }}>Tú: </span> : null}
+                        {conv.lastMessage?.content || '—'}
                       </p>
                     </div>
                   </button>
@@ -283,10 +322,10 @@ export default function InboxPage() {
             {selected ? (
               <>
                 <button className="chat-back items-center" onClick={() => setSelectedId(null)}
-                  style={{ gap: 8, height: 42, padding: '0 12px', border: 'none', borderBottom: '1px solid #FDE7F1', background: '#fff', color: '#BE185D', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-                  <ArrowLeft size={17} /> Chats
+                  style={{ gap: 8, height: 44, padding: '0 12px', border: 'none', borderBottom: '1px solid #FDE7F1', background: '#fff', color: '#BE185D', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                  <ArrowLeft size={18} /> Chats
                 </button>
-                {/* Mover la conversación de grupo (funciona en teléfono y PC) */}
+                {/* Reclasificar de categoría + (Meta: Cerrar) / (Seguimiento: Reabrir + Probar) */}
                 <div className="flex items-center" style={{ gap: 4, padding: '5px 10px', borderBottom: '1px solid #FDE7F1', background: '#fff', flexShrink: 0 }}>
                   {CATS.map(cat => {
                     const on = (selected.categoria ?? 'mary') === cat
@@ -298,19 +337,25 @@ export default function InboxPage() {
                       </button>
                     )
                   })}
-                  {/* Solo para los de Meta (potencial): probar 1 envío + cerrar el lead. */}
                   {(selected.categoria ?? 'mary') === 'potencial' && (
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-                      <button onClick={() => probarSeguimiento(selected.id)} disabled={segBusy} title="Enviar UN seguimiento de prueba a este contacto (úsalo con tu número)"
-                        style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C', opacity: segBusy ? 0.5 : 1 }}>
-                        Probar
-                      </button>
-                      <button onClick={() => marcarCerrado(selected.id, !selected.cerrado)} title={selected.cerrado ? 'Reabrir este lead' : 'Marcar como cerrado (fuera del seguimiento)'}
-                        className="flex items-center" style={{ gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
-                          border: selected.cerrado ? '1px solid #9CA3AF' : '1px solid #FAD1E5', background: selected.cerrado ? '#6B7280' : '#fff', color: selected.cerrado ? '#fff' : '#B0708C' }}>
-                        {selected.cerrado ? <CheckCircle2 size={13} /> : <Circle size={13} />}
-                        {selected.cerrado ? 'Cerrado' : 'Cerrar'}
-                      </button>
+                      {selected.cerrado ? (
+                        <>
+                          <button onClick={() => probarSeguimiento(selected.id)} disabled={segBusy} title="Enviar UN seguimiento de prueba a este contacto (úsalo con tu número)"
+                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C', opacity: segBusy ? 0.5 : 1 }}>
+                            Probar
+                          </button>
+                          <button onClick={() => marcarCerrado(selected.id, false)} title="Devolver este lead a Meta"
+                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C' }}>
+                            Reabrir
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => marcarCerrado(selected.id, true)} title="Cerrar y pasar a Seguimiento"
+                          style={{ fontSize: 12.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#EC4899', color: '#fff' }}>
+                          Cerrado
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -321,7 +366,7 @@ export default function InboxPage() {
             ) : (
               <div className="flex flex-col items-center justify-center" style={{ height: '100%', gap: 10, color: '#DBAFC6', padding: 24, textAlign: 'center' }}>
                 <MessageCircle size={40} strokeWidth={1.4} style={{ color: '#F7CFE1' }} />
-                <p style={{ fontSize: 13 }}>Elige una conversación para verla</p>
+                <p style={{ fontSize: 14 }}>Elige una conversación para verla</p>
               </div>
             )}
           </div>
