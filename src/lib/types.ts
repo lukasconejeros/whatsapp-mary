@@ -24,6 +24,7 @@ export interface Conversation {
   inboxId: number
   botActive: boolean
   categoria: Categoria
+  cerrado: boolean
   ctwaReferral: { title?: string; body?: string; sourceId?: string; sourceUrl?: string } | null
 }
 

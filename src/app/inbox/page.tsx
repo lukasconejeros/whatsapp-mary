@@ -5,7 +5,7 @@ import AppNav from '@/components/AppNav'
 import ConversationView from '@/components/ConversationView'
 import { Avatar } from '@/components/Avatar'
 import { Conversation, CATEGORIA_CONFIG, Categoria } from '@/lib/types'
-import { RefreshCw, Search, X, ArrowLeft, MessageCircle, Bell, BellRing, BellOff } from 'lucide-react'
+import { RefreshCw, Search, X, ArrowLeft, MessageCircle, Bell, BellRing, BellOff, CheckCircle2, Circle } from 'lucide-react'
 import { activarNotificaciones, estadoNotificaciones, sonarAviso, type EstadoNoti } from '@/lib/push-client'
 
 function timeAgo(ts: string | number): string {
@@ -109,6 +109,17 @@ export default function InboxPage() {
     } catch { /* la UI ya se actualizó de forma optimista */ }
   }
 
+  // Marca/desmarca un lead de Meta como CERRADO (queda fuera del seguimiento masivo).
+  async function marcarCerrado(id: number, cerrado: boolean) {
+    setConversations(p => p.map(c => c.id === id ? { ...c, cerrado } : c))
+    try {
+      await fetch(`/api/cerrado/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cerrado }),
+      })
+    } catch { /* la UI ya se actualizó de forma optimista */ }
+  }
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center" style={{ background: '#FFFFFF' }}>
       <div className="flex items-center gap-2" style={{ color: '#C0879F' }}>
@@ -179,9 +190,11 @@ export default function InboxPage() {
               ) : filtered.map(conv => {
                 const cat = (conv.categoria ?? 'mary') as Categoria
                 const active = selectedId === conv.id
+                const cerrado = !!conv.cerrado
                 return (
                   <button key={conv.id} onClick={() => setSelectedId(conv.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: '1px solid #FBEAF2', cursor: 'pointer', fontFamily: 'inherit',
+                      opacity: cerrado ? 0.55 : 1,
                       background: active ? '#FDE7F1' : 'transparent' }}
                     onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
@@ -194,8 +207,9 @@ export default function InboxPage() {
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#6E2547', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
                         <span style={{ fontSize: 11, color: '#CE8AAE', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
                       </div>
-                      <p style={{ fontSize: 12.5, color: '#B0708C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                        {conv.lastMessage?.content || '—'}
+                      <p style={{ fontSize: 12.5, color: '#B0708C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {cerrado && <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#9CA3AF', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>CERRADO</span>}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.lastMessage?.content || '—'}</span>
                       </p>
                     </div>
                   </button>
@@ -225,6 +239,15 @@ export default function InboxPage() {
                       </button>
                     )
                   })}
+                  {/* Cerrar lead: solo para los de Meta (potencial). Excluye del seguimiento masivo. */}
+                  {(selected.categoria ?? 'mary') === 'potencial' && (
+                    <button onClick={() => marcarCerrado(selected.id, !selected.cerrado)} title={selected.cerrado ? 'Reabrir este lead' : 'Marcar como cerrado (fuera del seguimiento)'}
+                      className="flex items-center" style={{ marginLeft: 'auto', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                        border: selected.cerrado ? '1px solid #9CA3AF' : '1px solid #FAD1E5', background: selected.cerrado ? '#6B7280' : '#fff', color: selected.cerrado ? '#fff' : '#B0708C' }}>
+                      {selected.cerrado ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                      {selected.cerrado ? 'Cerrado' : 'Cerrar'}
+                    </button>
+                  )}
                 </div>
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                   <ConversationView key={selected.id} conv={selected} />

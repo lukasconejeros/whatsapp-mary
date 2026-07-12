@@ -26,6 +26,7 @@
     "test:push": "tsx scripts/test-push.ts",
     "test:cartola": "tsx scripts/test-cartola.ts",
     "test:audio": "tsx scripts/test-audio.ts",
+    "test:cerrado": "tsx scripts/test-cerrado.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },

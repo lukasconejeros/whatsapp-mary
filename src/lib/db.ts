@@ -27,6 +27,7 @@ export interface Conversation {
   last_message_at: number | null;
   created_at: number;
   photo?: string | null; // foto de perfil (archivo local o URL); vacío = avatar gris
+  cerrado?: number; // 0 | 1 — lead de Meta marcado como CERRADO (fuera del seguimiento masivo)
 }
 
 export interface ConversationListItem extends Conversation {
@@ -73,7 +74,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   categoria_manual INTEGER NOT NULL DEFAULT 0,
   ctwa_referral TEXT,
   last_message_at INTEGER,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  cerrado INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -278,6 +280,7 @@ function build(): Ctx {
   addColumnaSiFalta(db, "conversations", "categoria_manual", "INTEGER NOT NULL DEFAULT 0");
   addColumnaSiFalta(db, "conversations", "ctwa_referral", "TEXT");
   addColumnaSiFalta(db, "conversations", "photo", "TEXT");
+  addColumnaSiFalta(db, "conversations", "cerrado", "INTEGER NOT NULL DEFAULT 0");
   addColumnaSiFalta(db, "messages", "media", "TEXT");
   for (const col of ["email", "estado", "horario", "alumnos"]) addColumnaSiFalta(db, "clientes", col, "TEXT");
   addColumnaSiFalta(db, "clases", "fecha", "TEXT");
@@ -399,6 +402,12 @@ export function getOrCreateConversation(
 
 export function setEstado(conversationId: number, estado: ConversationEstado): void {
   ctx().db.prepare("UPDATE conversations SET estado = ? WHERE id = ?").run(estado, conversationId);
+}
+
+// Marca/desmarca un lead de Meta como CERRADO. Los cerrados quedan fuera del
+// seguimiento masivo (Fase 3) y se ven atenuados en la lista.
+export function setCerrado(conversationId: number, cerrado: boolean): void {
+  ctx().db.prepare("UPDATE conversations SET cerrado = ? WHERE id = ?").run(cerrado ? 1 : 0, conversationId);
 }
 
 export function getConversationById(id: number): Conversation | null {
