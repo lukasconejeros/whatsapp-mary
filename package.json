@@ -24,6 +24,7 @@
     "test:media-path": "tsx scripts/test-media-path.ts",
     "test:db": "tsx scripts/test-db-integridad.ts",
     "test:push": "tsx scripts/test-push.ts",
+    "test:cartola": "tsx scripts/test-cartola.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
   },

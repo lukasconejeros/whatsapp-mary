@@ -285,6 +285,11 @@ function build(): Ctx {
   addColumnaSiFalta(db, "outbox", "kind", "TEXT NOT NULL DEFAULT 'text'");
   addColumnaSiFalta(db, "outbox", "media", "TEXT");
   addColumnaSiFalta(db, "outbox", "attempts", "INTEGER NOT NULL DEFAULT 0");
+  // mp_id: ID de transacción de MercadoPago (para importar cartolas sin duplicar).
+  addColumnaSiFalta(db, "ingresos", "mp_id", "TEXT");
+  addColumnaSiFalta(db, "costos", "mp_id", "TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ingresos_mp ON ingresos(mp_id)");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_costos_mp ON costos(mp_id)");
 
   return {
     db,
@@ -733,6 +738,21 @@ export function addIngreso(d: IngresoInput): number {
     .run(d.fecha, d.apoderado ?? null, Math.round(d.monto), d.tipo ?? null, d.detalle ?? null);
   return r.lastInsertRowid as number;
 }
+// Importa un movimiento de cartola (dedup por mp_id). Devuelve true si insertó,
+// false si ya existía. tipo='MercadoPago' para distinguirlo en la lista.
+export function importarIngresoCartola(d: { fecha: string; monto: number; detalle?: string; mpId: string }): boolean {
+  const r = ctx()
+    .db.prepare("INSERT INTO ingresos (fecha, monto, tipo, detalle, mp_id) VALUES (?,?,?,?,?) ON CONFLICT(mp_id) DO NOTHING")
+    .run(d.fecha, Math.round(d.monto), "MercadoPago", d.detalle ?? null, d.mpId);
+  return r.changes > 0;
+}
+export function importarCostoCartola(d: { fecha: string; valor: number; notas?: string; mpId: string }): boolean {
+  const r = ctx()
+    .db.prepare("INSERT INTO costos (fecha, valor, tipo, notas, mp_id) VALUES (?,?,?,?,?) ON CONFLICT(mp_id) DO NOTHING")
+    .run(d.fecha, Math.round(d.valor), "MercadoPago", d.notas ?? null, d.mpId);
+  return r.changes > 0;
+}
+
 export function updateIngreso(id: number, d: IngresoInput): void {
   ctx().db
     .prepare("UPDATE ingresos SET fecha=?, apoderado=?, monto=?, tipo=?, detalle=? WHERE id=?")

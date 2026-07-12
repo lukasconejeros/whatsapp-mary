@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import MetricasTab from '@/components/MetricasTab'
 import { INGRESO_TIPOS, COSTO_TIPOS, formatCLP, currentMonth, shiftMonth, monthLabel } from '@/lib/finanzas'
-import { Plus, ChevronLeft, ChevronRight, Trash2, Pencil, X } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Trash2, Pencil, X, Upload } from 'lucide-react'
 
 type Mov = { id: number; fecha: string; tipo: string | null; detalle?: string | null; apoderado?: string | null; notas?: string | null; monto?: number; valor?: number; cantidad?: number | null }
 
@@ -19,6 +19,21 @@ export default function FinanzasPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0, 10), tipo: '', monto: '', detalle: '' })
   const [guardando, setGuardando] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<null | { ingresosNuevos: number; costosNuevos: number; duplicados: number; omitidos: number }>(null)
+
+  async function importarCartola() {
+    if (importing || !importText.trim()) return
+    setImporting(true); setImportResult(null)
+    try {
+      const d = await fetch('/api/finanzas/importar-cartola', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: importText }) }).then(r => r.json())
+      if (d.ok) { setImportResult(d); setImportText(''); load() }
+      else alert(d.error || 'No se pudo importar')
+    } catch { alert('No se pudo importar. Revisa tu internet.') }
+    finally { setImporting(false) }
+  }
 
   function openNew() {
     setEditId(null)
@@ -100,6 +115,11 @@ export default function FinanzasPage() {
             <span style={{ fontSize: 13, fontWeight: 600, color: '#9D174D', minWidth: 130, textAlign: 'center' }}>{monthLabel(mes)}</span>
             <button onClick={() => setMes(m => shiftMonth(m, 1))} style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#EC4899' }}><ChevronRight size={18} /></button>
           </div>
+          <div className="flex-1" />
+          <button onClick={() => { setShowImport(true); setImportResult(null) }} className="flex items-center gap-1.5" title="Importar movimientos desde la cartola de MercadoPago"
+            style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#BE185D', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Upload size={13} /> Importar cartola
+          </button>
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '18px 20px' }}>
@@ -192,6 +212,31 @@ export default function FinanzasPage() {
               style={{ width: '100%', margin: '4px 0 16px', padding: '8px 10px', borderRadius: 8, border: '1px solid #FAD1E5', fontFamily: 'inherit', fontSize: 13 }} />
             <button type="submit" disabled={guardando} style={{ width: '100%', padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
           </form>
+        </div>
+      )}
+
+      {showImport && (
+        <div onClick={() => setShowImport(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(157,23,77,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, border: '1px solid #FAD1E5', width: '100%', maxWidth: 460, padding: 20, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="flex items-center" style={{ gap: 8, marginBottom: 6 }}>
+              <p style={{ flex: 1, fontSize: 15, fontWeight: 800, color: '#9D174D' }}>Importar cartola de MercadoPago</p>
+              <button onClick={() => setShowImport(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#C0879F' }}><X size={18} /></button>
+            </div>
+            <p style={{ fontSize: 12, color: '#B0708C', marginBottom: 10 }}>Copia y pega la tabla de movimientos de tu cartola. Los abonos entran como <b>ingresos</b>, los pagos como <b>gastos</b>, y las transferencias enviadas (retiros) se omiten. No duplica lo ya cargado.</p>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pega aquí los movimientos de la cartola…" rows={8}
+              style={{ width: '100%', borderRadius: 8, border: '1px solid #FAD1E5', padding: '8px 10px', fontSize: 12, fontFamily: 'inherit', resize: 'vertical', outline: 'none' }} />
+            {importResult && (
+              <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 9, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#15803D', fontSize: 13 }}>
+                ✅ Importado: {importResult.ingresosNuevos} ingresos y {importResult.costosNuevos} gastos.
+                {importResult.duplicados > 0 ? ` (${importResult.duplicados} ya estaban).` : ''}
+                {importResult.omitidos > 0 ? ` · ${importResult.omitidos} retiros omitidos.` : ''}
+              </div>
+            )}
+            <button onClick={importarCartola} disabled={importing || !importText.trim()}
+              style={{ width: '100%', marginTop: 14, padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: importing || !importText.trim() ? 'default' : 'pointer', opacity: importing || !importText.trim() ? 0.6 : 1, fontFamily: 'inherit' }}>
+              {importing ? 'Importando…' : 'Importar'}
+            </button>
+          </div>
         </div>
       )}
     </div>

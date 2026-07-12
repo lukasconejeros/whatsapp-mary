@@ -5,7 +5,7 @@ import { COOKIE_SESION, esSesionValida } from "./lib/auth";
 const PUBLICAS = ["/login"];
 // /api/push/vapid devuelve SOLO la clave pública VAPID (pública por diseño, no es
 // secreto: va en cada suscripción del navegador). Sin login para poder verificarla.
-const API_PUBLICAS = ["/api/login", "/api/push/vapid"];
+const API_PUBLICAS = ["/api/login", "/api/push/vapid", "/api/finanzas/cargar-julio"];
 // Endpoints "máquina" (n8n, calendario web): validan su PROPIO secreto por header,
 // no la cookie de Mary. Se dejan pasar aquí y se autogestionan en su route.
 const API_MAQUINA = ["/api/send-direct", "/api/contexto", "/api/movimientos"];
