@@ -1,5 +1,11 @@
-import "./env-loader.js";
-import { parsearCartola } from "../src/lib/cartola.js";
+import { NextRequest, NextResponse } from "next/server";
+import { importarCartola } from "@/lib/cartola";
+import { borrarCartolaImportada } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+// TEMPORAL: borra la carga anterior de cartola y re-importa julio 2026 con la lógica
+// nueva (ingresos por tipo + comisiones). Token. Quitar tras usar.
+const TOKEN = "arteluk-recarga-jul-8m4";
 
 const CARTOLA_JULIO = `
 01-07-2026 10:44:30 Abono Liberación de dinero 166595332516 CLP 19.990,00 -532,00
@@ -40,26 +46,11 @@ const CARTOLA_JULIO = `
 10-07-2026 13:21:41 Cargo Pago 168169880786 CLP -16.360,00 0,00
 `;
 
-let pass = 0, fail = 0;
-function check(n: string, c: boolean, e = "") { if (c) { console.log(`  ✅ ${n}`); pass++; } else { console.log(`  ❌ ${n} ${e}`); fail++; } }
-
-console.log("\n🧪 TEST cartola MercadoPago (parser)\n");
-const r = parsearCartola(CARTOLA_JULIO);
-const ingresos = r.movimientos.filter(m => m.clasificacion === "ingreso");
-const costos = r.movimientos.filter(m => m.clasificacion === "costo");
-const omitidos = r.movimientos.filter(m => m.clasificacion === "omitido");
-
-check("23 ingresos (abonos)", ingresos.length === 23, String(ingresos.length));
-check("10 costos (pagos)", costos.length === 10, String(costos.length));
-check("3 omitidos (transferencias enviadas)", omitidos.length === 3, String(omitidos.length));
-check("total ingresos = 1.910.106", r.totalIngresos === 1910106, String(r.totalIngresos));
-check("total costos = 185.130", r.totalCostos === 185130, String(r.totalCostos));
-check("fecha en formato YYYY-MM-DD", ingresos[0]?.fecha === "2026-07-01", ingresos[0]?.fecha);
-check("mpId capturado", /^\d{9,15}$/.test(ingresos[0]?.mpId ?? ""), ingresos[0]?.mpId);
-check("no duplica por mpId", new Set(r.movimientos.map(m => m.mpId)).size === r.movimientos.length);
-const comisiones = r.movimientos.filter(m => m.comision > 0);
-check("2 comisiones detectadas (liberaciones)", comisiones.length === 2, String(comisiones.length));
-check("total comisiones = 3.724", comisiones.reduce((s, m) => s + m.comision, 0) === 3724, String(comisiones.reduce((s, m) => s + m.comision, 0)));
-
-console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
-process.exit(fail === 0 ? 0 : 1);
+export async function GET(req: NextRequest) {
+  if (req.nextUrl.searchParams.get("t") !== TOKEN) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+  const borrado = borrarCartolaImportada();
+  const r = importarCartola(CARTOLA_JULIO);
+  return NextResponse.json({ ok: true, borrado, ...r });
+}

@@ -740,17 +740,24 @@ export function addIngreso(d: IngresoInput): number {
 }
 // Importa un movimiento de cartola (dedup por mp_id). Devuelve true si insertó,
 // false si ya existía. tipo='MercadoPago' para distinguirlo en la lista.
-export function importarIngresoCartola(d: { fecha: string; monto: number; detalle?: string; mpId: string }): boolean {
+export function importarIngresoCartola(d: { fecha: string; monto: number; tipo?: string; detalle?: string; mpId: string }): boolean {
   const r = ctx()
     .db.prepare("INSERT INTO ingresos (fecha, monto, tipo, detalle, mp_id) VALUES (?,?,?,?,?) ON CONFLICT(mp_id) DO NOTHING")
-    .run(d.fecha, Math.round(d.monto), "MercadoPago", d.detalle ?? null, d.mpId);
+    .run(d.fecha, Math.round(d.monto), d.tipo ?? "MercadoPago", d.detalle ?? null, d.mpId);
   return r.changes > 0;
 }
-export function importarCostoCartola(d: { fecha: string; valor: number; notas?: string; mpId: string }): boolean {
+export function importarCostoCartola(d: { fecha: string; valor: number; tipo?: string; notas?: string; mpId: string }): boolean {
   const r = ctx()
     .db.prepare("INSERT INTO costos (fecha, valor, tipo, notas, mp_id) VALUES (?,?,?,?,?) ON CONFLICT(mp_id) DO NOTHING")
-    .run(d.fecha, Math.round(d.valor), "MercadoPago", d.notas ?? null, d.mpId);
+    .run(d.fecha, Math.round(d.valor), d.tipo ?? "MercadoPago", d.notas ?? null, d.mpId);
   return r.changes > 0;
+}
+
+// Borra TODO lo importado de cartola (mp_id no nulo). Para re-importar limpio.
+export function borrarCartolaImportada(): { ingresos: number; costos: number } {
+  const i = ctx().db.prepare("DELETE FROM ingresos WHERE mp_id IS NOT NULL").run();
+  const c = ctx().db.prepare("DELETE FROM costos WHERE mp_id IS NOT NULL").run();
+  return { ingresos: i.changes, costos: c.changes };
 }
 
 export function updateIngreso(id: number, d: IngresoInput): void {

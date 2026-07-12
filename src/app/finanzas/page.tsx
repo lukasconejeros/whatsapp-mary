@@ -22,7 +22,7 @@ export default function FinanzasPage() {
   const [showImport, setShowImport] = useState(false)
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<null | { ingresosNuevos: number; costosNuevos: number; duplicados: number; omitidos: number }>(null)
+  const [importResult, setImportResult] = useState<null | { ingresosNuevos: number; costosNuevos: number; comisiones: number; duplicados: number; omitidos: number }>(null)
 
   async function importarCartola() {
     if (importing || !importText.trim()) return
@@ -227,7 +227,8 @@ export default function FinanzasPage() {
               style={{ width: '100%', borderRadius: 8, border: '1px solid #FAD1E5', padding: '8px 10px', fontSize: 12, fontFamily: 'inherit', resize: 'vertical', outline: 'none' }} />
             {importResult && (
               <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 9, background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#15803D', fontSize: 13 }}>
-                ✅ Importado: {importResult.ingresosNuevos} ingresos y {importResult.costosNuevos} gastos.
+                ✅ Importado: {importResult.ingresosNuevos} ingresos y {importResult.costosNuevos} gastos
+                {importResult.comisiones > 0 ? ` + ${importResult.comisiones} comisiones` : ''}.
                 {importResult.duplicados > 0 ? ` (${importResult.duplicados} ya estaban).` : ''}
                 {importResult.omitidos > 0 ? ` · ${importResult.omitidos} retiros omitidos.` : ''}
               </div>
