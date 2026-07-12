@@ -160,4 +160,7 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .chat-shell.has-selection .chat-list-pane { display: none; }
   .chat-shell.has-selection .chat-detail-pane { display: flex; }
   .chat-back { display: flex; }
+  /* Con un chat abierto, la barra inferior estorba: se oculta para dar toda la
+     pantalla al chat (se vuelve a ver al tocar "Chats" y volver a la lista). */
+  .chat-open .app-sidebar { display: none !important; }
 }

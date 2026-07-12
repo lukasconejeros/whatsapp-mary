@@ -15,6 +15,7 @@ export default function FinanzasPage() {
   const [costos, setCostos] = useState<Mov[]>([])
   const [loading, setLoading] = useState(true)
   const [openTipo, setOpenTipo] = useState<string | null>(null)
+  const [orden, setOrden] = useState<'fecha' | 'nombre'>('fecha')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0, 10), tipo: '', monto: '', detalle: '' })
@@ -64,7 +65,11 @@ export default function FinanzasPage() {
   const amount = (r: Mov) => tab === 'ganancias' ? (r.monto ?? 0) : (r.valor ?? 0)
   const tipos = tab === 'ganancias' ? INGRESO_TIPOS : COSTO_TIPOS
 
-  // Agrupar por tipo, ordenado por monto desc
+  // Nombre/detalle visible de un movimiento (para ordenar alfabéticamente).
+  const nombreDe = (r: Mov) => (r.detalle || r.apoderado || r.notas || '').trim()
+
+  // Agrupar por tipo (grupos ordenados por monto desc); los ítems de cada grupo se
+  // ordenan según la elección de la usuaria: por fecha (recientes primero) o A→Z.
   const grupos = useMemo(() => {
     const m = new Map<string, { total: number; items: Mov[] }>()
     for (const r of rows) {
@@ -72,8 +77,14 @@ export default function FinanzasPage() {
       const g = m.get(k) ?? { total: 0, items: [] }
       g.total += amount(r); g.items.push(r); m.set(k, g)
     }
+    for (const g of m.values()) {
+      g.items.sort((a, b) =>
+        orden === 'fecha'
+          ? (b.fecha || '').localeCompare(a.fecha || '')
+          : nombreDe(a).localeCompare(nombreDe(b), 'es', { sensitivity: 'base' }))
+    }
     return [...m.entries()].sort((a, b) => b[1].total - a[1].total)
-  }, [rows, tab])
+  }, [rows, tab, orden])
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault()
@@ -160,7 +171,21 @@ export default function FinanzasPage() {
           {tab === 'metricas' ? <MetricasTab />
             : loading ? <p style={{ color: '#C0879F', fontSize: 13 }}>Cargando…</p>
             : grupos.length === 0 ? <p style={{ color: '#DBAFC6', fontSize: 13 }}>Sin movimientos este mes.</p>
-            : grupos.map(([tipo, g]) => (
+            : (<>
+            <div className="flex items-center" style={{ gap: 6, marginBottom: 10 }}>
+              <span style={{ fontSize: 11, color: '#B0708C' }}>Ordenar:</span>
+              {([['fecha', 'Fecha'], ['nombre', 'A → Z']] as const).map(([k, lbl]) => {
+                const on = orden === k
+                return (
+                  <button key={k} onClick={() => setOrden(k)}
+                    style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                      border: on ? '1px solid #EC4899' : '1px solid #FAD1E5', background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
+                    {lbl}
+                  </button>
+                )
+              })}
+            </div>
+            {grupos.map(([tipo, g]) => (
               <div key={tipo} style={{ background: '#fff', border: '1px solid #FAD1E5', borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
                 <button onClick={() => setOpenTipo(p => p === tipo ? null : tipo)}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
@@ -183,6 +208,7 @@ export default function FinanzasPage() {
                 )}
               </div>
             ))}
+            </>)}
         </div>
       </div>
 

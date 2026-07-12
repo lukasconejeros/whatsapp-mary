@@ -56,9 +56,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
-  const [suggesting, setSuggesting] = useState(false)
   const [redactando, setRedactando] = useState(false)
-  const [tip, setTip] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [grabando, setGrabando] = useState(false)
   const [segundos, setSegundos] = useState(0)
@@ -97,27 +95,6 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
 
   useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
 
-  async function suggest() {
-    if (suggesting || msgs.length === 0) return
-    setSuggesting(true)
-    setTip('')
-    // Días desde el último mensaje de la conversación (para detectar silencio).
-    const ultimo = msgs[msgs.length - 1]
-    const ultimoTs = ultimo ? (typeof ultimo.createdAt === 'number' ? ultimo.createdAt * 1000 : new Date(ultimo.createdAt).getTime()) : Date.now()
-    const diasSinResponder = Math.floor((Date.now() - ultimoTs) / 86400000)
-    try {
-      const r = await fetch('/api/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: msgs.slice(-10).map(m => ({ role: m.senderType === 'user' ? 'user' : 'assistant', content: m.content })),
-          contactName: conv.contact.name,
-          categoria: conv.categoria,
-          diasSinResponder,
-        }) })
-      const d = await r.json()
-      if (d.ok && d.suggestion) setReply(d.suggestion)
-      if (d.ok && d.tip) setTip(d.tip)
-    } finally { setSuggesting(false) }
-  }
 
   // Toma la nota que Mary escribió en la caja y la convierte en un mensaje bonito
   // (con el nombre del apoderado y del niño). Deja el resultado en la caja, editable.
@@ -308,13 +285,6 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       </div>
 
       <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #FDE7F1',flexShrink:0 }}>
-        {tip && (
-          <div style={{ display:'flex',alignItems:'flex-start',gap:6,padding:'7px 10px',borderRadius:9,border:'1px solid #FAD1E5',background:'#FFF7FB',color:'#9D174D',fontSize:12,lineHeight:1.45 }}>
-            <span style={{ flexShrink:0 }}>💡</span>
-            <span style={{ flex:1 }}>{tip}</span>
-            <button type="button" onClick={()=>setTip('')} title="Ocultar" style={{ flexShrink:0,background:'none',border:'none',cursor:'pointer',color:'#C0879F',fontSize:14,lineHeight:1,padding:0 }}>×</button>
-          </div>
-        )}
         {sendError && (
           <div style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 10px',borderRadius:9,border:'1px solid #FCA5A5',background:'#FEF2F2',color:'#DC2626',fontSize:12 }}>
             <span style={{ flexShrink:0 }}>⚠</span>
@@ -328,10 +298,6 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
               title="Escribe tu nota arriba y esto la convierte en un mensaje bonito con el nombre"
               style={{ display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#BE185D',fontSize:11,fontWeight:600,cursor:redactando?'wait':'pointer',opacity:redactando?0.6:1,fontFamily:'inherit' }}>
               {redactando ? '⟳ Redactando…' : '✨ Redactar bonito'}
-            </button>
-            <button type="button" onClick={suggest} disabled={suggesting}
-              style={{ display:'flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:8,border:'1px solid #FAD1E5',background:'#FDE7F1',color:'#EC4899',fontSize:11,fontWeight:500,cursor:suggesting?'wait':'pointer',opacity:suggesting?0.6:1,fontFamily:'inherit' }}>
-              {suggesting ? '⟳ Pensando…' : '✦ Sugerir respuesta'}
             </button>
           </div>
         )}

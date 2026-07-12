@@ -5,8 +5,8 @@ import AppNav from '@/components/AppNav'
 import ConversationView from '@/components/ConversationView'
 import { Avatar } from '@/components/Avatar'
 import { Conversation, CATEGORIA_CONFIG, Categoria } from '@/lib/types'
-import { RefreshCw, Search, X, ArrowLeft, MessageCircle, Bell, BellRing, BellOff, CheckCircle2, Circle } from 'lucide-react'
-import { activarNotificaciones, estadoNotificaciones, sonarAviso, type EstadoNoti } from '@/lib/push-client'
+import { RefreshCw, Search, X, ArrowLeft, MessageCircle, CheckCircle2, Circle } from 'lucide-react'
+import { sonarAviso } from '@/lib/push-client'
 
 function timeAgo(ts: string | number): string {
   if (!ts) return ''
@@ -26,6 +26,7 @@ const FILTERS: { key: Categoria; label: string }[] = [
 ]
 
 const CATS: Categoria[] = ['mary', 'arteluk', 'potencial']
+const CAT_SHORT: Record<Categoria, string> = { mary: 'Mary', arteluk: 'Arteluk', potencial: 'Meta' }
 
 export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -34,13 +35,9 @@ export default function InboxPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<Categoria>('arteluk')
-  const [noti, setNoti] = useState<EstadoNoti>('inactivas')
-  const [activando, setActivando] = useState(false)
   const [segStats, setSegStats] = useState<{ pendientes: number; enviados: number; omitidos: number; enviadosHoy: number } | null>(null)
   const [segCand, setSegCand] = useState(0)
   const [segBusy, setSegBusy] = useState(false)
-
-  useEffect(() => { estadoNotificaciones().then(setNoti) }, [])
 
   // Progreso de la campaña de seguimiento (solo importa en la vista Meta).
   const cargarSeguimiento = useCallback(async () => {
@@ -84,20 +81,6 @@ export default function InboxPage() {
       else alert(d.error || 'No se pudo enviar la prueba')
     } catch { alert('No se pudo. Revisa tu internet.') }
     finally { setSegBusy(false) }
-  }
-
-  async function onActivarNoti() {
-    if (activando) return
-    setActivando(true)
-    try {
-      const r = await activarNotificaciones()
-      if (r.ok) { setNoti('activadas') }
-      else { alert(r.error || 'No se pudo activar'); setNoti(await estadoNotificaciones()) }
-    } catch {
-      alert('No se pudo activar. Reintenta.')
-    } finally {
-      setActivando(false) // nunca dejar el botón trabado en "Activando…"
-    }
   }
 
   const load = useCallback(async (silent = false) => {
@@ -185,7 +168,7 @@ export default function InboxPage() {
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
+    <div className={`flex h-screen overflow-hidden ${selected ? 'chat-open' : ''}`} style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="flex items-center gap-3 shrink-0"
@@ -193,16 +176,6 @@ export default function InboxPage() {
           <span style={{ fontSize: 14, fontWeight: 700, color: '#9D174D' }}>Chats</span>
           <span style={{ fontSize: 12, color: '#C0879F' }}>{conversations.length}</span>
           <div className="flex-1" />
-          <button onClick={noti === 'activadas' ? undefined : onActivarNoti} disabled={activando || noti === 'activadas'}
-            title="Avisos cuando escribe un cliente de Arteluk o un lead de Meta" className="flex items-center gap-1.5"
-            style={{ height: 30, padding: '0 10px', borderRadius: 8,
-              border: '1px solid ' + (noti === 'activadas' ? '#BBF7D0' : '#FAD1E5'),
-              background: noti === 'activadas' ? '#DCFCE7' : '#FFFFFF', fontSize: 12,
-              color: noti === 'activadas' ? '#15803D' : noti === 'bloqueadas' ? '#C2410C' : '#EC4899',
-              cursor: noti === 'activadas' ? 'default' : 'pointer', fontFamily: 'inherit', opacity: activando ? 0.5 : 1 }}>
-            {noti === 'activadas' ? <BellRing size={12} /> : noti === 'bloqueadas' ? <BellOff size={12} /> : <Bell size={12} />}
-            {noti === 'activadas' ? 'Avisos ✓' : noti === 'bloqueadas' ? 'Bloqueados' : activando ? 'Activando…' : 'Activar avisos'}
-          </button>
           <button onClick={() => load(true)} disabled={refreshing} className="flex items-center gap-1.5"
             style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid #FAD1E5', background: '#FFFFFF', fontSize: 12, color: '#EC4899', cursor: 'pointer', fontFamily: 'inherit', opacity: refreshing ? 0.5 : 1 }}>
             <RefreshCw size={11} className={refreshing ? 'spin' : ''} />
@@ -314,15 +287,14 @@ export default function InboxPage() {
                   <ArrowLeft size={17} /> Chats
                 </button>
                 {/* Mover la conversación de grupo (funciona en teléfono y PC) */}
-                <div className="flex items-center" style={{ gap: 6, padding: '6px 12px', borderBottom: '1px solid #FDE7F1', background: '#fff', flexShrink: 0, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, color: '#B0708C', marginRight: 2 }}>Grupo:</span>
+                <div className="flex items-center" style={{ gap: 4, padding: '5px 10px', borderBottom: '1px solid #FDE7F1', background: '#fff', flexShrink: 0 }}>
                   {CATS.map(cat => {
                     const on = (selected.categoria ?? 'mary') === cat
                     return (
-                      <button key={cat} onClick={() => cambiarCategoria(selected.id, cat)}
-                        style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                      <button key={cat} onClick={() => cambiarCategoria(selected.id, cat)} title={CATEGORIA_CONFIG[cat].label}
+                        style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 9px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
                           border: on ? '1px solid #EC4899' : '1px solid #FAD1E5', background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
-                        {CATEGORIA_CONFIG[cat].label}
+                        {CAT_SHORT[cat]}
                       </button>
                     )
                   })}
