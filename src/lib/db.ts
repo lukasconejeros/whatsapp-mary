@@ -487,12 +487,16 @@ export function countSeguimientosEnviadosDia(dia: string): number {
   return r.n;
 }
 
-export function markSeguimientoEnviado(id: number, mensaje: string, dia: string): void {
-  ctx().db
+// Reclama el envío de forma ATÓMICA: sólo pasa a 'enviado' si la fila SIGUE pendiente.
+// Devuelve true si lo reclamó. Si Mary tocó "Detener" (pendiente→omitido) mientras la
+// IA redactaba, devuelve false y el loop NO envía ese mensaje.
+export function markSeguimientoEnviado(id: number, mensaje: string, dia: string): boolean {
+  const r = ctx().db
     .prepare(
-      "UPDATE seguimientos SET estado = 'enviado', mensaje = ?, sent_at = unixepoch(), sent_day = ? WHERE id = ?"
+      "UPDATE seguimientos SET estado = 'enviado', mensaje = ?, sent_at = unixepoch(), sent_day = ? WHERE id = ? AND estado = 'pendiente'"
     )
     .run(mensaje, dia, id);
+  return (r.changes as number) > 0;
 }
 
 export function markSeguimientoOmitido(id: number): void {

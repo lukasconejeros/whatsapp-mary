@@ -45,9 +45,11 @@ async function tick(): Promise<number> {
 
   const cli = getClienteByPhone(conv.phone);
   const mensaje = await redactarSeguimiento(conv.name, cli?.alumnos ?? null);
+  // Reclamo ATÓMICO: si dejó de estar pendiente mientras redactaba la IA (Mary tocó
+  // "Detener"), no se envía. Sólo tras reclamar se encola y se muestra en el chat.
+  if (!markSeguimientoEnviado(pend.id, mensaje, hoy)) return 2_000;
   enqueueOutbox(conv.id, conv.phone, mensaje, { kind: "text" });
   insertMessage(conv.id, "human", mensaje); // se ve en el chat como enviado por Mary
-  markSeguimientoEnviado(pend.id, mensaje, hoy);
   logger.info({ conv: conv.id }, "Seguimiento: mensaje encolado");
 
   return randInt(CAMPANA.pausaMinS, CAMPANA.pausaMaxS) * 1000; // pausa larga anti-baneo

@@ -12,12 +12,14 @@ function envInt(name: string, def: number): number {
 
 // Parámetros de la campaña (overridables por env para pruebas). Getters: leen el env
 // vigente en cada tick, así se pueden ajustar sin recompilar.
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
 export const CAMPANA = {
-  get capDiario() { return envInt("SEGUIMIENTO_MAX_DIA", 35); },       // tope de envíos por día
-  get horaInicio() { return envInt("SEGUIMIENTO_HORA_INICIO", 9); },   // no mandar antes de las 9
-  get horaFin() { return envInt("SEGUIMIENTO_HORA_FIN", 21); },        // ni después de las 21
-  get pausaMinS() { return envInt("SEGUIMIENTO_PAUSA_MIN_S", 40); },   // pausa mínima entre envíos
-  get pausaMaxS() { return envInt("SEGUIMIENTO_PAUSA_MAX_S", 90); },   // pausa máxima entre envíos
+  get capDiario() { return envInt("SEGUIMIENTO_MAX_DIA", 35); },                    // tope de envíos por día
+  get horaInicio() { return clamp(envInt("SEGUIMIENTO_HORA_INICIO", 9), 0, 23); },  // no mandar antes de las 9
+  get horaFin() { return clamp(envInt("SEGUIMIENTO_HORA_FIN", 21), 1, 24); },       // ni después de las 21
+  get pausaMinS() { return envInt("SEGUIMIENTO_PAUSA_MIN_S", 40); },                // pausa mínima entre envíos
+  get pausaMaxS() { return envInt("SEGUIMIENTO_PAUSA_MAX_S", 90); },                // pausa máxima entre envíos
 };
 
 // Mensaje base de la promo (por si no hay IA disponible): clase de prueba $18.000
@@ -44,11 +46,16 @@ Datos:
 
 Reglas: español chileno con tuteo (nunca "vos/podés/decís"); CÁLIDO, cercano y CORTO (2-3 frases); saluda por su nombre si lo tienes y menciona al niño/a si lo tienes; incluye la promo ($18.000 antes $25.000) e invita a AGENDAR; 1-2 emojis suaves como mucho; SIN exagerar ni prometer de más. Devuelve SOLO el mensaje final, sin comillas ni explicaciones ni opciones.`;
 
+  // Timeout duro: si Anthropic se cuelga, no dejar el tick (y con él toda la campaña)
+  // esperando indefinidamente. Se cae al template.
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
   try {
     const res = await fetch(ANTHROPIC_URL, {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model: MODEL, max_tokens: 250, system, messages: [{ role: "user", content: "Escribe el mensaje." }] }),
+      signal: ctrl.signal,
     });
     if (!res.ok) return mensajeSeguimientoFallback(nombre, alumno);
     const data = (await res.json()) as { content?: { text?: string }[] };
@@ -56,5 +63,7 @@ Reglas: español chileno con tuteo (nunca "vos/podés/decís"); CÁLIDO, cercano
     return msg || mensajeSeguimientoFallback(nombre, alumno);
   } catch {
     return mensajeSeguimientoFallback(nombre, alumno);
+  } finally {
+    clearTimeout(t);
   }
 }

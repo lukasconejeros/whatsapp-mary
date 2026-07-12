@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getConversationById, insertMessage, enqueueOutbox } from "@/lib/db";
+import { getConversationById, insertMessage, enqueueOutbox, getConnectionState } from "@/lib/db";
 import { limitar } from "@/lib/ratelimit";
 import { prepararNotaVoz } from "@/lib/audio";
 
@@ -27,6 +27,11 @@ export async function POST(req: NextRequest) {
   const conv = getConversationById(conversationId);
   if (!conv) return NextResponse.json({ ok: false, error: "Conversación no encontrada" }, { status: 404 });
 
+  // Igual que en /api/send: no dar por enviado si WhatsApp no está conectado.
+  if (getConnectionState().status !== "connected") {
+    return NextResponse.json({ ok: false, error: "WhatsApp no está conectado. Revisa la conexión e inténtalo de nuevo." }, { status: 409 });
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
   if (buffer.length === 0) return NextResponse.json({ ok: false, error: "archivo vacío" }, { status: 400 });
   if (buffer.length > MAX_BYTES) return NextResponse.json({ ok: false, error: "archivo muy grande" }, { status: 413 });
@@ -39,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   let ext: string;
-  if (esAudio) ext = mime.includes("mp4") || mime.includes("m4a") ? "m4a" : mime.includes("mpeg") ? "mp3" : "ogg";
+  if (esAudio) ext = mime.includes("webm") ? "webm" : mime.includes("mp4") || mime.includes("m4a") ? "m4a" : mime.includes("mpeg") ? "mp3" : "ogg";
   else ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
   const name = `env_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
