@@ -246,21 +246,19 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           </div>
         ) : grouped.map(g=>(
           <div key={g.date}>
-            <div style={{ display:'flex',alignItems:'center',gap:8,margin:'14px 0 10px' }}>
-              <div style={{flex:1,height:1,background:'#FDE7F1'}}/>
-              <span style={{fontSize:12,color:'#94A3B8',fontWeight:500}}>{g.date}</span>
-              <div style={{flex:1,height:1,background:'#FDE7F1'}}/>
+            <div style={{ display:'flex',justifyContent:'center',margin:'14px 0 10px' }}>
+              <span style={{fontSize:12,color:'#54656F',fontWeight:500,background:'#F4F4F4',border:'1px solid #EDEDED',borderRadius:8,padding:'3px 10px',boxShadow:'0 1px 0.5px rgba(11,20,26,0.08)'}}>{g.date}</span>
             </div>
             {g.msgs.map((m,i)=>{
               const isOut = m.messageType===1
               const showName = !isOut&&(i===0||g.msgs[i-1]?.messageType===1)
               return (
                 <div key={m.id} style={{ display:'flex', justifyContent: isOut?'flex-end':'flex-start', marginBottom:3 }}>
-                  <div style={{ maxWidth:'76%' }}>
-                    {showName && <p style={{fontSize:12,color:'#94A3B8',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
-                    <div style={{ borderRadius:12, padding:'9px 13px', fontSize:15, lineHeight:1.5,
-                      ...(isOut ? { background:'#EC4899', color:'#fff', borderBottomRightRadius:4 }
-                               : { background:'#FFF4FA', color:'#0F172A', border:'1px solid #FAD1E5', borderBottomLeftRadius:4 }) }}>
+                  <div style={{ maxWidth:'80%' }}>
+                    {showName && <p style={{fontSize:12,color:'#667781',marginBottom:3,marginLeft:2}}>{conv.contact.name.split(' ')[0]}</p>}
+                    <div style={{ borderRadius:8, padding:'6px 9px 7px', fontSize:15, lineHeight:1.35, boxShadow:'0 1px 0.5px rgba(11,20,26,0.13)',
+                      ...(isOut ? { background:'#D9FDD3', color:'#111B21', borderTopRightRadius:2 }
+                               : { background:'#FFFFFF', color:'#111B21', border:'1px solid #EDEDED', borderTopLeftRadius:2 }) }}>
                       {m.media && (
                         <div style={{ marginBottom: showText(m) ? 6 : 0 }}>
                           {/\.(ogg|opus|mp3|m4a)$/i.test(m.media)
@@ -272,7 +270,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
                       )}
                       {showText(m) && <span style={{ whiteSpace:'pre-wrap' }}>{m.content}</span>}
                     </div>
-                    <p style={{fontSize:11.5,color:'#E9A9CC',marginTop:3,textAlign:isOut?'right':'left',paddingInline:2}}>
+                    <p style={{fontSize:11,color:'#8696A0',marginTop:2,textAlign:isOut?'right':'left',paddingInline:4}}>
                       {fmt(m.createdAt)}{isOut&&m.senderName&&m.senderName!=='Tú'&&` · ${m.senderName}`}
                     </p>
                   </div>
@@ -284,7 +282,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         <div ref={ref}/>
       </div>
 
-      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'10px 12px',background:'#fff',borderTop:'1px solid #FDE7F1',flexShrink:0 }}>
+      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'8px 10px',background:'#F0F2F5',borderTop:'1px solid #E9EDEF',flexShrink:0 }}>
         {sendError && (
           <div style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 10px',borderRadius:9,border:'1px solid #FCA5A5',background:'#FEF2F2',color:'#DC2626',fontSize:12 }}>
             <span style={{ flexShrink:0 }}>⚠</span>
@@ -313,46 +311,47 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
               <span style={{ marginLeft:'auto',color:'#9D174D',fontVariantNumeric:'tabular-nums' }}>{mmss}</span>
             </div>
             <button type="button" onClick={enviarGrabacion} title="Enviar audio"
-              style={{ width:42,height:42,borderRadius:'50%',border:'none',background:'#EC4899',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 4px 12px rgba(236,72,153,0.35)' }}>
-              <Send size={16}/>
+              style={{ width:44,height:44,borderRadius:'50%',border:'none',background:'#00A884',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 4px 12px rgba(0,168,132,0.35)' }}>
+              <Send size={18}/>
             </button>
           </div>
         ) : (
-        <div style={{ display:'flex',alignItems:'flex-end',gap:8,position:'relative' }}>
+        <div style={{ display:'flex',alignItems:'flex-end',gap:6,position:'relative' }}>
           {showEmoji && (
-            <div style={{ position:'absolute',bottom:52,left:0,background:'#fff',border:'1px solid #FAD1E5',borderRadius:12,padding:8,boxShadow:'0 8px 24px rgba(190,24,93,0.18)',display:'grid',gridTemplateColumns:'repeat(8, 1fr)',gap:2,width:290,maxHeight:190,overflowY:'auto',zIndex:20 }}>
+            <div style={{ position:'absolute',bottom:56,left:0,background:'#fff',border:'1px solid #E9EDEF',borderRadius:12,padding:8,boxShadow:'0 8px 24px rgba(11,20,26,0.18)',display:'grid',gridTemplateColumns:'repeat(8, 1fr)',gap:2,width:290,maxHeight:190,overflowY:'auto',zIndex:20 }}>
               {EMOJIS.map(em => (
                 <button key={em} type="button" onClick={()=>{setReply(r=>r+em)}}
                   style={{ fontSize:20,lineHeight:1.4,padding:2,background:'none',border:'none',cursor:'pointer',borderRadius:6 }}
-                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#FDE7F1'}
+                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F0F2F5'}
                   onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='none'}>{em}</button>
               ))}
             </div>
           )}
-          <button type="button" onClick={()=>setShowEmoji(s=>!s)} title="Emojis"
-            style={{ width:44,height:44,borderRadius:10,border:'1px solid #FAD1E5',background: showEmoji?'#FDE7F1':'#FFF4FA',color:'#EC4899',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-            <Smile size={22}/>
-          </button>
-          <input ref={fotoInputRef} type="file" accept="image/*" onChange={enviarFoto} style={{ display:'none' }} />
-          <button type="button" onClick={()=>fotoInputRef.current?.click()} disabled={sending} title="Enviar foto"
-            style={{ width:44,height:44,borderRadius:10,border:'1px solid #FAD1E5',background:'#FFF4FA',color: sending?'#F7CFE1':'#EC4899',cursor: sending?'default':'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
-            <ImageIcon size={22}/>
-          </button>
-          <textarea value={reply} onChange={e=>setReply(e.target.value)}
-            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e as unknown as React.FormEvent)}}}
-            placeholder="Escribe un mensaje..." rows={2}
-            style={{ flex:1,resize:'none',borderRadius:10,padding:'10px 13px',fontSize:15,border:'1px solid #FAD1E5',background:'#FFF4FA',color:'#0F172A',outline:'none',fontFamily:'inherit',lineHeight:1.5 }}
-            onFocus={e=>{e.target.style.borderColor='#EC4899';e.target.style.background='#fff'}}
-            onBlur={e=>{e.target.style.borderColor='#FAD1E5';e.target.style.background='#FFF4FA'}}
-          />
+          {/* Pastilla estilo WhatsApp: emoji + texto + foto adentro */}
+          <div style={{ flex:1,display:'flex',alignItems:'flex-end',gap:2,background:'#fff',border:'1px solid #E9EDEF',borderRadius:22,padding:'0 4px' }}>
+            <button type="button" onClick={()=>setShowEmoji(s=>!s)} title="Emojis"
+              style={{ width:40,height:44,border:'none',background:'none',color:'#54656F',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <Smile size={23}/>
+            </button>
+            <textarea value={reply} onChange={e=>setReply(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e as unknown as React.FormEvent)}}}
+              placeholder="Mensaje" rows={1}
+              style={{ flex:1,resize:'none',border:'none',outline:'none',background:'transparent',padding:'11px 2px',fontSize:15,color:'#111B21',fontFamily:'inherit',lineHeight:1.35,maxHeight:100,overflowY:'auto' }}
+            />
+            <input ref={fotoInputRef} type="file" accept="image/*" onChange={enviarFoto} style={{ display:'none' }} />
+            <button type="button" onClick={()=>fotoInputRef.current?.click()} disabled={sending} title="Enviar foto"
+              style={{ width:40,height:44,border:'none',background:'none',color: sending?'#B7C0C6':'#54656F',cursor: sending?'default':'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              <ImageIcon size={22}/>
+            </button>
+          </div>
           {reply.trim() ? (
             <button type="submit" disabled={sending}
-              style={{ width:44,height:44,borderRadius:'50%',border:'none',background:!sending?'#EC4899':'#FAD1E5',color:'#fff',cursor:!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              style={{ width:46,height:46,borderRadius:'50%',border:'none',background:!sending?'#00A884':'#A7D8CC',color:'#fff',cursor:!sending?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
               <Send size={20}/>
             </button>
           ) : (
             <button type="button" onClick={iniciarGrabacion} title="Grabar nota de voz"
-              style={{ width:44,height:44,borderRadius:'50%',border:'none',background:'#EC4899',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+              style={{ width:46,height:46,borderRadius:'50%',border:'none',background:'#00A884',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
               <Mic size={22}/>
             </button>
           )}
