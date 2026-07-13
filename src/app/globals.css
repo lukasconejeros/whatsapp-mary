@@ -3,18 +3,18 @@
 @theme {
   --color-bg:          #FFFFFF;
   --color-surface:     #FFFFFF;
-  --color-border:      #FAD1E5;
-  --color-border-soft: #FDE7F1;
+  --color-border:      #D3E7DE;
+  --color-border-soft: #E7F1EC;
 
   --color-ink-1:  #5A1A38;
-  --color-ink-2:  #EC4899;
+  --color-ink-2:  #00A884;
   --color-ink-3:  #9CA3AF;
   --color-ink-4:  #EFC3D8;
 
-  --color-pink:    #EC4899;
-  --color-pink-h:  #BE185D;
-  --color-pink-bg: #FDE7F1;
-  --color-pink-bd: #FAD1E5;
+  --color-pink:    #00A884;
+  --color-pink-h:  #008069;
+  --color-pink-bg: #E7F1EC;
+  --color-pink-bd: #D3E7DE;
 
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -79,7 +79,7 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
     height: auto !important;
     flex-direction: row !important;
     border-right: none !important;
-    border-top: 1px solid #FAD1E5;
+    border-top: 1px solid #D3E7DE;
     box-shadow: 0 -4px 16px rgba(74,46,57,0.06);
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -121,16 +121,16 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   width: 58px; height: 58px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: #fff; text-decoration: none;
-  background: linear-gradient(135deg, #FB6FB0 0%, #EC4899 55%, #BE185D 100%);
-  box-shadow: 0 8px 24px rgba(236,72,153,0.5), 0 0 0 4px rgba(236,72,153,0.14);
+  background: linear-gradient(135deg, #FB6FB0 0%, #00A884 55%, #008069 100%);
+  box-shadow: 0 8px 24px rgba(0,168,132,0.5), 0 0 0 4px rgba(0,168,132,0.14);
   animation: fabGlow 2.4s ease-in-out infinite;
   transition: transform .15s ease;
 }
 .asistente-fab:hover { transform: scale(1.08); }
 .asistente-fab:active { transform: scale(0.95); }
 @keyframes fabGlow {
-  0%, 100% { box-shadow: 0 8px 24px rgba(236,72,153,0.5), 0 0 0 4px rgba(236,72,153,0.14); }
-  50%      { box-shadow: 0 12px 32px rgba(236,72,153,0.72), 0 0 0 8px rgba(236,72,153,0.10); }
+  0%, 100% { box-shadow: 0 8px 24px rgba(0,168,132,0.5), 0 0 0 4px rgba(0,168,132,0.14); }
+  50%      { box-shadow: 0 12px 32px rgba(0,168,132,0.72), 0 0 0 8px rgba(0,168,132,0.10); }
 }
 @media (max-width: 767px) {
   /* Sube el botón por encima de la barra inferior */
@@ -157,7 +157,7 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-.chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #FAD1E5; min-height: 0; }
+.chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #D3E7DE; min-height: 0; }
 .chat-detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #FFFFFF; }
 .chat-back { display: none; }
 

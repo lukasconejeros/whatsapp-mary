@@ -35,17 +35,17 @@ export default function LeadsPage() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor: '#FAD1E5' }}>
+        <div className="flex items-center justify-between px-5 py-3 border-b bg-white" style={{ borderColor: '#D3E7DE' }}>
           <div>
-            <h1 className="text-base font-bold" style={{ color: '#9D174D' }}>Panel de Leads</h1>
-            <p className="text-xs" style={{ color: '#F7CFE1' }}>{leads.length} leads totales</p>
+            <h1 className="text-base font-bold" style={{ color: '#054D44' }}>Panel de Leads</h1>
+            <p className="text-xs" style={{ color: '#A7D8CC' }}>{leads.length} leads totales</p>
           </div>
-          <button onClick={() => fetchLeads(true)} disabled={refreshing} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: '#EC4899' }}>
+          <button onClick={() => fetchLeads(true)} disabled={refreshing} className="flex items-center gap-1.5 text-xs transition-colors" style={{ color: '#00A884' }}>
             <RefreshCw size={13} className={refreshing ? "spin" : ""} />Actualizar
           </button>
         </div>
         {loading ? (
-          <div className="flex-1 flex items-center justify-center text-sm" style={{ color: '#F7CFE1' }}>Cargando leads...</div>
+          <div className="flex-1 flex items-center justify-center text-sm" style={{ color: '#A7D8CC' }}>Cargando leads...</div>
         ) : (
           <div className="flex-1 overflow-x-auto">
             <div className="flex gap-3 h-full px-4 py-4" style={{ minWidth: "900px" }}>

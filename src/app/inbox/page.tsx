@@ -190,7 +190,7 @@ export default function InboxPage() {
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center" style={{ background: '#FFFFFF' }}>
-      <div className="flex items-center gap-2" style={{ color: '#C0879F' }}>
+      <div className="flex items-center gap-2" style={{ color: '#8696A0' }}>
         <RefreshCw size={13} className="spin" />
         <span style={{ fontSize: 13 }}>Cargando...</span>
       </div>
@@ -204,12 +204,12 @@ export default function InboxPage() {
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <header className="flex items-center gap-3 shrink-0"
-          style={{ height: 48, padding: '0 20px', background: '#FFFFFF', borderBottom: '1px solid #FAD1E5' }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#9D174D' }}>Chats</span>
-          <span style={{ fontSize: 12, color: '#C0879F' }}>{conversations.length}</span>
+          style={{ height: 48, padding: '0 20px', background: '#FFFFFF', borderBottom: '1px solid #D3E7DE' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#054D44' }}>Chats</span>
+          <span style={{ fontSize: 12, color: '#8696A0' }}>{conversations.length}</span>
           <div className="flex-1" />
           <button onClick={() => load(true)} disabled={refreshing} className="flex items-center gap-1.5"
-            style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid #FAD1E5', background: '#FFFFFF', fontSize: 12, color: '#EC4899', cursor: 'pointer', fontFamily: 'inherit', opacity: refreshing ? 0.5 : 1 }}>
+            style={{ height: 30, padding: '0 10px', borderRadius: 8, border: '1px solid #D3E7DE', background: '#FFFFFF', fontSize: 12, color: '#00A884', cursor: 'pointer', fontFamily: 'inherit', opacity: refreshing ? 0.5 : 1 }}>
             <RefreshCw size={11} className={refreshing ? 'spin' : ''} />
             Actualizar
           </button>
@@ -218,14 +218,14 @@ export default function InboxPage() {
         <div className={`chat-shell ${selected ? 'has-selection' : ''}`}>
           {/* ── Lista de chats ── */}
           <div className="chat-list-pane">
-            <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid #FDE7F1' }}>
+            <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid #E7F1EC' }}>
               <div className="relative flex items-center" style={{ marginBottom: 8 }}>
-                <Search size={13} style={{ position: 'absolute', left: 10, color: '#C0879F', pointerEvents: 'none' }} />
+                <Search size={13} style={{ position: 'absolute', left: 10, color: '#8696A0', pointerEvents: 'none' }} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar chat o mensaje..."
-                  style={{ width: '100%', paddingLeft: 31, paddingRight: search ? 30 : 12, height: 38, fontSize: 14, borderRadius: 10, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#9D174D', outline: 'none', fontFamily: 'inherit' }}
-                  onFocus={e => { e.target.style.borderColor = '#EC4899'; e.target.style.background = '#fff' }}
-                  onBlur={e => { e.target.style.borderColor = '#FAD1E5'; e.target.style.background = '#FFF4FA' }} />
-                {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 9, cursor: 'pointer', color: '#C0879F', background: 'none', border: 'none', display: 'flex' }}><X size={13} /></button>}
+                  style={{ width: '100%', paddingLeft: 31, paddingRight: search ? 30 : 12, height: 38, fontSize: 14, borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#054D44', outline: 'none', fontFamily: 'inherit' }}
+                  onFocus={e => { e.target.style.borderColor = '#00A884'; e.target.style.background = '#fff' }}
+                  onBlur={e => { e.target.style.borderColor = '#D3E7DE'; e.target.style.background = '#F3F9F6' }} />
+                {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 9, cursor: 'pointer', color: '#8696A0', background: 'none', border: 'none', display: 'flex' }}><X size={13} /></button>}
               </div>
               <div className="flex" style={{ gap: 6, flexWrap: 'wrap' }}>
                 {FILTERS.map(f => {
@@ -233,8 +233,8 @@ export default function InboxPage() {
                   return (
                     <button key={f.key} onClick={() => setFilter(f.key)}
                       style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
-                        border: on ? '1px solid #EC4899' : '1px solid #FAD1E5',
-                        background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
+                        border: on ? '1px solid #00A884' : '1px solid #D3E7DE',
+                        background: on ? '#00A884' : '#fff', color: on ? '#fff' : '#667781' }}>
                       {f.label}
                     </button>
                   )
@@ -244,22 +244,22 @@ export default function InboxPage() {
 
             {/* Panel de Seguimiento: mensaje EDITABLE + enviar/detener + progreso. */}
             {filter === 'seguimiento' && (
-              <div style={{ padding: '12px', borderBottom: '1px solid #FDE7F1', background: '#FFF9FC' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: '#9D174D', marginBottom: 6 }}>Mensaje de seguimiento</p>
+              <div style={{ padding: '12px', borderBottom: '1px solid #E7F1EC', background: '#F6FBF8' }}>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: '#054D44', marginBottom: 6 }}>Mensaje de seguimiento</p>
                 <textarea value={segMsg} onChange={e => { setSegMsg(e.target.value); setMsgDirty(true) }}
                   rows={5} placeholder="Escribe el mensaje que se enviará…"
-                  style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #FAD1E5', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#0F172A', outline: 'none', fontFamily: 'inherit' }} />
+                  style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#0F172A', outline: 'none', fontFamily: 'inherit' }} />
                 <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
-                  <span style={{ fontSize: 11, color: '#B0708C', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
+                  <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
                   <button onClick={guardarMensaje} disabled={savingMsg || !msgDirty}
-                    style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !msgDirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: msgDirty ? '#fff' : '#F9F0F5', color: msgDirty ? '#BE185D' : '#C0879F' }}>
+                    style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !msgDirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: msgDirty ? '#fff' : '#F0F5F2', color: msgDirty ? '#008069' : '#8696A0' }}>
                     {savingMsg ? 'Guardando…' : msgDirty ? 'Guardar' : 'Guardado ✓'}
                   </button>
                 </div>
 
                 <div className="flex items-center" style={{ gap: 8, marginTop: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 12.5, color: '#B0708C' }}>
+                    <p style={{ fontSize: 12.5, color: '#667781' }}>
                       {enviando ? `Enviando… ${segStats!.enviados} enviados · ${segStats!.pendientes} en cola` : `${segCand} lead(s) en seguimiento`}
                     </p>
                   </div>
@@ -270,14 +270,14 @@ export default function InboxPage() {
                     </button>
                   ) : (
                     <button onClick={iniciarSeguimiento} disabled={segBusy || segCand === 0}
-                      style={{ fontSize: 12.5, fontWeight: 700, padding: '7px 14px', borderRadius: 8, cursor: (segBusy || segCand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || segCand === 0) ? '#F7CFE1' : '#EC4899', color: '#fff', flexShrink: 0 }}>
+                      style={{ fontSize: 12.5, fontWeight: 700, padding: '7px 14px', borderRadius: 8, cursor: (segBusy || segCand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || segCand === 0) ? '#A7D8CC' : '#00A884', color: '#fff', flexShrink: 0 }}>
                       {segBusy ? 'Enviando…' : 'Enviar seguimiento'}
                     </button>
                   )}
                 </div>
                 {enviando && (
-                  <div style={{ height: 5, borderRadius: 999, background: '#FDE7F1', overflow: 'hidden', marginTop: 8 }}>
-                    <div style={{ height: '100%', borderRadius: 999, background: '#EC4899', width: `${Math.round((segStats!.enviados / Math.max(1, segStats!.enviados + segStats!.pendientes)) * 100)}%`, transition: 'width 0.4s' }} />
+                  <div style={{ height: 5, borderRadius: 999, background: '#E7F1EC', overflow: 'hidden', marginTop: 8 }}>
+                    <div style={{ height: '100%', borderRadius: 999, background: '#00A884', width: `${Math.round((segStats!.enviados / Math.max(1, segStats!.enviados + segStats!.pendientes)) * 100)}%`, transition: 'width 0.4s' }} />
                   </div>
                 )}
               </div>
@@ -285,7 +285,7 @@ export default function InboxPage() {
 
             <div className="flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#DBAFC6', textAlign: 'center', padding: '30px 16px' }}>
+                <p style={{ fontSize: 13, color: '#9AA7AD', textAlign: 'center', padding: '30px 16px' }}>
                   {conversations.length === 0 ? 'Aún no hay conversaciones. Conecta WhatsApp para empezar a recibirlas.'
                     : filter === 'seguimiento' ? 'Sin leads en seguimiento. Marca un lead de Meta como "Cerrado" para que aparezca aquí.'
                     : 'Nada por aquí con ese filtro.'}
@@ -294,20 +294,20 @@ export default function InboxPage() {
                 const active = selectedId === conv.id
                 return (
                   <button key={conv.id} onClick={() => setSelectedId(conv.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: '1px solid #FBEAF2', cursor: 'pointer', fontFamily: 'inherit',
-                      background: active ? '#FDE7F1' : 'transparent' }}
-                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: '1px solid #EEF5F1', cursor: 'pointer', fontFamily: 'inherit',
+                      background: active ? '#E7F1EC' : 'transparent' }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#F3F9F6' }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
                     <div style={{ flexShrink: 0 }}>
                       <Avatar src={conv.contact.avatar} size={46} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#6E2547', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
-                        <span style={{ fontSize: 11.5, color: '#CE8AAE', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#054D44', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
+                        <span style={{ fontSize: 11.5, color: '#8696A0', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
                       </div>
-                      <p style={{ fontSize: 13.5, color: '#B0708C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                        {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#C68BAA' }}>Tú: </span> : null}
+                      <p style={{ fontSize: 13.5, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                        {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#8696A0' }}>Tú: </span> : null}
                         {conv.lastMessage?.content || '—'}
                       </p>
                     </div>
@@ -322,17 +322,17 @@ export default function InboxPage() {
             {selected ? (
               <>
                 <button className="chat-back items-center" onClick={() => setSelectedId(null)}
-                  style={{ gap: 8, height: 44, padding: '0 12px', border: 'none', borderBottom: '1px solid #FDE7F1', background: '#fff', color: '#BE185D', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                  style={{ gap: 8, height: 44, padding: '0 12px', border: 'none', borderBottom: '1px solid #E7F1EC', background: '#fff', color: '#008069', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
                   <ArrowLeft size={18} /> Chats
                 </button>
                 {/* Reclasificar de categoría + (Meta: Cerrar) / (Seguimiento: Reabrir + Probar) */}
-                <div className="flex items-center" style={{ gap: 4, padding: '5px 10px', borderBottom: '1px solid #FDE7F1', background: '#fff', flexShrink: 0 }}>
+                <div className="flex items-center" style={{ gap: 4, padding: '5px 10px', borderBottom: '1px solid #E7F1EC', background: '#fff', flexShrink: 0 }}>
                   {CATS.map(cat => {
                     const on = (selected.categoria ?? 'mary') === cat
                     return (
                       <button key={cat} onClick={() => cambiarCategoria(selected.id, cat)} title={CATEGORIA_CONFIG[cat].label}
                         style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
-                          border: on ? '1px solid #EC4899' : '1px solid #FAD1E5', background: on ? '#EC4899' : '#fff', color: on ? '#fff' : '#B0708C' }}>
+                          border: on ? '1px solid #00A884' : '1px solid #D3E7DE', background: on ? '#00A884' : '#fff', color: on ? '#fff' : '#667781' }}>
                         {CAT_SHORT[cat]}
                       </button>
                     )
@@ -342,17 +342,17 @@ export default function InboxPage() {
                       {selected.cerrado ? (
                         <>
                           <button onClick={() => probarSeguimiento(selected.id)} disabled={segBusy} title="Enviar UN seguimiento de prueba a este contacto (úsalo con tu número)"
-                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C', opacity: segBusy ? 0.5 : 1 }}>
+                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#667781', opacity: segBusy ? 0.5 : 1 }}>
                             Probar
                           </button>
                           <button onClick={() => marcarCerrado(selected.id, false)} title="Devolver este lead a Meta"
-                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C' }}>
+                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#667781' }}>
                             Reabrir
                           </button>
                         </>
                       ) : (
                         <button onClick={() => marcarCerrado(selected.id, true)} title="Cerrar y pasar a Seguimiento"
-                          style={{ fontSize: 12.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#EC4899', color: '#fff' }}>
+                          style={{ fontSize: 12.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#00A884', color: '#fff' }}>
                           Cerrado
                         </button>
                       )}
@@ -364,8 +364,8 @@ export default function InboxPage() {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center" style={{ height: '100%', gap: 10, color: '#DBAFC6', padding: 24, textAlign: 'center' }}>
-                <MessageCircle size={40} strokeWidth={1.4} style={{ color: '#F7CFE1' }} />
+              <div className="flex flex-col items-center justify-center" style={{ height: '100%', gap: 10, color: '#9AA7AD', padding: 24, textAlign: 'center' }}>
+                <MessageCircle size={40} strokeWidth={1.4} style={{ color: '#A7D8CC' }} />
                 <p style={{ fontSize: 14 }}>Elige una conversación para verla</p>
               </div>
             )}

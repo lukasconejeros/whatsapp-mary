@@ -69,9 +69,9 @@ export default function ContactosPage() {
       style={{
         padding: '6px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer',
         fontFamily: 'inherit', transition: 'all .15s',
-        border: '1px solid ' + (filtro === f ? '#EC4899' : '#FAD1E5'),
-        background: filtro === f ? '#EC4899' : '#fff',
-        color: filtro === f ? '#fff' : '#BE185D',
+        border: '1px solid ' + (filtro === f ? '#00A884' : '#D3E7DE'),
+        background: filtro === f ? '#00A884' : '#fff',
+        color: filtro === f ? '#fff' : '#008069',
       }}>
       {label} <span style={{ opacity: .7 }}>{n}</span>
     </button>
@@ -81,15 +81,15 @@ export default function ContactosPage() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="shrink-0" style={{ padding: '16px 20px', borderBottom: '1px solid #FAD1E5', background: '#FFFFFF' }}>
-          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#9D174D', margin: 0 }}>CRM</h1>
-          <p style={{ fontSize: 12, color: '#B0708C', margin: '4px 0 12px' }}>
+        <header className="shrink-0" style={{ padding: '16px 20px', borderBottom: '1px solid #D3E7DE', background: '#FFFFFF' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: '#054D44', margin: 0 }}>CRM</h1>
+          <p style={{ fontSize: 12, color: '#667781', margin: '4px 0 12px' }}>
             Tus apoderados de Arteluk. Toca la etiqueta para marcarlos activos o no activos.
           </p>
           <div style={{ position: 'relative', maxWidth: 420 }}>
-            <Search size={15} style={{ position: 'absolute', left: 11, top: 10, color: '#CE8AAE' }} />
+            <Search size={15} style={{ position: 'absolute', left: 11, top: 10, color: '#8696A0' }} />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por apoderado, niño o teléfono…"
-              style={{ width: '100%', borderRadius: 10, border: '1px solid #FAD1E5', padding: '8px 12px 8px 32px', fontSize: 13, outline: 'none', color: '#374151' }} />
+              style={{ width: '100%', borderRadius: 10, border: '1px solid #D3E7DE', padding: '8px 12px 8px 32px', fontSize: 13, outline: 'none', color: '#374151' }} />
           </div>
           <div className="flex" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             {chip('todos', 'Todos', contactos.length)}
@@ -99,30 +99,30 @@ export default function ContactosPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '14px 20px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
-          {cargando && <p style={{ color: '#C0879F', fontSize: 13 }}>Cargando contactos…</p>}
+          {cargando && <p style={{ color: '#8696A0', fontSize: 13 }}>Cargando contactos…</p>}
           {!cargando && filtrados.length === 0 && (
-            <p style={{ color: '#C0879F', fontSize: 13 }}>No hay contactos que coincidan.</p>
+            <p style={{ color: '#8696A0', fontSize: 13 }}>No hay contactos que coincidan.</p>
           )}
           <div className="flex flex-col" style={{ gap: 8 }}>
             {filtrados.map(c => {
               const activo = esActivo(c)
               return (
                 <div key={c.id} className="flex items-center"
-                  style={{ gap: 12, padding: '11px 14px', borderRadius: 12, border: '1px solid #FAD1E5', background: '#fff' }}>
+                  style={{ gap: 12, padding: '11px 14px', borderRadius: 12, border: '1px solid #D3E7DE', background: '#fff' }}>
                   <div className="flex items-center justify-center shrink-0"
-                    style={{ width: 40, height: 40, borderRadius: '50%', background: '#FDE7F1', color: '#BE185D', fontWeight: 700, fontSize: 15 }}>
+                    style={{ width: 40, height: 40, borderRadius: '50%', background: '#E7F1EC', color: '#008069', fontWeight: 700, fontSize: 15 }}>
                     {(c.nombre ?? '?').trim().charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <UserRound size={13} style={{ color: '#CE8AAE' }} /> {c.nombre ?? '(sin nombre)'}
+                      <UserRound size={13} style={{ color: '#8696A0' }} /> {c.nombre ?? '(sin nombre)'}
                     </p>
                     {c.alumnos && (
-                      <p style={{ fontSize: 12, color: '#B0708C', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Baby size={12} style={{ color: '#CE8AAE' }} /> {c.alumnos}
+                      <p style={{ fontSize: 12, color: '#667781', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Baby size={12} style={{ color: '#8696A0' }} /> {c.alumnos}
                       </p>
                     )}
-                    <p style={{ fontSize: 11, color: '#C0879F', margin: '3px 0 0' }}>+{c.telefono}</p>
+                    <p style={{ fontSize: 11, color: '#8696A0', margin: '3px 0 0' }}>+{c.telefono}</p>
                   </div>
                   <button onClick={() => toggle(c)} disabled={guardando === c.telefono} title="Cambiar etiqueta"
                     style={{

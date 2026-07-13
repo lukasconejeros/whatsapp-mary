@@ -182,18 +182,18 @@ export default function AsistentePage() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="shrink-0 flex items-center" style={{ gap: 12, padding: '16px 20px', borderBottom: '1px solid #FAD1E5', background: '#FFFFFF' }}>
+        <header className="shrink-0 flex items-center" style={{ gap: 12, padding: '16px 20px', borderBottom: '1px solid #D3E7DE', background: '#FFFFFF' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ fontSize: 18, fontWeight: 800, color: '#9D174D', margin: 0 }}>Asistente</h1>
-            <p style={{ fontSize: 12, color: '#B0708C', margin: '4px 0 0' }}>Cuéntame gastos e ingresos, pregúntame por la plata y el calendario, o pídeme mandarle un mensaje con fotos a un apoderado.</p>
+            <h1 style={{ fontSize: 18, fontWeight: 800, color: '#054D44', margin: 0 }}>Asistente</h1>
+            <p style={{ fontSize: 12, color: '#667781', margin: '4px 0 0' }}>Cuéntame gastos e ingresos, pregúntame por la plata y el calendario, o pídeme mandarle un mensaje con fotos a un apoderado.</p>
           </div>
           <Link href="/feedbacks" title="Ver los mensajes que enviaste"
-            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 10, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#BE185D', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
             <MailCheck size={14} /> Enviados
           </Link>
           {!historialVisto && (
             <button onClick={cargarHistorial} title="Ver el historial completo"
-              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 10, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#BE185D', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
               <History size={14} /> Ver historial
             </button>
           )}
@@ -201,7 +201,7 @@ export default function AsistentePage() {
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 720, width: '100%', margin: '0 auto' }}>
           {msgs.length === 0 && !pensando && (
-            <div style={{ alignSelf: 'flex-start', maxWidth: '80%', background: '#fff', color: '#374151', border: '1px solid #FAD1E5', borderRadius: 14, padding: '9px 13px', fontSize: 13 }}>
+            <div style={{ alignSelf: 'flex-start', maxWidth: '80%', background: '#fff', color: '#374151', border: '1px solid #D3E7DE', borderRadius: 14, padding: '9px 13px', fontSize: 13 }}>
               ¡Hola Mary! 🎨 Cuéntame un gasto o ingreso, pregúntame por la plata y el calendario, o dime algo como <em>&ldquo;mándale un mensaje a la mamá de Amparo&rdquo;</em> y adjunta las fotos con 🖼️.
             </div>
           )}
@@ -211,18 +211,18 @@ export default function AsistentePage() {
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {m.fotos.map((u, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={i} src={u} alt="foto" style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 10, border: '1px solid #FAD1E5' }} />
+                    <img key={i} src={u} alt="foto" style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 10, border: '1px solid #D3E7DE' }} />
                   ))}
                 </div>
               )}
               {m.texto && (
-                <div style={{ background: m.rol === 'user' ? '#EC4899' : '#fff', color: m.rol === 'user' ? '#fff' : '#374151', border: m.rol === 'user' ? 'none' : '1px solid #FAD1E5', borderRadius: 14, padding: '9px 13px', fontSize: 13, whiteSpace: 'pre-wrap' }}>
+                <div style={{ background: m.rol === 'user' ? '#00A884' : '#fff', color: m.rol === 'user' ? '#fff' : '#374151', border: m.rol === 'user' ? 'none' : '1px solid #D3E7DE', borderRadius: 14, padding: '9px 13px', fontSize: 13, whiteSpace: 'pre-wrap' }}>
                   {m.texto}
                 </div>
               )}
             </div>
           ))}
-          {pensando && <div style={{ alignSelf: 'flex-start', color: '#C0879F', fontSize: 12, fontStyle: 'italic' }}>escribiendo…</div>}
+          {pensando && <div style={{ alignSelf: 'flex-start', color: '#8696A0', fontSize: 12, fontStyle: 'italic' }}>escribiendo…</div>}
           <div ref={finRef} />
         </div>
 
@@ -233,10 +233,10 @@ export default function AsistentePage() {
               {fotos.map(f => (
                 <div key={f.url} style={{ position: 'relative' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="adjunta" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 10, border: '1px solid #FAD1E5', opacity: f.subiendo ? 0.5 : 1 }} />
-                  {f.subiendo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#BE185D' }}>subiendo…</div>}
+                  <img src={f.url} alt="adjunta" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 10, border: '1px solid #D3E7DE', opacity: f.subiendo ? 0.5 : 1 }} />
+                  {f.subiendo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#008069' }}>subiendo…</div>}
                   <button onClick={() => quitarFoto(f.url)} title="Quitar"
-                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#BE185D', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#008069', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <X size={12} />
                   </button>
                 </div>
@@ -244,17 +244,17 @@ export default function AsistentePage() {
             </div>
           )}
 
-          <form onSubmit={e => { e.preventDefault(); enviar(texto) }} style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #FAD1E5', background: '#FFFFFF', alignItems: 'center' }}>
+          <form onSubmit={e => { e.preventDefault(); enviar(texto) }} style={{ display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #D3E7DE', background: '#FFFFFF', alignItems: 'center' }}>
             <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { subirFotos(e.target.files); e.target.value = '' }} />
             <button type="button" onClick={() => fileRef.current?.click()} title="Adjuntar fotos"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: '#FAD1E5', color: '#9D174D' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: '#D3E7DE', color: '#054D44' }}>
               <ImagePlus size={18} />
             </button>
-            <button type="button" onClick={toggleMic} title={grabando ? 'Detener' : 'Grabar audio'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: grabando ? '#DC2626' : '#FAD1E5', color: grabando ? '#fff' : '#9D174D' }}>
+            <button type="button" onClick={toggleMic} title={grabando ? 'Detener' : 'Grabar audio'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: grabando ? '#DC2626' : '#D3E7DE', color: grabando ? '#fff' : '#054D44' }}>
               {grabando ? <Square size={18} /> : <Mic size={18} />}
             </button>
-            <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escribe aquí…" style={{ flex: 1, borderRadius: 12, border: '1px solid #FAD1E5', padding: '0 14px', height: 42, fontSize: 13, outline: 'none' }} />
-            <button type="submit" disabled={pensando || !puedeEnviar} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: '#EC4899', color: '#fff', opacity: pensando || !puedeEnviar ? 0.5 : 1 }}>
+            <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escribe aquí…" style={{ flex: 1, borderRadius: 12, border: '1px solid #D3E7DE', padding: '0 14px', height: 42, fontSize: 13, outline: 'none' }} />
+            <button type="submit" disabled={pensando || !puedeEnviar} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: 12, border: 'none', cursor: 'pointer', background: '#00A884', color: '#fff', opacity: pensando || !puedeEnviar ? 0.5 : 1 }}>
               <Send size={18} />
             </button>
           </form>

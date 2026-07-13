@@ -140,23 +140,23 @@ export default function CalendarioPage() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#FFFFFF' }}>
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <header className="flex items-center gap-3 shrink-0" style={{ minHeight: 48, padding: '6px 20px', background: '#FFFFFF', borderBottom: '1px solid #FAD1E5', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#9D174D' }}>Calendario</span>
+        <header className="flex items-center gap-3 shrink-0" style={{ minHeight: 48, padding: '6px 20px', background: '#FFFFFF', borderBottom: '1px solid #D3E7DE', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#054D44' }}>Calendario</span>
           <div className="flex items-center gap-1">
-            <button onClick={() => goMonth(-1)} title="Mes anterior" style={{ display: 'flex', border: '1px solid #FAD1E5', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#BE185D' }}><ChevronLeft size={15} /></button>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#9D174D', minWidth: 130, textAlign: 'center' }}>{monthName}</span>
-            <button onClick={() => goMonth(1)} title="Mes siguiente" style={{ display: 'flex', border: '1px solid #FAD1E5', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#BE185D' }}><ChevronRight size={15} /></button>
-            <button onClick={irHoy} style={{ marginLeft: 4, border: '1px solid #FAD1E5', background: '#fff', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', color: '#B0708C', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>Hoy</button>
+            <button onClick={() => goMonth(-1)} title="Mes anterior" style={{ display: 'flex', border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#008069' }}><ChevronLeft size={15} /></button>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#054D44', minWidth: 130, textAlign: 'center' }}>{monthName}</span>
+            <button onClick={() => goMonth(1)} title="Mes siguiente" style={{ display: 'flex', border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#008069' }}><ChevronRight size={15} /></button>
+            <button onClick={irHoy} style={{ marginLeft: 4, border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', color: '#667781', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>Hoy</button>
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-1.5" style={{ flexWrap: 'wrap' }}>
             {['Todas', ...PROFE_NOMBRES].map(p => {
               const active = filtro === p
-              const col = p === 'Todas' ? '#9D174D' : profeColor(p).color
+              const col = p === 'Todas' ? '#054D44' : profeColor(p).color
               return (
                 <button key={p} onClick={() => setFiltro(p)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-                    border: `1px solid ${active ? col : '#FAD1E5'}`, background: active ? col : '#fff', color: active ? '#fff' : '#B0708C' }}>
+                    border: `1px solid ${active ? col : '#D3E7DE'}`, background: active ? col : '#fff', color: active ? '#fff' : '#667781' }}>
                   {p !== 'Todas' && <span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : profeColor(p).color, display: 'inline-block' }} />}
                   {p}
                 </button>
@@ -169,10 +169,10 @@ export default function CalendarioPage() {
           <div className="cal-main">
             {/* Grilla del mes */}
             <section className="cal-grid">
-              <div style={{ background: '#fff', border: '1px solid #FAD1E5', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(190,24,93,0.06)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #FDE7F1' }}>
+              <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #E7F1EC' }}>
                   {DOW_LABELS.map(d => (
-                    <div key={d} style={{ padding: '8px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#B0708C' }}>{d}</div>
+                    <div key={d} style={{ padding: '8px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#667781' }}>{d}</div>
                   ))}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
@@ -186,12 +186,12 @@ export default function CalendarioPage() {
                       <button key={i} onClick={() => setSel(f)} className="cal-cell"
                         style={{ position: 'relative', minHeight: 92, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
                           padding: '5px 5px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                          border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #FDE7F1' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #FDE7F1' : 'none',
-                          background: isSel ? '#FDE7F1' : inMonth ? '#fff' : '#FFF9FC',
+                          border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #E7F1EC' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #E7F1EC' : 'none',
+                          background: isSel ? '#E7F1EC' : inMonth ? '#fff' : '#F6FBF8',
                           boxShadow: isSel && !isHoy ? 'inset 0 0 0 1.5px #F9A8D4' : 'none' }}>
                         <span style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 999, padding: '0 4px',
                           fontSize: 11, fontWeight: isHoy ? 800 : 600,
-                          background: isHoy ? '#EC4899' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#374151' : '#DBAFC6' }}>{cell.getDate()}</span>
+                          background: isHoy ? '#00A884' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#374151' : '#9AA7AD' }}>{cell.getDate()}</span>
                         {/* Etiquetas completas (PC) */}
                         <div className="cal-ev-full" style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                           {evs.slice(0, 3).map(c => {
@@ -205,7 +205,7 @@ export default function CalendarioPage() {
                               </span>
                             )
                           })}
-                          {evs.length > 3 && <span style={{ fontSize: 10, color: '#B0708C', paddingLeft: 3 }}>+{evs.length - 3} más</span>}
+                          {evs.length > 3 && <span style={{ fontSize: 10, color: '#667781', paddingLeft: 3 }}>+{evs.length - 3} más</span>}
                         </div>
                         {/* Puntos de color (teléfono): mantiene todas las celdas de la misma altura */}
                         {evs.length > 0 && (
@@ -224,17 +224,17 @@ export default function CalendarioPage() {
 
             {/* Detalle del día seleccionado */}
             <aside className="cal-detail">
-              <div style={{ background: '#fff', border: '1px solid #FAD1E5', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(190,24,93,0.06)' }}>
-                <div className="flex items-center gap-2" style={{ padding: '12px 14px', borderBottom: '1px solid #FDE7F1' }}>
-                  <p style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#9D174D' }}>{fechaLarga(sel)}</p>
+              <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
+                <div className="flex items-center gap-2" style={{ padding: '12px 14px', borderBottom: '1px solid #E7F1EC' }}>
+                  <p style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#054D44' }}>{fechaLarga(sel)}</p>
                   <button onClick={() => openNew(sel)} title="Agregar clase"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#EC4899', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
                     <Plus size={14} /> Agregar
                   </button>
                 </div>
                 <div style={{ padding: 12, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
-                  {loading ? <p style={{ fontSize: 12, color: '#DBAFC6', textAlign: 'center', padding: '24px 0' }}>Cargando…</p>
-                    : eventosSel.length === 0 ? <p style={{ fontSize: 12, color: '#C0879F', textAlign: 'center', padding: '24px 0' }}>Sin clases este día.<br />Toca «Agregar» para crear una.</p>
+                  {loading ? <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '24px 0' }}>Cargando…</p>
+                    : eventosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin clases este día.<br />Toca «Agregar» para crear una.</p>
                     : eventosSel.map(c => {
                       const pc = profeColor(c.profe)
                       return (
@@ -242,8 +242,8 @@ export default function CalendarioPage() {
                           <div className="flex items-center gap-2" style={{ marginBottom: 5 }}>
                             <span style={{ fontSize: 15, fontWeight: 800, color: '#1F2937' }}>{c.hora || '—'}</span>
                             <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, flex: 1 }}>{c.profe}</span>
-                            <button onClick={() => openEdit(c)} title="Editar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#B0708C' }}><Pencil size={13} /></button>
-                            <button onClick={() => del(c)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#B0708C' }}><Trash2 size={13} /></button>
+                            <button onClick={() => openEdit(c)} title="Editar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#667781' }}><Pencil size={13} /></button>
+                            <button onClick={() => del(c)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#667781' }}><Trash2 size={13} /></button>
                           </div>
                           {c.nota && <p style={{ fontSize: 12, color: '#5A1A38', fontWeight: 600, marginBottom: 5 }}>{c.nota}</p>}
                           <div className="flex flex-wrap gap-1">
@@ -264,66 +264,66 @@ export default function CalendarioPage() {
 
       {/* Modal agregar / editar */}
       {showForm && (
-        <div onClick={closeForm} style={{ position: 'fixed', inset: 0, background: 'rgba(131,24,67,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+        <div onClick={closeForm} style={{ position: 'fixed', inset: 0, background: 'rgba(6,77,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
           <form onClick={e => e.stopPropagation()} onSubmit={submitForm}
-            style={{ background: '#fff', borderRadius: 16, padding: 20, width: 420, maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(131,24,67,0.25)' }}>
+            style={{ background: '#fff', borderRadius: 16, padding: 20, width: 420, maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(6,77,68,0.25)' }}>
             <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#9D174D' }}>{editId ? 'Editar' : 'Agregar'} clase · {fechaLarga(form.fecha)}</p>
-              <button type="button" onClick={closeForm} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#C0879F', display: 'flex' }}><X size={16} /></button>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#054D44' }}>{editId ? 'Editar' : 'Agregar'} clase · {fechaLarga(form.fecha)}</p>
+              <button type="button" onClick={closeForm} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8696A0', display: 'flex' }}><X size={16} /></button>
             </div>
 
             <div className="flex gap-2" style={{ marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 12, color: '#B0708C' }}>Profe</label>
+                <label style={{ fontSize: 12, color: '#667781' }}>Profe</label>
                 <select value={form.profe} onChange={e => setForm({ ...form, profe: e.target.value })}
-                  style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #FAD1E5', fontFamily: 'inherit', fontSize: 13, background: '#fff' }}>
+                  style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13, background: '#fff' }}>
                   {PROFES.map(p => <option key={p.nombre} value={p.nombre}>{p.nombre}</option>)}
                 </select>
               </div>
               <div style={{ width: 110 }}>
-                <label style={{ fontSize: 12, color: '#B0708C' }}>Hora</label>
+                <label style={{ fontSize: 12, color: '#667781' }}>Hora</label>
                 <input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })}
-                  style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #FAD1E5', fontFamily: 'inherit', fontSize: 13 }} />
+                  style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13 }} />
               </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: '#B0708C' }}>Título / nota</label>
+              <label style={{ fontSize: 12, color: '#667781' }}>Título / nota</label>
               <input value={form.nota} onChange={e => setForm({ ...form, nota: e.target.value })} placeholder="Ej: taller de óleo"
-                style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #FAD1E5', fontFamily: 'inherit', fontSize: 13 }} />
+                style={{ width: '100%', marginTop: 4, padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13 }} />
             </div>
 
-            <label style={{ fontSize: 12, color: '#B0708C' }}>Alumnos ({form.alumnos.length + form.alumnosExtra.length})</label>
+            <label style={{ fontSize: 12, color: '#667781' }}>Alumnos ({form.alumnos.length + form.alumnosExtra.length})</label>
             {form.alumnosExtra.length > 0 && (
               <div className="flex flex-wrap gap-1" style={{ margin: '4px 0' }}>
                 {form.alumnosExtra.map((a, k) => (
-                  <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', background: '#FDE7F1', border: '1px solid #FAD1E5', borderRadius: 6, padding: '1px 6px' }}>
+                  <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', background: '#E7F1EC', border: '1px solid #D3E7DE', borderRadius: 6, padding: '1px 6px' }}>
                     {String(a)}
                     <button type="button" onClick={() => setForm(f => ({ ...f, alumnosExtra: f.alumnosExtra.filter((_, j) => j !== k) }))}
-                      style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#B0708C', padding: 0 }}><X size={11} /></button>
+                      style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#667781', padding: 0 }}><X size={11} /></button>
                   </span>
                 ))}
               </div>
             )}
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar alumno…"
-              style={{ width: '100%', margin: '4px 0 8px', padding: '8px 10px', borderRadius: 8, border: '1px solid #FAD1E5', fontFamily: 'inherit', fontSize: 13 }} />
-            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #FDE7F1', borderRadius: 8 }}>
+              style={{ width: '100%', margin: '4px 0 8px', padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13 }} />
+            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #E7F1EC', borderRadius: 8 }}>
               {clientesOrdenados.map(c => {
                 const selA = form.alumnos.includes(c.id)
                 const esDelDia = c.horario.includes(diaForm)
                 return (
                   <button type="button" key={c.id} onClick={() => toggleAlumno(c.id)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: 'none', borderBottom: '1px solid #FFF4FA', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, textAlign: 'left', background: selA ? '#FDE7F1' : '#fff' }}>
-                    <span style={{ width: 15, height: 15, borderRadius: 4, border: '1px solid ' + (selA ? '#EC4899' : '#FAD1E5'), background: selA ? '#EC4899' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, flexShrink: 0 }}>{selA ? '✓' : ''}</span>
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: 'none', borderBottom: '1px solid #F3F9F6', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, textAlign: 'left', background: selA ? '#E7F1EC' : '#fff' }}>
+                    <span style={{ width: 15, height: 15, borderRadius: 4, border: '1px solid ' + (selA ? '#00A884' : '#D3E7DE'), background: selA ? '#00A884' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, flexShrink: 0 }}>{selA ? '✓' : ''}</span>
                     <span style={{ flex: 1, color: '#374151' }}>{c.nombre || c.telefono}</span>
-                    {esDelDia && <span style={{ fontSize: 10, fontWeight: 700, color: '#EC4899', background: '#FDE7F1', borderRadius: 5, padding: '1px 6px' }}>viene {DIA_LABEL[diaForm] ?? diaForm}</span>}
+                    {esDelDia && <span style={{ fontSize: 10, fontWeight: 700, color: '#00A884', background: '#E7F1EC', borderRadius: 5, padding: '1px 6px' }}>viene {DIA_LABEL[diaForm] ?? diaForm}</span>}
                   </button>
                 )
               })}
-              {clientesOrdenados.length === 0 && <p style={{ fontSize: 12, color: '#DBAFC6', textAlign: 'center', padding: '14px 0' }}>Sin clientes</p>}
+              {clientesOrdenados.length === 0 && <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '14px 0' }}>Sin clientes</p>}
             </div>
 
-            <button type="submit" disabled={guardando} style={{ width: '100%', marginTop: 16, padding: '10px', borderRadius: 9, border: 'none', background: '#EC4899', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+            <button type="submit" disabled={guardando} style={{ width: '100%', marginTop: 16, padding: '10px', borderRadius: 9, border: 'none', background: '#00A884', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
           </form>
         </div>
       )}

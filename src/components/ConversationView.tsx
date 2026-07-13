@@ -38,7 +38,7 @@ function fmtDate(ts: number | string) {
 }
 
 const CHANNEL_DOT: Record<string, string> = {
-  whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#EC4899', tiktok: '#0F172A', unknown: '#94A3B8',
+  whatsapp: '#22C55E', instagram: '#A855F7', messenger: '#00A884', tiktok: '#0F172A', unknown: '#94A3B8',
 }
 
 // Placeholders genéricos que ponemos cuando no se pudo describir/transcribir un
@@ -217,7 +217,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #FDE7F1', background:'#fff', flexShrink:0 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #E7F1EC', background:'#fff', flexShrink:0 }}>
         <Avatar src={conv.contact.avatar} size={38} />
         <div style={{ flex:1, minWidth:0 }}>
           <p style={{ fontSize:15,fontWeight:600,color:'#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{conv.contact.name}</p>
@@ -229,7 +229,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             {conv.contact.phone && <span style={{fontSize:12,color:'#94A3B8'}}>{conv.contact.phone}</span>}
           </div>
         </div>
-        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #FAD1E5',color: conv.botActive ? '#EC4899' : '#94A3B8',background:'#FFF4FA',flexShrink:0 }}>
+        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #D3E7DE',color: conv.botActive ? '#00A884' : '#94A3B8',background:'#F3F9F6',flexShrink:0 }}>
           {conv.botActive ? '● Bot activo' : '○ Bot apagado'}
         </span>
       </div>
@@ -237,12 +237,12 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
       <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FFFFFF' }}>
         {loading ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:6,color:'#94A3B8' }}>
-            <div style={{ width:13,height:13,border:'2px solid #FAD1E5',borderTopColor:'#EC4899',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
+            <div style={{ width:13,height:13,border:'2px solid #D3E7DE',borderTopColor:'#00A884',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>
             <span style={{fontSize:12}}>Cargando...</span>
           </div>
         ) : grouped.length===0 ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%' }}>
-            <p style={{fontSize:12,color:'#F7CFE1'}}>Sin mensajes</p>
+            <p style={{fontSize:12,color:'#A7D8CC'}}>Sin mensajes</p>
           </div>
         ) : grouped.map(g=>(
           <div key={g.date}>
@@ -294,7 +294,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
           <div style={{ display:'flex',gap:6,flexWrap:'wrap' }}>
             <button type="button" onClick={redactarBonito} disabled={redactando}
               title="Escribe tu nota arriba y esto la convierte en un mensaje bonito con el nombre"
-              style={{ display:'flex',alignItems:'center',gap:5,padding:'7px 13px',borderRadius:9,border:'1px solid #FBCFE8',background:'#FCE7F3',color:'#BE185D',fontSize:13,fontWeight:600,cursor:redactando?'wait':'pointer',opacity:redactando?0.6:1,fontFamily:'inherit' }}>
+              style={{ display:'flex',alignItems:'center',gap:5,padding:'7px 13px',borderRadius:9,border:'1px solid #B8E0C8',background:'#E3F6EC',color:'#008069',fontSize:13,fontWeight:600,cursor:redactando?'wait':'pointer',opacity:redactando?0.6:1,fontFamily:'inherit' }}>
               {redactando ? '⟳ Redactando…' : '✨ Redactar bonito'}
             </button>
           </div>
@@ -308,7 +308,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             <div style={{ flex:1,display:'flex',alignItems:'center',gap:8,fontSize:14,fontWeight:600,color:'#DC2626' }}>
               <span className="pulse-red" style={{ width:10,height:10,borderRadius:'50%',background:'#DC2626',display:'inline-block',flexShrink:0 }}/>
               <span>Grabando…</span>
-              <span style={{ marginLeft:'auto',color:'#9D174D',fontVariantNumeric:'tabular-nums' }}>{mmss}</span>
+              <span style={{ marginLeft:'auto',color:'#054D44',fontVariantNumeric:'tabular-nums' }}>{mmss}</span>
             </div>
             <button type="button" onClick={enviarGrabacion} title="Enviar audio"
               style={{ width:44,height:44,borderRadius:'50%',border:'none',background:'#00A884',color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'0 4px 12px rgba(0,168,132,0.35)' }}>

@@ -9,8 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     // WhatsApp (QR) sigue en "/" y en el menú Conexión cuando haga falta.
     start_url: "/inbox",
     display: "standalone",
-    background_color: "#FFF4FA",
-    theme_color: "#EC4899",
+    // Barra de estado / borde de la app en BLANCO (no verde), como se pidió.
+    background_color: "#FFFFFF",
+    theme_color: "#FFFFFF",
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },
     ],

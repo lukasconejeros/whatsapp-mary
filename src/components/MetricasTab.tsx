@@ -53,15 +53,15 @@ export default function MetricasTab() {
     preset(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, today())
   }
 
-  const inputStyle: React.CSSProperties = { height: 34, borderRadius: 9, border: '1px solid #FAD1E5', background: '#FFF4FA', color: '#9D174D', padding: '0 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }
+  const inputStyle: React.CSSProperties = { height: 34, borderRadius: 9, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#054D44', padding: '0 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }
 
   return (
     <div>
       {/* Filtro de fechas dinámico */}
       <div className="flex items-center" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        <span style={{ fontSize: 12, color: '#B0708C' }}>Del</span>
+        <span style={{ fontSize: 12, color: '#667781' }}>Del</span>
         <input type="date" value={desde} max={hasta} onChange={e => setDesde(e.target.value)} style={inputStyle} />
-        <span style={{ fontSize: 12, color: '#B0708C' }}>al</span>
+        <span style={{ fontSize: 12, color: '#667781' }}>al</span>
         <input type="date" value={hasta} min={desde} onChange={e => setHasta(e.target.value)} style={inputStyle} />
         <div style={{ width: 8 }} />
         <button onClick={() => ultimosDias(7)} style={presetBtn}>7 días</button>
@@ -70,17 +70,17 @@ export default function MetricasTab() {
         <button onClick={() => preset(`${new Date().getFullYear()}-01-01`, today())} style={presetBtn}>Este año</button>
       </div>
 
-      {loading ? <p style={{ color: '#C0879F', fontSize: 13 }}>Cargando…</p> : (
+      {loading ? <p style={{ color: '#8696A0', fontSize: 13 }}>Cargando…</p> : (
         <>
           {/* Tarjetas de totales */}
           <div className="flex gap-3" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
             {[
               { l: 'Ingresos', v: totalIng, c: '#15803D', bg: '#F0FDF4', bd: '#BBF7D0', n: ingresos.length },
-              { l: 'Costos', v: totalCos, c: '#BE185D', bg: '#FDE7F1', bd: '#FAD1E5', n: costos.length },
-              { l: 'Ganancia neta', v: ganancia, c: ganancia >= 0 ? '#15803D' : '#DC2626', bg: '#FFFFFF', bd: '#FAD1E5', n: null },
+              { l: 'Costos', v: totalCos, c: '#008069', bg: '#E7F1EC', bd: '#D3E7DE', n: costos.length },
+              { l: 'Ganancia neta', v: ganancia, c: ganancia >= 0 ? '#15803D' : '#DC2626', bg: '#FFFFFF', bd: '#D3E7DE', n: null },
             ].map(card => (
               <div key={card.l} style={{ flex: 1, minWidth: 160, background: card.bg, border: `1px solid ${card.bd}`, borderRadius: 14, padding: '14px 16px' }}>
-                <p style={{ fontSize: 12, color: '#B0708C', marginBottom: 6 }}>{card.l}{card.n !== null && <span style={{ color: '#C0879F' }}> · {card.n}</span>}</p>
+                <p style={{ fontSize: 12, color: '#667781', marginBottom: 6 }}>{card.l}{card.n !== null && <span style={{ color: '#8696A0' }}> · {card.n}</span>}</p>
                 <p style={{ fontSize: 22, fontWeight: 800, color: card.c, letterSpacing: '-0.02em' }}>{formatCLP(card.v)}</p>
               </div>
             ))}
@@ -89,7 +89,7 @@ export default function MetricasTab() {
           {/* Desglose por categoría */}
           <div className="flex gap-3" style={{ flexWrap: 'wrap' }}>
             <Breakdown titulo="Ingresos por categoría" rows={ingPorTipo} color="#15803D" signo="+" total={totalIng} />
-            <Breakdown titulo="Costos por categoría" rows={cosPorTipo} color="#BE185D" signo="−" total={totalCos} />
+            <Breakdown titulo="Costos por categoría" rows={cosPorTipo} color="#008069" signo="−" total={totalCos} />
           </div>
         </>
       )}
@@ -97,18 +97,18 @@ export default function MetricasTab() {
   )
 }
 
-const presetBtn: React.CSSProperties = { fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 999, border: '1px solid #FAD1E5', background: '#fff', color: '#B0708C', cursor: 'pointer', fontFamily: 'inherit' }
+const presetBtn: React.CSSProperties = { fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 999, border: '1px solid #D3E7DE', background: '#fff', color: '#667781', cursor: 'pointer', fontFamily: 'inherit' }
 
 function Breakdown({ titulo, rows, color, signo, total }: { titulo: string; rows: [string, number][]; color: string; signo: string; total: number }) {
   return (
-    <div style={{ flex: 1, minWidth: 240, background: '#fff', border: '1px solid #FAD1E5', borderRadius: 12, padding: '12px 16px' }}>
-      <p style={{ fontSize: 12, fontWeight: 700, color: '#9D174D', marginBottom: 8 }}>{titulo}</p>
-      {rows.length === 0 ? <p style={{ fontSize: 12, color: '#C0879F' }}>Nada en este rango.</p>
+    <div style={{ flex: 1, minWidth: 240, background: '#fff', border: '1px solid #D3E7DE', borderRadius: 12, padding: '12px 16px' }}>
+      <p style={{ fontSize: 12, fontWeight: 700, color: '#054D44', marginBottom: 8 }}>{titulo}</p>
+      {rows.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0' }}>Nada en este rango.</p>
         : rows.map(([cat, v]) => (
-          <div key={cat} className="flex items-center" style={{ fontSize: 12, padding: '5px 0', borderBottom: '1px solid #FDE7F1' }}>
+          <div key={cat} className="flex items-center" style={{ fontSize: 12, padding: '5px 0', borderBottom: '1px solid #E7F1EC' }}>
             <span style={{ flex: 1, color: '#6B5563' }}>{cat}</span>
             <span style={{ color, fontWeight: 700, marginLeft: 10 }}>{signo}{formatCLP(v)}</span>
-            <span style={{ color: '#C0879F', fontSize: 11, marginLeft: 8, width: 38, textAlign: 'right' }}>{total > 0 ? Math.round((v / total) * 100) : 0}%</span>
+            <span style={{ color: '#8696A0', fontSize: 11, marginLeft: 8, width: 38, textAlign: 'right' }}>{total > 0 ? Math.round((v / total) * 100) : 0}%</span>
           </div>
         ))}
     </div>

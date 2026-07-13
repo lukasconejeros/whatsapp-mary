@@ -44,22 +44,22 @@ export default function AppNav() {
     )}
 
     <nav className="app-sidebar flex flex-col h-full shrink-0"
-      style={{ width: 212, background: '#FFFFFF', borderRight: '1px solid #FAD1E5' }}>
+      style={{ width: 212, background: '#FFFFFF', borderRight: '1px solid #D3E7DE' }}>
 
       {/* Marca */}
-      <div className="app-brand flex items-center gap-3" style={{ padding: '20px 18px 16px', borderBottom: '1px solid #FDE7F1' }}>
+      <div className="app-brand flex items-center gap-3" style={{ padding: '20px 18px 16px', borderBottom: '1px solid #E7F1EC' }}>
         <div className="flex items-center justify-center shrink-0"
-          style={{ width: 38, height: 38, borderRadius: 11, background: '#fff', border: '1px solid #FAD1E5', boxShadow: '0 4px 12px rgba(236,72,153,0.2)' }}>
-          <Brush size={20} strokeWidth={2} style={{ color: '#EC4899' }} />
+          style={{ width: 38, height: 38, borderRadius: 11, background: '#fff', border: '1px solid #D3E7DE', boxShadow: '0 4px 12px rgba(0,168,132,0.2)' }}>
+          <Brush size={20} strokeWidth={2} style={{ color: '#00A884' }} />
         </div>
         <div>
-          <p style={{ fontSize: 15, fontWeight: 700, color: '#9D174D', lineHeight: 1.1, letterSpacing: '-0.01em' }}>Arteluk</p>
-          <p style={{ fontSize: 11, color: '#C0879F', marginTop: 3, letterSpacing: '0.01em' }}>Panel de Mary</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#054D44', lineHeight: 1.1, letterSpacing: '-0.01em' }}>Arteluk</p>
+          <p style={{ fontSize: 11, color: '#8696A0', marginTop: 3, letterSpacing: '0.01em' }}>Panel de Mary</p>
         </div>
       </div>
 
       {/* Navegación */}
-      <p className="app-menuLabel" style={{ fontSize: 10, fontWeight: 700, color: '#DBAFC6', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '16px 20px 6px' }}>Menú</p>
+      <p className="app-menuLabel" style={{ fontSize: 10, fontWeight: 700, color: '#9AA7AD', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '16px 20px 6px' }}>Menú</p>
       <div className="app-navitems flex flex-col gap-1" style={{ padding: '0 10px' }}>
         {items.map(({ href, Icon, label }) => {
           const active = path.startsWith(href)
@@ -69,13 +69,13 @@ export default function AppNav() {
             <Link key={href} href={href}
               className="flex items-center gap-2.5 transition-colors"
               style={{ padding: '8px 12px', fontSize: 13, fontWeight: active ? 600 : 450, borderRadius: 10,
-                color: active ? '#BE185D' : '#6B5563',
-                background: active ? '#FDE7F1' : 'transparent',
-                boxShadow: active ? 'inset 0 0 0 1px #FAD1E5' : 'none',
+                color: active ? '#008069' : '#6B5563',
+                background: active ? '#E7F1EC' : 'transparent',
+                boxShadow: active ? 'inset 0 0 0 1px #D3E7DE' : 'none',
                 textDecoration: 'none' }}
-              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#FFF4FA' }}
+              onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#F3F9F6' }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
-              <Icon size={22} strokeWidth={active ? 2.2 : 1.7} style={{ color: active ? '#EC4899' : '#CE8AAE' }} />
+              <Icon size={22} strokeWidth={active ? 2.2 : 1.7} style={{ color: active ? '#00A884' : '#8696A0' }} />
               <span style={{ flex: 1 }}>{label}</span>
               {isConexion && dotColor && (
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor,
@@ -101,9 +101,9 @@ export default function AppNav() {
 
       {/* Pie */}
       <div className="app-footer" style={{ padding: '0 12px 16px' }}>
-        <div style={{ padding: '10px 12px', borderRadius: 11, background: '#FFF4FA', border: '1px solid #FDE7F1' }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: '#BE185D', marginBottom: 2 }}>Arteluk · academia de arte</p>
-          <p style={{ fontSize: 11, color: '#C0879F' }}>Hecho con cariño 💕</p>
+        <div style={{ padding: '10px 12px', borderRadius: 11, background: '#F3F9F6', border: '1px solid #E7F1EC' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#008069', marginBottom: 2 }}>Arteluk · academia de arte</p>
+          <p style={{ fontSize: 11, color: '#8696A0' }}>Hecho con cariño 💕</p>
         </div>
       </div>
     </nav>

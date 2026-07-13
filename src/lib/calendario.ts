@@ -9,7 +9,7 @@ export interface Profe { nombre: string; color: string; bg: string; bd: string }
 // Profesoras activas: Mary y Paula (Lusmaría quedó fuera).
 // profeColor() da un gris de respaldo para clases antiguas con otro nombre.
 export const PROFES: Profe[] = [
-  { nombre: "Mary",     color: "#EC4899", bg: "#FDE7F1", bd: "#FAD1E5" },
+  { nombre: "Mary",     color: "#00A884", bg: "#E7F1EC", bd: "#D3E7DE" },
   { nombre: "Paula",    color: "#8B5CF6", bg: "#F3E8FF", bd: "#E9D5FF" },
 ];
 export const PROFE_NOMBRES = PROFES.map((p) => p.nombre);

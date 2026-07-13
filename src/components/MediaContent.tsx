@@ -35,12 +35,12 @@ export function AudioNote({ src }: { src: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 200, padding: '2px 0' }}>
       <button onClick={toggle} aria-label={playing ? 'Pausar' : 'Reproducir'}
-        style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#EC4899', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#00A884', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {playing ? <Pause size={19} /> : <Play size={19} style={{ marginLeft: 2 }} />}
       </button>
       <div style={{ flex: 1 }}>
         <div onClick={seek} style={{ height: 7, background: '#CBD5E1', borderRadius: 4, cursor: 'pointer', position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: '#EC4899', borderRadius: 4 }} />
+          <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${pct}%`, background: '#00A884', borderRadius: 4 }} />
         </div>
         <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>{fmt(cur)} / {fmt(dur)}</div>
       </div>
