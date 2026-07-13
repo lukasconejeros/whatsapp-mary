@@ -49,7 +49,11 @@ export default function InboxPage() {
   const [dirtyMeta, setDirtyMeta] = useState(false)
   const [dirtySeg, setDirtySeg] = useState(false)
   const [savingMsg, setSavingMsg] = useState(false)
+  const [editando, setEditando] = useState(false)
   const msgLoadedRef = useRef(false)
+
+  // Al cambiar de pestaña, el mensaje vuelve a estar plegado.
+  useEffect(() => { setEditando(false) }, [filter])
 
   // Progreso + candidatos de ambos envíos + las dos plantillas (se cargan una vez).
   const cargarSeguimiento = useCallback(async () => {
@@ -208,19 +212,32 @@ export default function InboxPage() {
     const titulo = esMeta ? 'Mensaje para los leads de Meta' : 'Mensaje de seguimiento (pagaron la prueba)'
     const cta = esMeta ? 'Enviar a Meta' : 'Enviar seguimiento'
     return (
-      <div style={{ padding: 12, borderBottom: '1px solid #D3E7DE', background: '#F3F9F6' }}>
-        <p style={{ fontSize: 12.5, fontWeight: 700, color: '#054D44', marginBottom: 6 }}>{titulo}</p>
-        <textarea value={msg} onChange={e => { setMsg(e.target.value); setDirty(true) }} rows={5}
-          placeholder="Escribe el mensaje que se enviará…"
-          style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#111B21', outline: 'none', fontFamily: 'inherit' }} />
-        <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
-          <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
-          <button onClick={() => guardarMensaje(tipo, msg, () => setDirty(false))} disabled={savingMsg || !dirty}
-            style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !dirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: dirty ? '#fff' : '#EAF4EF', color: dirty ? '#008069' : '#8696A0' }}>
-            {savingMsg ? 'Guardando…' : dirty ? 'Guardar' : 'Guardado ✓'}
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid #D3E7DE', background: '#F3F9F6' }}>
+        {/* Cabecera compacta: título + botón Editar (despliega el cuadro de texto) */}
+        <div className="flex items-center" style={{ gap: 8 }}>
+          <p style={{ fontSize: 12.5, fontWeight: 700, color: '#054D44', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titulo}</p>
+          <button onClick={() => setEditando(v => !v)}
+            style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#008069', flexShrink: 0 }}>
+            {editando ? 'Cerrar' : 'Editar'}
           </button>
         </div>
-        <div className="flex items-center" style={{ gap: 8, marginTop: 12 }}>
+        {editando ? (
+          <>
+            <textarea value={msg} onChange={e => { setMsg(e.target.value); setDirty(true) }} rows={5}
+              placeholder="Escribe el mensaje que se enviará…"
+              style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#111B21', outline: 'none', fontFamily: 'inherit', marginTop: 8 }} />
+            <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
+              <button onClick={() => guardarMensaje(tipo, msg, () => setDirty(false))} disabled={savingMsg || !dirty}
+                style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !dirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: dirty ? '#fff' : '#EAF4EF', color: dirty ? '#008069' : '#8696A0' }}>
+                {savingMsg ? 'Guardando…' : dirty ? 'Guardar' : 'Guardado ✓'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: 12, color: '#667781', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg || 'Sin mensaje. Toca Editar.'}</p>
+        )}
+        <div className="flex items-center" style={{ gap: 8, marginTop: 10 }}>
           <span style={{ fontSize: 12.5, color: '#667781', flex: 1 }}>
             {enviando ? `Enviando… ${segStats!.enviados} enviados · ${segStats!.pendientes} en cola` : `${cand} chat(s)`}
           </span>
