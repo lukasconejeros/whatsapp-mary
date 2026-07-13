@@ -142,7 +142,10 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 .cal-grid { flex: 1; min-width: 0; }
 .cal-detail { width: 340px; flex-shrink: 0; position: sticky; top: 0; }
 @media (max-width: 767px) {
-  .cal-main { flex-direction: column; padding: 12px; gap: 12px; }
+  /* align-items: stretch para que la grilla y el detalle ocupen TODO el ancho (antes
+     heredaban flex-start y se encogían a su contenido, dejando hueco a la derecha). */
+  .cal-main { flex-direction: column; align-items: stretch; padding: 12px; gap: 12px; }
+  .cal-grid { width: 100%; }
   .cal-detail { width: 100%; position: static; }
 }
 

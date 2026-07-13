@@ -1,13 +1,21 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import { DIA_LABEL, PROFES, PROFE_NOMBRES, profeColor, diaFromFecha } from '@/lib/calendario'
-import { Plus, Trash2, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Pencil, X, ChevronLeft, ChevronRight, Mic, Keyboard } from 'lucide-react'
 
 type Clase = { id: number; fecha: string | null; dia: string; profe: string; hora: string | null; alumnos: (string | number)[]; nota: string | null }
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
 type Form = { fecha: string; profe: string; hora: string; alumnos: number[]; alumnosExtra: (string | number)[]; nota: string }
+
+// Tipos mínimos del reconocimiento de voz nativo (webkitSpeechRecognition).
+interface SpeechResultEvent { results: { length: number; [i: number]: { [j: number]: { transcript: string } } } }
+interface SpeechRecognitionLike {
+  lang: string; interimResults: boolean; continuous: boolean
+  onresult: (e: SpeechResultEvent) => void; onerror: () => void; onend: () => void
+  start: () => void; stop: () => void
+}
 
 const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -37,6 +45,12 @@ export default function CalendarioPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<Form>({ fecha: hoy, profe: 'Mary', hora: '16:00', alumnos: [], alumnosExtra: [], nota: '' })
   const [search, setSearch] = useState('')
+  // Agendar por VOZ
+  const [showVoz, setShowVoz] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const [creandoVoz, setCreandoVoz] = useState(false)
+  const recRef = useRef<{ stop: () => void } | null>(null)
 
   // Celdas de la grilla del mes (semanas completas, lunes→domingo).
   const first = new Date(cursor.y, cursor.m, 1)
@@ -86,6 +100,35 @@ export default function CalendarioPage() {
     setShowForm(true)
   }
   function closeForm() { setShowForm(false); setEditId(null) }
+
+  // ── Agendar por VOZ (reconocimiento nativo del teléfono, gratis) ──
+  function abrirVoz() { setTranscript(''); setShowVoz(true) }
+  function cerrarVoz() { try { recRef.current?.stop() } catch { /* noop */ } setListening(false); setShowVoz(false) }
+  function toggleEscucha() {
+    if (listening) { try { recRef.current?.stop() } catch { /* noop */ } setListening(false); return }
+    const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+    if (!SR) { alert('Tu teléfono no permite dictar aquí. Escribe la clase abajo y toca «Crear clase».'); return }
+    const rec = new SR()
+    rec.lang = 'es-CL'; rec.interimResults = true; rec.continuous = true
+    rec.onresult = (e: SpeechResultEvent) => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setTranscript(t) }
+    rec.onerror = () => setListening(false)
+    rec.onend = () => setListening(false)
+    recRef.current = rec
+    try { rec.start(); setListening(true) } catch { setListening(false) }
+  }
+  async function crearPorVoz() {
+    const texto = transcript.trim()
+    if (!texto || creandoVoz) return
+    try { recRef.current?.stop() } catch { /* noop */ }
+    setListening(false); setCreandoVoz(true)
+    try {
+      const d = await fetch('/api/clases/voz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, fecha: sel }) }).then(r => r.json())
+      if (d.ok) { setShowVoz(false); setTranscript(''); if (d.clase?.fecha) setSel(d.clase.fecha); load(desde, hasta) }
+      else alert(d.error || 'No se pudo agendar')
+    } catch { alert('No se pudo agendar. Revisa tu internet.') }
+    finally { setCreandoVoz(false) }
+  }
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault()
@@ -227,9 +270,9 @@ export default function CalendarioPage() {
               <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
                 <div className="flex items-center gap-2" style={{ padding: '12px 14px', borderBottom: '1px solid #E7F1EC' }}>
                   <p style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#054D44' }}>{fechaLarga(sel)}</p>
-                  <button onClick={() => openNew(sel)} title="Agregar clase"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
-                    <Plus size={14} /> Agregar
+                  <button onClick={abrirVoz} title="Agendar por voz"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+                    <Mic size={14} /> Agregar
                   </button>
                 </div>
                 <div style={{ padding: 12, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
@@ -261,6 +304,36 @@ export default function CalendarioPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal AGENDAR POR VOZ */}
+      {showVoz && (
+        <div onClick={cerrarVoz} style={{ position: 'fixed', inset: 0, background: 'rgba(6,77,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 20, width: 420, maxWidth: '100%', boxShadow: '0 20px 50px rgba(6,77,68,0.25)' }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#054D44' }}>Agendar por voz · {fechaLarga(sel)}</p>
+              <button onClick={cerrarVoz} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8696A0', display: 'flex' }}><X size={16} /></button>
+            </div>
+            <p style={{ fontSize: 12.5, color: '#667781', marginBottom: 14 }}>Toca el micrófono y di la clase. Ej: «clase con Paula el martes a las 4 de la tarde con Sofía y Juan».</p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+              <button onClick={toggleEscucha} className={listening ? 'pulse-red' : ''}
+                style={{ width: 76, height: 76, borderRadius: '50%', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', background: listening ? '#DC2626' : '#00A884', boxShadow: listening ? '0 0 0 6px rgba(220,38,38,0.15)' : '0 6px 18px rgba(0,168,132,0.35)' }}>
+                <Mic size={30} />
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: listening ? '#DC2626' : '#8696A0', textAlign: 'center', marginBottom: 10 }}>{listening ? 'Escuchando… toca para detener' : 'Toca el micrófono para hablar'}</p>
+            <textarea value={transcript} onChange={e => setTranscript(e.target.value)} rows={3} placeholder="Aquí aparece lo que dices (puedes corregirlo)…"
+              style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#111B21', outline: 'none', fontFamily: 'inherit' }} />
+            <button onClick={crearPorVoz} disabled={creandoVoz || !transcript.trim()}
+              style={{ width: '100%', marginTop: 12, padding: '11px', borderRadius: 9, border: 'none', background: (creandoVoz || !transcript.trim()) ? '#A7D8CC' : '#00A884', color: '#fff', fontWeight: 700, fontSize: 14, cursor: (creandoVoz || !transcript.trim()) ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+              {creandoVoz ? 'Agendando…' : 'Crear clase'}
+            </button>
+            <button onClick={() => { cerrarVoz(); openNew(sel) }}
+              style={{ width: '100%', marginTop: 8, padding: '8px', borderRadius: 9, border: '1px solid #D3E7DE', background: '#fff', color: '#667781', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Keyboard size={14} /> Prefiero a mano
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal agregar / editar */}
       {showForm && (
