@@ -414,6 +414,12 @@ export function getOrCreateConversation(
       if (incomingEsLid || existenteEsLid) {
         const newJid = preferRealJid(byName.jid, jid);
         if (newJid && newJid !== byName.jid) c.updateConvJid.run(newJid, byName.id);
+        // Si el que ENTRA trae número real y el existente era @lid, ascender también el
+        // TELÉFONO al número real (así el contacto deja de mostrar el número larguísimo).
+        // El phone es único, pero el paso 1 ya confirmó que no hay conv con este phone.
+        if (!incomingEsLid && existenteEsLid && phone !== byName.phone) {
+          c.db.prepare("UPDATE conversations SET phone = ? WHERE id = ?").run(phone, byName.id);
+        }
         return c.getConvById.get(byName.id) as Conversation;
       }
     }

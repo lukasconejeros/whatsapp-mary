@@ -207,13 +207,23 @@ export async function handleIncomingMessages(
     }
     if (!text) continue;
 
-    const phone = remoteJid.split("@")[0].split(":")[0];
+    // @lid: WhatsApp a veces entrega un identificador LARGUÍSIMO en vez del número real.
+    // Baileys 6.7.x trae el número real en key.senderPn → lo preferimos como JID/teléfono
+    // para que el contacto muestre su número normal. Si NO viene, caemos al @lid: el
+    // mensaje igual se guarda (no se pierde), solo se ve el número largo hasta que llegue
+    // uno con número real (ahí la deduplicación por nombre lo asciende).
+    const senderPn = (msg.key as { senderPn?: string }).senderPn;
+    const jidReal = remoteJid.endsWith("@lid") && senderPn && senderPn.endsWith("@s.whatsapp.net")
+      ? senderPn
+      : remoteJid;
+
+    const phone = jidReal.split("@")[0].split(":")[0];
     const name = msg.pushName ?? undefined;
 
-    const convo = getOrCreateConversation(phone, name, remoteJid);
+    const convo = getOrCreateConversation(phone, name, jidReal);
     insertMessage(convo.id, "user", text, media);
     // Foto de perfil: la traemos una vez (si no la tiene), sin bloquear la respuesta.
-    if (!convo.photo) void guardarFotoPerfil(sock, remoteJid, convo.id);
+    if (!convo.photo) void guardarFotoPerfil(sock, jidReal, convo.id);
 
     // Clasificación automática (solo si la usuaria no la movió a mano).
     // La señal CTWA (vino de anuncio) llega solo en el primer mensaje del contacto.

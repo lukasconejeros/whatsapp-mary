@@ -27,6 +27,7 @@
     "test:cartola": "tsx scripts/test-cartola.ts",
     "test:audio": "tsx scripts/test-audio.ts",
     "test:cerrado": "tsx scripts/test-cerrado.ts",
+    "test:lid": "tsx scripts/test-lid.ts",
     "test:seguimiento": "tsx scripts/test-seguimiento.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth"
