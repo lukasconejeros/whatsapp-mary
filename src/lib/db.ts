@@ -443,32 +443,36 @@ export function setConfig(clave: string, valor: string): void {
   ctx().db.prepare("INSERT INTO config (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor").run(clave, valor);
 }
 
-// ── Cola de campaña de seguimiento (Fase 3) ──────────────────────────────────
+// ── Cola de campaña (envíos masivos Meta / Seguimiento) ──────────────────────
 export interface SeguimientoLead { id: number; phone: string; name: string | null; }
 
-// El seguimiento se manda a los leads de Meta marcados como CERRADO (los que Mary
-// movió a la pestaña Seguimiento). Antes eran los NO cerrados; el flujo cambió.
-export function getLeadsParaSeguimiento(): SeguimientoLead[] {
+// Audiencias: Meta = leads potencial NO cerrados; Seguimiento = potencial CERRADOS
+// (los que Mary movió con el botón del chat porque pagaron la clase de prueba).
+export function getLeadsMeta(): SeguimientoLead[] {
   return ctx().db
-    .prepare(
-      "SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 1 ORDER BY COALESCE(last_message_at, created_at) DESC"
-    )
+    .prepare("SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 0 ORDER BY COALESCE(last_message_at, created_at) DESC")
+    .all() as SeguimientoLead[];
+}
+export function getLeadsSeguimiento(): SeguimientoLead[] {
+  return ctx().db
+    .prepare("SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 1 ORDER BY COALESCE(last_message_at, created_at) DESC")
     .all() as SeguimientoLead[];
 }
 
-// Encola seguimientos para los leads dados, SALTANDO a quien ya tiene uno pendiente o
-// ya enviado (nunca se re-mensajea al mismo). Devuelve cuántos se agregaron.
-export function enqueueSeguimientos(items: { id: number; phone: string }[]): number {
+// Encola envíos con el MENSAJE ya personalizado (para que Meta y Seguimiento puedan
+// usar textos distintos en la misma cola). Salta a quien ya tiene uno pendiente/enviado.
+// Devuelve cuántos se agregaron.
+export function enqueueSeguimientos(items: { id: number; phone: string; mensaje: string }[]): number {
   const c = ctx();
   const yaTiene = c.db.prepare(
     "SELECT 1 FROM seguimientos WHERE conversation_id = ? AND estado IN ('pendiente','enviado') LIMIT 1"
   );
-  const ins = c.db.prepare("INSERT INTO seguimientos (conversation_id, phone) VALUES (?, ?)");
+  const ins = c.db.prepare("INSERT INTO seguimientos (conversation_id, phone, mensaje) VALUES (?, ?, ?)");
   const tx = c.db.transaction(() => {
     let n = 0;
     for (const it of items) {
       if (yaTiene.get(it.id)) continue;
-      ins.run(it.id, it.phone);
+      ins.run(it.id, it.phone, it.mensaje);
       n++;
     }
     return n;
@@ -476,20 +480,19 @@ export function enqueueSeguimientos(items: { id: number; phone: string }[]): num
   return tx();
 }
 
-// Encola UNA prueba para una conversación concreta, SIN dedup (para poder probar el
-// envío real a un número propio antes de soltar el masivo, cuantas veces haga falta).
-export function enqueueSeguimientoTest(conversationId: number, phone: string): void {
-  ctx().db.prepare("INSERT INTO seguimientos (conversation_id, phone) VALUES (?, ?)").run(conversationId, phone);
+// Encola UNA prueba (sin dedup) con su mensaje ya personalizado.
+export function enqueueSeguimientoTest(conversationId: number, phone: string, mensaje: string): void {
+  ctx().db.prepare("INSERT INTO seguimientos (conversation_id, phone, mensaje) VALUES (?, ?, ?)").run(conversationId, phone, mensaje);
 }
 
-export interface SeguimientoPendiente { id: number; conversation_id: number; phone: string; }
+export interface SeguimientoPendiente { id: number; conversation_id: number; phone: string; mensaje: string | null; }
 
-// El seguimiento pendiente más antiguo (el bot los envía de a uno).
+// El envío pendiente más antiguo (el bot los manda de a uno). Trae el mensaje ya listo.
 export function getSeguimientoPendiente(): SeguimientoPendiente | null {
   return (
     (ctx().db
       .prepare(
-        "SELECT id, conversation_id, phone FROM seguimientos WHERE estado = 'pendiente' ORDER BY created_at ASC, id ASC LIMIT 1"
+        "SELECT id, conversation_id, phone, mensaje FROM seguimientos WHERE estado = 'pendiente' ORDER BY created_at ASC, id ASC LIMIT 1"
       )
       .get() as SeguimientoPendiente | undefined) ?? null
   );

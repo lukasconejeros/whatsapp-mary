@@ -5,7 +5,8 @@ import {
   getOrCreateConversation,
   setCategoria,
   setCerrado,
-  getLeadsParaSeguimiento,
+  getLeadsMeta,
+  getLeadsSeguimiento,
   enqueueSeguimientos,
   getSeguimientoPendiente,
   markSeguimientoEnviado,
@@ -15,7 +16,7 @@ import {
   deleteConversation,
 } from "../src/lib/db.js";
 import { todaySantiago } from "../src/lib/fechas.js";
-import { personalizarMensaje, MENSAJE_SEGUIMIENTO_DEFAULT } from "../src/lib/seguimiento.js";
+import { personalizarMensaje, MENSAJE_META_DEFAULT, MENSAJE_SEGUIMIENTO_DEFAULT } from "../src/lib/seguimiento.js";
 
 let pass = 0, fail = 0;
 function check(n: string, c: boolean, e = "") { if (c) { console.log(`  ✅ ${n}`); pass++; } else { console.log(`  ❌ ${n} ${e}`); fail++; } }
@@ -36,23 +37,27 @@ const ids = [A.id, B.id, C.id];
 raw.prepare(`DELETE FROM seguimientos WHERE conversation_id IN (${ids.join(",")})`).run();
 const baseEnviadosHoy = countSeguimientosEnviadosDia(hoy);
 
-// 1) Candidatos: incluye A y B (cerrados = en Seguimiento), excluye C (abierto = Meta).
-const cand = getLeadsParaSeguimiento().map(l => l.id);
-check("candidato incluye lead cerrado A", cand.includes(A.id));
-check("candidato incluye lead cerrado B", cand.includes(B.id));
-check("candidato EXCLUYE lead abierto C", !cand.includes(C.id));
+// 1) Audiencias: Seguimiento incluye A y B (cerrados); Meta incluye C (abierto).
+const candSeg = getLeadsSeguimiento().map(l => l.id);
+const candMeta = getLeadsMeta().map(l => l.id);
+check("Seguimiento incluye lead cerrado A", candSeg.includes(A.id));
+check("Seguimiento incluye lead cerrado B", candSeg.includes(B.id));
+check("Seguimiento EXCLUYE lead abierto C", !candSeg.includes(C.id));
+check("Meta incluye lead abierto C", candMeta.includes(C.id));
+check("Meta EXCLUYE lead cerrado A", !candMeta.includes(A.id));
 
-// 2) Encolar: agrega A y B (2), no C.
-const items = getLeadsParaSeguimiento().filter(l => ids.includes(l.id)).map(l => ({ id: l.id, phone: l.phone }));
+// 2) Encolar: agrega A y B (2) con su mensaje ya personalizado.
+const items = getLeadsSeguimiento().filter(l => ids.includes(l.id)).map(l => ({ id: l.id, phone: l.phone, mensaje: personalizarMensaje(MENSAJE_SEGUIMIENTO_DEFAULT, l.name, null) }));
 const agregados = enqueueSeguimientos(items);
-check("encola 2 (A y B, no el cerrado)", agregados === 2, String(agregados));
+check("encola 2 (A y B)", agregados === 2, String(agregados));
 
 // 3) Dedup: reencolar no agrega nada (ya tienen pendiente).
 check("reencolar no duplica (0)", enqueueSeguimientos(items) === 0);
 
-// 4) FIFO: el pendiente más antiguo sale primero (A antes que B).
+// 4) FIFO: el pendiente más antiguo sale primero (A antes que B) y trae su mensaje.
 const p1 = getSeguimientoPendiente();
 check("pendiente FIFO = A primero", p1?.conversation_id === A.id, String(p1?.conversation_id));
+check("pendiente trae el mensaje ya listo", !!p1?.mensaje && p1.mensaje.includes("Arteluk"), p1?.mensaje ?? "");
 
 // 5) Marcar enviado A: sube el contador del día en 1; ya no vuelve a salir.
 markSeguimientoEnviado(p1!.id, "msg", hoy);
@@ -71,13 +76,15 @@ const stats = getSeguimientoStats(hoy);
 check("stats.enviados ≥ 1", stats.enviados >= 1, String(stats.enviados));
 check("stats.omitidos ≥ 1", stats.omitidos >= 1, String(stats.omitidos));
 
-// 8) Plantilla editable personaliza tokens y lleva la promo.
-const m = personalizarMensaje(MENSAJE_SEGUIMIENTO_DEFAULT, "Ana", "Sofía");
-check("mensaje menciona $18.000", m.includes("$18.000"));
-check("mensaje menciona antes $25.000", m.includes("$25.000"));
-check("mensaje personaliza (Ana y Sofía)", m.includes("Ana") && m.includes("Sofía"));
-check("mensaje firma Arteluk", m.includes("Arteluk"));
-check("no quedan tokens sin reemplazar", !m.includes("{nombre}") && !m.includes("{alumno}"));
+// 8) Plantillas: Meta lleva la promo; ambas personalizan tokens.
+const mMeta = personalizarMensaje(MENSAJE_META_DEFAULT, "Ana", "Sofía");
+check("Meta menciona $18.000", mMeta.includes("$18.000"));
+check("Meta menciona antes $25.000", mMeta.includes("$25.000"));
+check("Meta personaliza (Ana y Sofía)", mMeta.includes("Ana") && mMeta.includes("Sofía"));
+check("Meta firma Arteluk", mMeta.includes("Arteluk"));
+check("Meta sin tokens sin reemplazar", !mMeta.includes("{nombre}") && !mMeta.includes("{alumno}"));
+const mSeg = personalizarMensaje(MENSAJE_SEGUIMIENTO_DEFAULT, "Ana", "Sofía");
+check("Seguimiento personaliza y firma Arteluk", mSeg.includes("Ana") && mSeg.includes("Sofía") && mSeg.includes("Arteluk"));
 
 // Limpieza: borra seguimientos de prueba y las conversaciones.
 raw.prepare(`DELETE FROM seguimientos WHERE conversation_id IN (${ids.join(",")})`).run();

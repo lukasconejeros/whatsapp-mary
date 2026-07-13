@@ -1,6 +1,7 @@
-// Campaña de seguimiento: plantilla EDITABLE del mensaje y parámetros anti-baneo.
-// Mary edita el texto en la pestaña Seguimiento (se guarda en config); la campaña lo
-// manda a cada lead cerrado reemplazando los tokens {nombre} y {alumno}.
+// Envíos masivos: DOS plantillas editables (Meta y Seguimiento), guardadas en config.
+//  - Meta: promo para invitar a los leads a la clase de prueba.
+//  - Seguimiento: mensaje para los que ya pagaron la prueba (que se inscriban al taller).
+// Cada envío personaliza los tokens {nombre} y {alumno} por contacto al encolar.
 
 function envInt(name: string, def: number): number {
   const v = parseInt(process.env[name] ?? "", 10);
@@ -17,13 +18,17 @@ export const CAMPANA = {
   get pausaMaxS() { return envInt("SEGUIMIENTO_PAUSA_MAX_S", 90); },                // pausa máxima entre envíos
 };
 
-// Clave de config donde se guarda la plantilla editable.
-export const SEGUIMIENTO_MSG_KEY = "seguimiento_msg";
+// Claves de config de cada plantilla editable.
+export const MSG_META_KEY = "msg_meta";
+export const MSG_SEGUIMIENTO_KEY = "msg_seguimiento";
 
-// Plantilla por defecto (Mary la puede editar). Tokens: {nombre} = apoderado,
-// {alumno} = niño/a. La promo: clase de prueba $18.000 (antes $25.000).
-export const MENSAJE_SEGUIMIENTO_DEFAULT =
+// Plantilla META (promo a los leads). Tokens: {nombre}=apoderado, {alumno}=niño/a.
+export const MENSAJE_META_DEFAULT =
   "Hola {nombre} 🎨 Soy Mary, de la academia de arte Arteluk. Me encantaría invitar a {alumno} a nuestra clase de prueba. Tenemos una promoción: la clase de prueba queda en $18.000 (antes $25.000). ¿Te gustaría que agendemos un día para que venga a probar? — Mary, Arteluk";
+
+// Plantilla SEGUIMIENTO (a los que ya pagaron la prueba, para que se inscriban).
+export const MENSAJE_SEGUIMIENTO_DEFAULT =
+  "Hola {nombre} 🎨 Soy Mary, de Arteluk. {alumno} lo pasó muy bien en la clase de prueba, ¡tiene mucho talento! Nos encantaría que siga aprendiendo con nosotros. ¿Te gustaría que conversemos para inscribir el taller? — Mary, Arteluk";
 
 // Reemplaza {nombre}/{alumno} por los datos del contacto y limpia espacios sobrantes
 // si algún dato falta. Lo que Mary escribe es lo que se manda (sin reescritura de IA).

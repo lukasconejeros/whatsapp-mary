@@ -8,14 +8,12 @@ import {
   markSeguimientoEnviado,
   markSeguimientoOmitido,
   getConversationById,
-  getClienteByPhone,
   enqueueOutbox,
   insertMessage,
   getConnectionState,
-  getConfig,
 } from "./db.js";
 import { todaySantiago, hourSantiago } from "./fechas.js";
-import { CAMPANA, SEGUIMIENTO_MSG_KEY, MENSAJE_SEGUIMIENTO_DEFAULT, personalizarMensaje } from "./seguimiento.js";
+import { CAMPANA } from "./seguimiento.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
 
@@ -43,16 +41,15 @@ async function tick(): Promise<number> {
 
   const conv = getConversationById(pend.conversation_id);
   if (!conv) { markSeguimientoOmitido(pend.id); return 2_000; } // conversación borrada: saltar
+  const mensaje = (pend.mensaje ?? "").trim();
+  if (!mensaje) { markSeguimientoOmitido(pend.id); return 2_000; } // sin mensaje: saltar
 
-  const cli = getClienteByPhone(conv.phone);
-  const template = getConfig(SEGUIMIENTO_MSG_KEY, MENSAJE_SEGUIMIENTO_DEFAULT);
-  const mensaje = personalizarMensaje(template, conv.name, cli?.alumnos ?? null);
-  // Reclamo ATÓMICO: si dejó de estar pendiente mientras redactaba la IA (Mary tocó
-  // "Detener"), no se envía. Sólo tras reclamar se encola y se muestra en el chat.
+  // Reclamo ATÓMICO: si dejó de estar pendiente mientras esperaba (Mary tocó "Detener"),
+  // no se envía. Sólo tras reclamar se encola y se muestra en el chat.
   if (!markSeguimientoEnviado(pend.id, mensaje, hoy)) return 2_000;
   enqueueOutbox(conv.id, conv.phone, mensaje, { kind: "text" });
   insertMessage(conv.id, "human", mensaje); // se ve en el chat como enviado por Mary
-  logger.info({ conv: conv.id }, "Seguimiento: mensaje encolado");
+  logger.info({ conv: conv.id }, "Campaña: mensaje encolado");
 
   return randInt(CAMPANA.pausaMinS, CAMPANA.pausaMaxS) * 1000; // pausa larga anti-baneo
 }

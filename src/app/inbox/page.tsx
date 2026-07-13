@@ -19,8 +19,8 @@ function timeAgo(ts: string | number): string {
   return `${Math.floor(s / 86400)}d`
 }
 
-// Pestañas del inbox. Meta = leads de Meta sin cerrar; Seguimiento = leads cerrados
-// (los que Mary movió con el botón "Cerrado", listos para la campaña de seguimiento).
+// Pestañas del inbox. Meta = leads sin cerrar (envío de promo). Seguimiento = leads que
+// pagaron la prueba (botón del chat los mueve aquí) = envío de seguimiento.
 type Tab = 'todos' | 'arteluk' | 'meta' | 'seguimiento'
 const FILTERS: { key: Tab; label: string }[] = [
   { key: 'todos', label: 'Todos' },
@@ -40,53 +40,60 @@ export default function InboxPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<Tab>('todos')
-  const [segStats, setSegStats] = useState<{ pendientes: number; enviados: number; omitidos: number; enviadosHoy: number } | null>(null)
-  const [segCand, setSegCand] = useState(0)
+  const [segStats, setSegStats] = useState<{ pendientes: number; enviados: number } | null>(null)
+  const [candMeta, setCandMeta] = useState(0)
+  const [candSeg, setCandSeg] = useState(0)
   const [segBusy, setSegBusy] = useState(false)
-  const [segMsg, setSegMsg] = useState('')
-  const [msgDirty, setMsgDirty] = useState(false)
+  const [msgMeta, setMsgMeta] = useState('')
+  const [msgSeg, setMsgSeg] = useState('')
+  const [dirtyMeta, setDirtyMeta] = useState(false)
+  const [dirtySeg, setDirtySeg] = useState(false)
   const [savingMsg, setSavingMsg] = useState(false)
   const msgLoadedRef = useRef(false)
 
-  // Progreso de la campaña + plantilla editable. La plantilla se carga UNA vez (no la
-  // pisamos en cada refresco para no borrar lo que Mary está escribiendo).
+  // Progreso + candidatos de ambos envíos + las dos plantillas (se cargan una vez).
   const cargarSeguimiento = useCallback(async () => {
     try {
       const d = await fetch('/api/seguimiento').then(r => r.json())
       if (d.ok) {
-        setSegStats(d.stats); setSegCand(d.candidatos)
-        if (!msgLoadedRef.current && typeof d.mensaje === 'string') { setSegMsg(d.mensaje); msgLoadedRef.current = true }
+        setSegStats(d.stats); setCandMeta(d.candMeta); setCandSeg(d.candSeguimiento)
+        if (!msgLoadedRef.current) {
+          if (typeof d.msgMeta === 'string') setMsgMeta(d.msgMeta)
+          if (typeof d.msgSeguimiento === 'string') setMsgSeg(d.msgSeguimiento)
+          msgLoadedRef.current = true
+        }
       }
     } catch { /* sin conexión: no romper la vista */ }
   }, [])
 
-  async function guardarMensaje() {
-    if (savingMsg || !segMsg.trim()) return
+  async function guardarMensaje(tipo: 'meta' | 'seguimiento', mensaje: string, limpiarDirty: () => void) {
+    if (savingMsg || !mensaje.trim()) return
     setSavingMsg(true)
     try {
-      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'guardar', mensaje: segMsg }) }).then(r => r.json())
-      if (d.ok) setMsgDirty(false)
+      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'guardar', tipo, mensaje }) }).then(r => r.json())
+      if (d.ok) limpiarDirty()
       else alert(d.error || 'No se pudo guardar el mensaje')
     } catch { alert('No se pudo guardar. Revisa tu internet.') }
     finally { setSavingMsg(false) }
   }
 
-  async function iniciarSeguimiento() {
+  async function iniciar(tipo: 'meta' | 'seguimiento', cand: number, dirty: boolean) {
     if (segBusy) return
-    if (msgDirty && !confirm('Tienes cambios sin guardar en el mensaje. ¿Enviar igual con el mensaje guardado anterior?')) return
-    if (!confirm(`¿Enviar el seguimiento a ${segCand} lead(s) en Seguimiento?\n\nSe mandan de a poco, con pausas y tope diario, para no arriesgar el número.`)) return
+    if (dirty && !confirm('Tienes cambios sin guardar en el mensaje. Guarda primero para enviar el texto nuevo. ¿Enviar igual con el guardado?')) return
+    const quien = tipo === 'meta' ? 'leads de Meta' : 'chats en Seguimiento'
+    if (!confirm(`¿Enviar el mensaje a ${cand} ${quien}?\n\nSe mandan de a poco, con pausas y tope diario, para no arriesgar el número.`)) return
     setSegBusy(true)
     try {
-      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'iniciar' }) }).then(r => r.json())
+      const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'iniciar', tipo }) }).then(r => r.json())
       if (d.ok) { setSegStats(d.stats); await cargarSeguimiento(); alert(`Listo: ${d.agregados} en cola. Se irán enviando solos, de a poco.`) }
       else alert(d.error || 'No se pudo iniciar')
     } catch { alert('No se pudo iniciar. Revisa tu internet.') }
     finally { setSegBusy(false) }
   }
 
-  async function detenerSeguimiento() {
+  async function detener() {
     if (segBusy) return
-    if (!confirm('¿Detener la campaña? Los que faltan por enviar se cancelan (los ya enviados quedan).')) return
+    if (!confirm('¿Detener los envíos? Los que faltan por mandar se cancelan (los ya enviados quedan).')) return
     setSegBusy(true)
     try {
       const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'detener' }) }).then(r => r.json())
@@ -95,10 +102,9 @@ export default function InboxPage() {
     finally { setSegBusy(false) }
   }
 
-  // Envía UN seguimiento de prueba a este contacto (para verificar con tu propio número).
-  async function probarSeguimiento(id: number) {
+  async function probar(id: number) {
     if (segBusy) return
-    if (!confirm('¿Enviar UN seguimiento de prueba a este contacto?\n\nÚsalo con tu propio número para verificar que llega bien antes del envío masivo.')) return
+    if (!confirm('¿Enviar UN mensaje de prueba a este contacto?\n\nÚsalo con tu propio número para ver cómo llega antes del envío masivo.')) return
     setSegBusy(true)
     try {
       const d = await fetch('/api/seguimiento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'test', conversationId: id }) }).then(r => r.json())
@@ -117,8 +123,6 @@ export default function InboxPage() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  // Real-time: recarga la lista cuando llega un mensaje nuevo. NO cerramos en onerror:
-  // así EventSource reconecta solo tras un corte de red.
   useEffect(() => {
     const es = new EventSource('/api/events')
     es.addEventListener('update', (e: MessageEvent) => {
@@ -137,9 +141,9 @@ export default function InboxPage() {
     return () => es.close()
   }, [load])
 
-  // En la pestaña Seguimiento, carga el progreso y lo refresca cada 6 s.
+  // En Meta o Seguimiento, carga el progreso y lo refresca cada 6 s.
   useEffect(() => {
-    if (filter !== 'seguimiento') return
+    if (filter !== 'meta' && filter !== 'seguimiento') return
     cargarSeguimiento()
     const t = setInterval(cargarSeguimiento, 6000)
     return () => clearInterval(t)
@@ -168,23 +172,16 @@ export default function InboxPage() {
   async function cambiarCategoria(id: number, categoria: Categoria) {
     setConversations(p => p.map(c => c.id === id ? { ...c, categoria } : c))
     try {
-      await fetch(`/api/categoria/${id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoria }),
-      })
+      await fetch(`/api/categoria/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ categoria }) })
     } catch { /* la UI ya se actualizó de forma optimista */ }
   }
 
-  // "Cerrado": mueve el lead a Seguimiento (y lleva la vista ahí). "Reabrir": lo devuelve
-  // a Meta. Es el flujo pedido: Meta → Cerrado → Seguimiento.
+  // Botón del chat: mueve el lead a Seguimiento (pagó la prueba) o lo devuelve a Meta.
   async function marcarCerrado(id: number, cerrado: boolean) {
     setConversations(p => p.map(c => c.id === id ? { ...c, cerrado } : c))
     setFilter(cerrado ? 'seguimiento' : 'meta')
     try {
-      await fetch(`/api/cerrado/${id}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cerrado }),
-      })
+      await fetch(`/api/cerrado/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cerrado }) })
     } catch { /* la UI ya se actualizó de forma optimista */ }
   }
 
@@ -198,6 +195,55 @@ export default function InboxPage() {
   )
 
   const enviando = !!(segStats && segStats.pendientes > 0)
+  const pct = segStats ? Math.round((segStats.enviados / Math.max(1, segStats.enviados + segStats.pendientes)) * 100) : 0
+
+  // Panel de envío editable, reutilizado en Meta y en Seguimiento.
+  const panelEnvio = (tipo: 'meta' | 'seguimiento') => {
+    const esMeta = tipo === 'meta'
+    const msg = esMeta ? msgMeta : msgSeg
+    const setMsg = esMeta ? setMsgMeta : setMsgSeg
+    const dirty = esMeta ? dirtyMeta : dirtySeg
+    const setDirty = esMeta ? setDirtyMeta : setDirtySeg
+    const cand = esMeta ? candMeta : candSeg
+    const titulo = esMeta ? 'Mensaje para los leads de Meta' : 'Mensaje de seguimiento (pagaron la prueba)'
+    const cta = esMeta ? 'Enviar a Meta' : 'Enviar seguimiento'
+    return (
+      <div style={{ padding: 12, borderBottom: '1px solid #D3E7DE', background: '#F3F9F6' }}>
+        <p style={{ fontSize: 12.5, fontWeight: 700, color: '#054D44', marginBottom: 6 }}>{titulo}</p>
+        <textarea value={msg} onChange={e => { setMsg(e.target.value); setDirty(true) }} rows={5}
+          placeholder="Escribe el mensaje que se enviará…"
+          style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#111B21', outline: 'none', fontFamily: 'inherit' }} />
+        <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
+          <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
+          <button onClick={() => guardarMensaje(tipo, msg, () => setDirty(false))} disabled={savingMsg || !dirty}
+            style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !dirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: dirty ? '#fff' : '#EAF4EF', color: dirty ? '#008069' : '#8696A0' }}>
+            {savingMsg ? 'Guardando…' : dirty ? 'Guardar' : 'Guardado ✓'}
+          </button>
+        </div>
+        <div className="flex items-center" style={{ gap: 8, marginTop: 12 }}>
+          <span style={{ fontSize: 12.5, color: '#667781', flex: 1 }}>
+            {enviando ? `Enviando… ${segStats!.enviados} enviados · ${segStats!.pendientes} en cola` : `${cand} chat(s)`}
+          </span>
+          {enviando ? (
+            <button onClick={detener} disabled={segBusy}
+              style={{ fontSize: 12.5, fontWeight: 600, padding: '7px 14px', borderRadius: 8, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FCA5A5', background: '#fff', color: '#DC2626', flexShrink: 0, opacity: segBusy ? 0.5 : 1 }}>
+              Detener
+            </button>
+          ) : (
+            <button onClick={() => iniciar(tipo, cand, dirty)} disabled={segBusy || cand === 0}
+              style={{ fontSize: 12.5, fontWeight: 700, padding: '7px 14px', borderRadius: 8, cursor: (segBusy || cand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || cand === 0) ? '#A7D8CC' : '#00A884', color: '#fff', flexShrink: 0 }}>
+              {segBusy ? 'Enviando…' : cta}
+            </button>
+          )}
+        </div>
+        {enviando && (
+          <div style={{ height: 5, borderRadius: 999, background: '#D3E7DE', overflow: 'hidden', marginTop: 8 }}>
+            <div style={{ height: '100%', borderRadius: 999, background: '#00A884', width: `${pct}%`, transition: 'width 0.4s' }} />
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={`flex h-screen overflow-hidden ${selected ? 'chat-open' : ''}`} style={{ background: '#FFFFFF' }}>
@@ -242,52 +288,14 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Panel de Seguimiento: mensaje EDITABLE + enviar/detener + progreso. */}
-            {filter === 'seguimiento' && (
-              <div style={{ padding: '12px', borderBottom: '1px solid #E7F1EC', background: '#F6FBF8' }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: '#054D44', marginBottom: 6 }}>Mensaje de seguimiento</p>
-                <textarea value={segMsg} onChange={e => { setSegMsg(e.target.value); setMsgDirty(true) }}
-                  rows={5} placeholder="Escribe el mensaje que se enviará…"
-                  style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#0F172A', outline: 'none', fontFamily: 'inherit' }} />
-                <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
-                  <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
-                  <button onClick={guardarMensaje} disabled={savingMsg || !msgDirty}
-                    style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !msgDirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: msgDirty ? '#fff' : '#F0F5F2', color: msgDirty ? '#008069' : '#8696A0' }}>
-                    {savingMsg ? 'Guardando…' : msgDirty ? 'Guardar' : 'Guardado ✓'}
-                  </button>
-                </div>
-
-                <div className="flex items-center" style={{ gap: 8, marginTop: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 12.5, color: '#667781' }}>
-                      {enviando ? `Enviando… ${segStats!.enviados} enviados · ${segStats!.pendientes} en cola` : `${segCand} lead(s) en seguimiento`}
-                    </p>
-                  </div>
-                  {enviando ? (
-                    <button onClick={detenerSeguimiento} disabled={segBusy}
-                      style={{ fontSize: 12.5, fontWeight: 600, padding: '7px 14px', borderRadius: 8, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #FCA5A5', background: '#fff', color: '#DC2626', flexShrink: 0, opacity: segBusy ? 0.5 : 1 }}>
-                      Detener
-                    </button>
-                  ) : (
-                    <button onClick={iniciarSeguimiento} disabled={segBusy || segCand === 0}
-                      style={{ fontSize: 12.5, fontWeight: 700, padding: '7px 14px', borderRadius: 8, cursor: (segBusy || segCand === 0) ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none', background: (segBusy || segCand === 0) ? '#A7D8CC' : '#00A884', color: '#fff', flexShrink: 0 }}>
-                      {segBusy ? 'Enviando…' : 'Enviar seguimiento'}
-                    </button>
-                  )}
-                </div>
-                {enviando && (
-                  <div style={{ height: 5, borderRadius: 999, background: '#E7F1EC', overflow: 'hidden', marginTop: 8 }}>
-                    <div style={{ height: '100%', borderRadius: 999, background: '#00A884', width: `${Math.round((segStats!.enviados / Math.max(1, segStats!.enviados + segStats!.pendientes)) * 100)}%`, transition: 'width 0.4s' }} />
-                  </div>
-                )}
-              </div>
-            )}
+            {filter === 'meta' && panelEnvio('meta')}
+            {filter === 'seguimiento' && panelEnvio('seguimiento')}
 
             <div className="flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p style={{ fontSize: 13, color: '#9AA7AD', textAlign: 'center', padding: '30px 16px' }}>
                   {conversations.length === 0 ? 'Aún no hay conversaciones. Conecta WhatsApp para empezar a recibirlas.'
-                    : filter === 'seguimiento' ? 'Sin leads en seguimiento. Marca un lead de Meta como "Cerrado" para que aparezca aquí.'
+                    : filter === 'seguimiento' ? 'Sin chats en seguimiento. En un chat de Meta toca "Pagó la prueba" para moverlo aquí.'
                     : 'Nada por aquí con ese filtro.'}
                 </p>
               ) : filtered.map(conv => {
@@ -303,7 +311,7 @@ export default function InboxPage() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#054D44', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#111B21', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
                         <span style={{ fontSize: 11.5, color: '#8696A0', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
                       </div>
                       <p style={{ fontSize: 13.5, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
@@ -325,7 +333,6 @@ export default function InboxPage() {
                   style={{ gap: 8, height: 44, padding: '0 12px', border: 'none', borderBottom: '1px solid #E7F1EC', background: '#fff', color: '#008069', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
                   <ArrowLeft size={18} /> Chats
                 </button>
-                {/* Reclasificar de categoría + (Meta: Cerrar) / (Seguimiento: Reabrir + Probar) */}
                 <div className="flex items-center" style={{ gap: 4, padding: '5px 10px', borderBottom: '1px solid #E7F1EC', background: '#fff', flexShrink: 0 }}>
                   {CATS.map(cat => {
                     const on = (selected.categoria ?? 'mary') === cat
@@ -339,21 +346,19 @@ export default function InboxPage() {
                   })}
                   {(selected.categoria ?? 'mary') === 'potencial' && (
                     <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                      <button onClick={() => probar(selected.id)} disabled={segBusy} title="Enviar UN mensaje de prueba a este contacto (úsalo con tu número)"
+                        style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#667781', opacity: segBusy ? 0.5 : 1 }}>
+                        Probar
+                      </button>
                       {selected.cerrado ? (
-                        <>
-                          <button onClick={() => probarSeguimiento(selected.id)} disabled={segBusy} title="Enviar UN seguimiento de prueba a este contacto (úsalo con tu número)"
-                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: segBusy ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#667781', opacity: segBusy ? 0.5 : 1 }}>
-                            Probar
-                          </button>
-                          <button onClick={() => marcarCerrado(selected.id, false)} title="Devolver este lead a Meta"
-                            style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#667781' }}>
-                            Reabrir
-                          </button>
-                        </>
+                        <button onClick={() => marcarCerrado(selected.id, false)} title="Devolver este lead a Meta"
+                          style={{ fontSize: 12.5, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: '#fff', color: '#667781' }}>
+                          Volver a Meta
+                        </button>
                       ) : (
-                        <button onClick={() => marcarCerrado(selected.id, true)} title="Cerrar y pasar a Seguimiento"
+                        <button onClick={() => marcarCerrado(selected.id, true)} title="Pagó la clase de prueba → pasar a Seguimiento"
                           style={{ fontSize: 12.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#00A884', color: '#fff' }}>
-                          Cerrado
+                          Pagó la prueba
                         </button>
                       )}
                     </div>
@@ -365,7 +370,7 @@ export default function InboxPage() {
               </>
             ) : (
               <div className="flex flex-col items-center justify-center" style={{ height: '100%', gap: 10, color: '#9AA7AD', padding: 24, textAlign: 'center' }}>
-                <MessageCircle size={40} strokeWidth={1.4} style={{ color: '#A7D8CC' }} />
+                <MessageCircle size={40} strokeWidth={1.4} style={{ color: '#B8E0C8' }} />
                 <p style={{ fontSize: 14 }}>Elige una conversación para verla</p>
               </div>
             )}
