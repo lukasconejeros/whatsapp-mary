@@ -145,6 +145,15 @@ export default function InboxPage() {
     return () => es.close()
   }, [load])
 
+  // Respaldo al SSE: refresca la lista sola cada 10 s mientras la app está visible (en el
+  // iPhone-PWA el SSE a veces se corta; así los chats se actualizan solos sin tocar «Actualizar»).
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') load(true)
+    }, 10000)
+    return () => clearInterval(t)
+  }, [load])
+
   // En Meta o Seguimiento, carga el progreso y lo refresca cada 6 s.
   useEffect(() => {
     if (filter !== 'meta' && filter !== 'seguimiento') return

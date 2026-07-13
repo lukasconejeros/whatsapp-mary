@@ -9,12 +9,17 @@ type Clase = { id: number; fecha: string | null; dia: string; profe: string; hor
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
 type Form = { fecha: string; profe: string; hora: string; alumnos: number[]; alumnosExtra: (string | number)[]; nota: string }
 
-// Tipos mínimos del reconocimiento de voz nativo (webkitSpeechRecognition).
-interface SpeechResultEvent { results: { length: number; [i: number]: { [j: number]: { transcript: string } } } }
-interface SpeechRecognitionLike {
+// Reconocimiento de voz nativo (webkitSpeechRecognition), mismo patrón que el Asistente.
+interface SREvent { resultIndex: number; results: { length: number; [i: number]: { isFinal?: boolean; 0: { transcript: string } } } }
+interface SpeechRec {
   lang: string; interimResults: boolean; continuous: boolean
-  onresult: (e: SpeechResultEvent) => void; onerror: () => void; onend: () => void
+  onresult: ((e: SREvent) => void) | null; onerror: (() => void) | null; onend: (() => void) | null
   start: () => void; stop: () => void
+}
+function getSpeechRecognition(): (new () => SpeechRec) | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
 const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -50,7 +55,10 @@ export default function CalendarioPage() {
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [creandoVoz, setCreandoVoz] = useState(false)
-  const recRef = useRef<{ stop: () => void } | null>(null)
+  const [transcribiendo, setTranscribiendo] = useState(false)
+  const srRef = useRef<SpeechRec | null>(null)
+  const mrRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   // Celdas de la grilla del mes (semanas completas, lunes→domingo).
   const first = new Date(cursor.y, cursor.m, 1)
@@ -101,26 +109,70 @@ export default function CalendarioPage() {
   }
   function closeForm() { setShowForm(false); setEditId(null) }
 
-  // ── Agendar por VOZ (reconocimiento nativo del teléfono, gratis) ──
+  // ── Agendar por VOZ (dictado nativo + respaldo por servidor, como el Asistente) ──
   function abrirVoz() { setTranscript(''); setShowVoz(true) }
-  function cerrarVoz() { try { recRef.current?.stop() } catch { /* noop */ } setListening(false); setShowVoz(false) }
+  function pararVoz() { try { srRef.current?.stop() } catch { /* noop */ } try { mrRef.current?.stop() } catch { /* noop */ } }
+  function cerrarVoz() { pararVoz(); setListening(false); setShowVoz(false) }
+
   function toggleEscucha() {
-    if (listening) { try { recRef.current?.stop() } catch { /* noop */ } setListening(false); return }
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
-    if (!SR) { alert('Tu teléfono no permite dictar aquí. Escribe la clase abajo y toca «Crear clase».'); return }
-    const rec = new SR()
-    rec.lang = 'es-CL'; rec.interimResults = true; rec.continuous = true
-    rec.onresult = (e: SpeechResultEvent) => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setTranscript(t) }
-    rec.onerror = () => setListening(false)
-    rec.onend = () => setListening(false)
-    recRef.current = rec
-    try { rec.start(); setListening(true) } catch { setListening(false) }
+    if (listening) { pararVoz(); setListening(false); return }
+    // 1) Dictado NATIVO del teléfono (gratis). continuous=false para que funcione en iOS.
+    const SR = getSpeechRecognition()
+    if (SR) {
+      try {
+        const rec = new SR()
+        rec.lang = 'es-CL'; rec.interimResults = true; rec.continuous = false
+        let finalText = ''
+        rec.onresult = (e: SREvent) => {
+          let interim = ''
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const r = e.results[i]; const t = r[0].transcript
+            if (r.isFinal) finalText += t; else interim += t
+          }
+          setTranscript((finalText + interim).trim())
+        }
+        rec.onerror = () => setListening(false)
+        rec.onend = () => { setListening(false); const t = finalText.trim(); if (t) setTranscript(t) }
+        rec.start(); srRef.current = rec; setListening(true)
+        return
+      } catch { setListening(false) }
+    }
+    // 2) Respaldo: grabar y transcribir en el servidor (reusa el endpoint del Asistente).
+    grabarYTranscribir()
   }
+
+  async function grabarYTranscribir() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      chunksRef.current = []
+      rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setListening(false)
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        if (blob.size === 0) return
+        setTranscribiendo(true)
+        try {
+          const form = new FormData()
+          form.append('file', blob, 'audio.webm')
+          const d = await fetch('/api/asistente/transcribir', { method: 'POST', body: form }).then(r => r.json())
+          if (d.ok && d.texto) setTranscript(d.texto)
+          else alert('No te escuché bien. Intenta de nuevo o escribe la clase abajo.')
+        } catch { alert('No se pudo transcribir. Escribe la clase abajo.') }
+        finally { setTranscribiendo(false) }
+      }
+      rec.start(); mrRef.current = rec; setListening(true)
+    } catch {
+      setListening(false)
+      alert('No pude usar el micrófono. Dale permiso al micrófono, o escribe la clase abajo.')
+    }
+  }
+
   async function crearPorVoz() {
     const texto = transcript.trim()
     if (!texto || creandoVoz) return
-    try { recRef.current?.stop() } catch { /* noop */ }
+    pararVoz()
     setListening(false); setCreandoVoz(true)
     try {
       const d = await fetch('/api/clases/voz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, fecha: sel }) }).then(r => r.json())
@@ -320,7 +372,7 @@ export default function CalendarioPage() {
                 <Mic size={30} />
               </button>
             </div>
-            <p style={{ fontSize: 12, color: listening ? '#DC2626' : '#8696A0', textAlign: 'center', marginBottom: 10 }}>{listening ? 'Escuchando… toca para detener' : 'Toca el micrófono para hablar'}</p>
+            <p style={{ fontSize: 12, color: listening ? '#DC2626' : '#8696A0', textAlign: 'center', marginBottom: 10 }}>{transcribiendo ? 'Transcribiendo…' : listening ? 'Escuchando… toca para detener' : 'Toca el micrófono para hablar'}</p>
             <textarea value={transcript} onChange={e => setTranscript(e.target.value)} rows={3} placeholder="Aquí aparece lo que dices (puedes corregirlo)…"
               style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#111B21', outline: 'none', fontFamily: 'inherit' }} />
             <button onClick={crearPorVoz} disabled={creandoVoz || !transcript.trim()}
