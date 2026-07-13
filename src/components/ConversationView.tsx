@@ -282,7 +282,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         <div ref={ref}/>
       </div>
 
-      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,padding:'8px 10px',background:'#F0F2F5',borderTop:'1px solid #E9EDEF',flexShrink:0 }}>
+      <form onSubmit={send} style={{ display:'flex',flexDirection:'column',gap:6,paddingTop:8,paddingLeft:10,paddingRight:10,paddingBottom:'calc(10px + env(safe-area-inset-bottom))',background:'#F0F2F5',borderTop:'1px solid #E9EDEF',flexShrink:0 }}>
         {sendError && (
           <div style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 10px',borderRadius:9,border:'1px solid #FCA5A5',background:'#FEF2F2',color:'#DC2626',fontSize:12 }}>
             <span style={{ flexShrink:0 }}>⚠</span>
