@@ -25,6 +25,7 @@ export interface Conversation {
   botActive: boolean
   categoria: Categoria
   cerrado: boolean
+  contactado: boolean
   ctwaReferral: { title?: string; body?: string; sourceId?: string; sourceUrl?: string } | null
 }
 

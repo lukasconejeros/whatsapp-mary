@@ -27,6 +27,7 @@ export async function GET() {
     botActive: c.mode === 'AI',
     categoria: (c.categoria ?? 'mary'),
     cerrado: !!c.cerrado,
+    contactado: !!c.contactado,
     ctwaReferral: c.ctwa_referral ? safeJson(c.ctwa_referral) : null,
   }));
 

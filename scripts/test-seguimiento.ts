@@ -13,6 +13,7 @@ import {
   countSeguimientosEnviadosDia,
   getSeguimientoStats,
   omitirSeguimientosPendientes,
+  insertMessage,
   deleteConversation,
 } from "../src/lib/db.js";
 import { todaySantiago } from "../src/lib/fechas.js";
@@ -76,18 +77,24 @@ const stats = getSeguimientoStats(hoy);
 check("stats.enviados ≥ 1", stats.enviados >= 1, String(stats.enviados));
 check("stats.omitidos ≥ 1", stats.omitidos >= 1, String(stats.omitidos));
 
-// 8) Plantillas: Meta lleva la promo; ambas personalizan tokens.
+// 8) Plantillas: GENÉRICAS (sin nombre/alumno, porque de los leads no lo sabemos).
 const mMeta = personalizarMensaje(MENSAJE_META_DEFAULT, "Ana", "Sofía");
 check("Meta menciona $18.000", mMeta.includes("$18.000"));
 check("Meta menciona antes $25.000", mMeta.includes("$25.000"));
-check("Meta personaliza (Ana y Sofía)", mMeta.includes("Ana") && mMeta.includes("Sofía"));
-check("Meta firma Arteluk", mMeta.includes("Arteluk"));
-check("Meta sin tokens sin reemplazar", !mMeta.includes("{nombre}") && !mMeta.includes("{alumno}"));
+check("Meta menciona Arteluk", mMeta.includes("Arteluk"));
+check("Meta NO mete nombres (genérico)", !mMeta.includes("Ana") && !mMeta.includes("{nombre}") && !mMeta.includes("{alumno}"));
 const mSeg = personalizarMensaje(MENSAJE_SEGUIMIENTO_DEFAULT, "Ana", "Sofía");
-check("Seguimiento personaliza y firma Arteluk", mSeg.includes("Ana") && mSeg.includes("Sofía") && mSeg.includes("Arteluk"));
+check("Seguimiento menciona Arteluk y sin nombres", mSeg.includes("Arteluk") && !mSeg.includes("Ana") && !mSeg.includes("{alumno}"));
 
-// Limpieza: borra seguimientos de prueba y las conversaciones.
+// 9) Ya contactado: si el lead tiene un mensaje SALIENTE, sale de los candidatos.
+insertMessage(C.id, "human", "hola, te escribo");
+check("Meta EXCLUYE al lead ya contactado (C)", !getLeadsMeta().map(l => l.id).includes(C.id));
+insertMessage(B.id, "human", "hola");
+check("Seguimiento EXCLUYE al cerrado ya contactado (B)", !getLeadsSeguimiento().map(l => l.id).includes(B.id));
+
+// Limpieza: borra seguimientos, mensajes y las conversaciones de prueba.
 raw.prepare(`DELETE FROM seguimientos WHERE conversation_id IN (${ids.join(",")})`).run();
+raw.prepare(`DELETE FROM messages WHERE conversation_id IN (${ids.join(",")})`).run();
 for (const id of ids) deleteConversation(id);
 raw.close();
 

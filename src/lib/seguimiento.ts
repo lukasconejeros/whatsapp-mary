@@ -22,13 +22,14 @@ export const CAMPANA = {
 export const MSG_META_KEY = "msg_meta";
 export const MSG_SEGUIMIENTO_KEY = "msg_seguimiento";
 
-// Plantilla META (promo a los leads). Tokens: {nombre}=apoderado, {alumno}=niño/a.
+// Plantilla META (promo a los leads). Sin nombre del apoderado/niño: de los leads no
+// lo sabemos, así que el mensaje es genérico.
 export const MENSAJE_META_DEFAULT =
-  "Hola {nombre} 🎨 Soy Mary, de la academia de arte Arteluk. Me encantaría invitar a {alumno} a nuestra clase de prueba. Tenemos una promoción: la clase de prueba queda en $18.000 (antes $25.000). ¿Te gustaría que agendemos un día para que venga a probar? — Mary, Arteluk";
+  "¡Hola! 🎨 Soy Mary, de la academia de arte Arteluk. Me encantaría invitarte a nuestra clase de prueba. Tenemos una promoción: la clase de prueba queda en $18.000 (antes $25.000). ¿Te gustaría que agendemos un día para venir a probar?";
 
-// Plantilla SEGUIMIENTO (a los que ya pagaron la prueba, para que se inscriban).
+// Plantilla SEGUIMIENTO (a los que ya pagaron la prueba, para que se inscriban). Genérico.
 export const MENSAJE_SEGUIMIENTO_DEFAULT =
-  "Hola {nombre} 🎨 Soy Mary, de Arteluk. {alumno} lo pasó muy bien en la clase de prueba, ¡tiene mucho talento! Nos encantaría que siga aprendiendo con nosotros. ¿Te gustaría que conversemos para inscribir el taller? — Mary, Arteluk";
+  "¡Hola! 🎨 Soy Mary, de la academia de arte Arteluk. Me encantó tenerte en la clase de prueba y me encantaría que sigas aprendiendo con nosotros. ¿Te gustaría que conversemos para inscribirte en el taller?";
 
 // Reemplaza {nombre}/{alumno} por los datos del contacto y limpia espacios sobrantes
 // si algún dato falta. Lo que Mary escribe es lo que se manda (sin reescritura de IA).

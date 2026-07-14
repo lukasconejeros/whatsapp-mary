@@ -33,6 +33,7 @@ export interface Conversation {
 export interface ConversationListItem extends Conversation {
   last_message_preview: string | null;
   last_message_role: string | null; // 'user' (entrante) | 'human' (Mary) | 'assistant' (bot)
+  contactado: number; // 1 si ya tiene algún mensaje saliente (ya se le envió algo)
 }
 
 export interface Message {
@@ -332,7 +333,9 @@ function build(): Ctx {
         SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1
       ) AS last_message_preview, (
         SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC, id DESC LIMIT 1
-      ) AS last_message_role
+      ) AS last_message_role, (
+        SELECT EXISTS(SELECT 1 FROM messages WHERE conversation_id = c.id AND role IN ('human','assistant'))
+      ) AS contactado
       FROM conversations c
       ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
     `),
@@ -454,14 +457,17 @@ export interface SeguimientoLead { id: number; phone: string; name: string | nul
 
 // Audiencias: Meta = leads potencial NO cerrados; Seguimiento = potencial CERRADOS
 // (los que Mary movió con el botón del chat porque pagaron la clase de prueba).
+// Candidatos: leads que AÚN NO tienen ningún mensaje saliente (no se les envió nada,
+// ni por campaña ni a mano). Así no se contacta dos veces a la misma persona.
+const SIN_ENVIAR = "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.role IN ('human','assistant'))";
 export function getLeadsMeta(): SeguimientoLead[] {
   return ctx().db
-    .prepare("SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 0 ORDER BY COALESCE(last_message_at, created_at) DESC")
+    .prepare(`SELECT c.id, c.phone, c.name FROM conversations c WHERE c.categoria = 'potencial' AND COALESCE(c.cerrado,0) = 0 ${SIN_ENVIAR} ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`)
     .all() as SeguimientoLead[];
 }
 export function getLeadsSeguimiento(): SeguimientoLead[] {
   return ctx().db
-    .prepare("SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 1 ORDER BY COALESCE(last_message_at, created_at) DESC")
+    .prepare(`SELECT c.id, c.phone, c.name FROM conversations c WHERE c.categoria = 'potencial' AND COALESCE(c.cerrado,0) = 1 ${SIN_ENVIAR} ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`)
     .all() as SeguimientoLead[];
 }
 

@@ -236,7 +236,7 @@ export default function InboxPage() {
               placeholder="Escribe el mensaje que se enviará…"
               style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #D3E7DE', background: '#fff', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: '#111B21', outline: 'none', fontFamily: 'inherit', marginTop: 8 }} />
             <div className="flex items-center" style={{ gap: 8, marginTop: 6 }}>
-              <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Usa <b>{'{nombre}'}</b> y <b>{'{alumno}'}</b> para personalizar.</span>
+              <span style={{ fontSize: 11, color: '#667781', flex: 1 }}>Se envía tal cual a los leads (mensaje general, sin nombres).</span>
               <button onClick={() => guardarMensaje(tipo, msg, () => setDirty(false))} disabled={savingMsg || !dirty}
                 style={{ fontSize: 12.5, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: (savingMsg || !dirty) ? 'default' : 'pointer', fontFamily: 'inherit', border: '1px solid #D3E7DE', background: dirty ? '#fff' : '#EAF4EF', color: dirty ? '#008069' : '#8696A0' }}>
                 {savingMsg ? 'Guardando…' : dirty ? 'Guardar' : 'Guardado ✓'}
@@ -340,9 +340,14 @@ export default function InboxPage() {
                         <span style={{ fontSize: 15, fontWeight: 600, color: '#111B21', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.contact.name}</span>
                         <span style={{ fontSize: 11.5, color: '#8696A0', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
                       </div>
-                      <p style={{ fontSize: 13.5, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                        {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#8696A0' }}>Tú: </span> : null}
-                        {conv.lastMessage?.content || '—'}
+                      <p style={{ fontSize: 13.5, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {(conv.categoria === 'potencial') && conv.contactado && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#008069', background: '#D9FDD3', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>✓ Enviado</span>
+                        )}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.lastMessage?.fromHuman && conv.lastMessage?.content ? <span style={{ color: '#8696A0' }}>Tú: </span> : null}
+                          {conv.lastMessage?.content || '—'}
+                        </span>
                       </p>
                     </div>
                   </button>
