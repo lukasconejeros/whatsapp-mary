@@ -176,8 +176,12 @@ export default function CalendarioPage() {
     setListening(false); setCreandoVoz(true)
     try {
       const d = await fetch('/api/clases/voz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, fecha: sel }) }).then(r => r.json())
-      if (d.ok) { setShowVoz(false); setTranscript(''); if (d.clase?.fecha) setSel(d.clase.fecha); load(desde, hasta) }
-      else alert(d.error || 'No se pudo agendar')
+      if (d.ok && d.clases?.length) {
+        setShowVoz(false); setTranscript('')
+        setSel(d.clases[0].fecha)
+        load(desde, hasta)
+        if (d.clases.length > 1) alert(`Listo: ${d.clases.length} clases agendadas.`)
+      } else alert(d.error || 'No se pudo agendar')
     } catch { alert('No se pudo agendar. Revisa tu internet.') }
     finally { setCreandoVoz(false) }
   }
