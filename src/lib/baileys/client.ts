@@ -93,7 +93,10 @@ export async function start(): Promise<void> {
         setConnectionState({ status: "disconnected", qr_string: null, phone: null });
         logger.warn("Sesión cerrada (logout). Reconecta escaneando el QR.");
       } else {
-        // Any other code — keep DB state as-is and schedule reconnect
+        // Caída no-logout: el socket está MUERTO. Antes se dejaba el estado "as-is", o sea
+        // pegado en 'connected' → la app aceptaba envíos, los mostraba "enviado" y nunca
+        // salían. Marcamos 'connecting' para que /api/send avise y no se pierda nada.
+        setConnectionState({ status: "connecting", qr_string: null });
         scheduleReconnect(code);
       }
     }

@@ -18,32 +18,41 @@ const MEDIA_DIR = path.resolve(process.cwd(), "data/media");
 
 let outboxTimer: ReturnType<typeof setTimeout> | null = null;
 let corriendo = false;
+let detenido = true;                    // sin conexión no se procesa nada
+let sockActual: WASocket | null = null; // socket VIVO (se re-engancha en cada reconexión)
 
 const INTERVALO_MS = 2000;
 
 // Loop del outbox con BACKPRESSURE: cada pasada se reprograma con setTimeout SÓLO
-// después de terminar la anterior. Antes era setInterval, que disparaba cada 2 s sin
-// esperar; con envíos > 2 s (audio/foto) el siguiente tick releía los mismos items
-// sent=0 y los reenviaba → el cliente recibía el mensaje 2-3 veces. El flag `corriendo`
-// es un candado extra de reentrada.
+// después de terminar la anterior (con setInterval se solapaban y duplicaban envíos).
+//
+// IMPORTANTE (bug de mensajes perdidos): antes el socket quedaba CAPTURADO en la
+// clausura. Si el socket moría a mitad de una pasada, el `finally` revivía el loop con
+// el socket MUERTO y `startOutboxLoop(nuevoSock)` se devolvía (veía el timer puesto) sin
+// enganchar el socket nuevo → todos los envíos fallaban → a los 5 intentos se
+// descartaban EN SILENCIO. Ahora el socket vive en `sockActual` y siempre se re-engancha.
 export function startOutboxLoop(sock: WASocket): void {
-  if (outboxTimer || corriendo) return;
-
-  const tick = async () => {
-    corriendo = true;
-    try {
-      await procesarPendientes(sock);
-    } catch (err) {
-      logger.error({ err }, "Outbox: error inesperado en la pasada");
-    } finally {
-      corriendo = false;
-      // Reprograma DESPUÉS de terminar (nunca dos pasadas solapadas).
-      outboxTimer = setTimeout(tick, INTERVALO_MS);
-    }
-  };
-
+  sockActual = sock; // re-engancha SIEMPRE el socket nuevo
+  detenido = false;
+  if (outboxTimer || corriendo) return; // ya hay loop vivo: usará el socket nuevo
   outboxTimer = setTimeout(tick, 0);
 }
+
+const tick = async (): Promise<void> => {
+  outboxTimer = null;
+  corriendo = true;
+  try {
+    // Sin socket vivo NO se intenta enviar: así no se queman los 5 reintentos durante
+    // una caída (era otra vía por la que se perdían mensajes). Esperan a la reconexión.
+    const s = sockActual;
+    if (s && !detenido) await procesarPendientes(s);
+  } catch (err) {
+    logger.error({ err }, "Outbox: error inesperado en la pasada");
+  } finally {
+    corriendo = false;
+    if (!detenido) outboxTimer = setTimeout(tick, INTERVALO_MS);
+  }
+};
 
 async function procesarPendientes(sock: WASocket): Promise<void> {
   const pending = getPendingOutbox(20);
@@ -106,6 +115,10 @@ async function procesarPendientes(sock: WASocket): Promise<void> {
 }
 
 export function stopOutboxLoop(): void {
+  // `detenido` evita que una pasada EN VUELO reprograme el loop después del stop
+  // (eso dejaba un loop zombi con el socket muerto).
+  detenido = true;
+  sockActual = null;
   if (outboxTimer) {
     clearTimeout(outboxTimer);
     outboxTimer = null;
