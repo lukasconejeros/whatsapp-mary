@@ -27,9 +27,28 @@ export function GET(req: NextRequest) {
       reencolados = db.prepare("UPDATE outbox SET sent = 0, attempts = 0 WHERE sent = 2").run().changes as number;
     }
 
+    // Salud de la RECEPCIÓN (arreglo de mensajes perdidos): que exista la tabla de
+    // dedup y cuántos ids lleva registrados = prueba de que el bot está procesando
+    // los "append" (re-entrega tras reconexión) sin duplicar.
+    let recepcion: Record<string, unknown>;
+    try {
+      const n = db.prepare("SELECT COUNT(*) AS n FROM processed_msgs").get() as { n: number };
+      const ult = db.prepare("SELECT wa_id, created_at FROM processed_msgs ORDER BY created_at DESC LIMIT 5").all();
+      recepcion = { dedupTabla: true, idsRegistrados: n.n, ultimos: ult };
+    } catch {
+      recepcion = { dedupTabla: false, nota: "processed_msgs no existe — el fix NO está activo" };
+    }
+    // Últimos mensajes ENTRANTES guardados, para confirmar que siguen llegando.
+    const entrantes = db.prepare(
+      "SELECT m.id, m.conversation_id, m.created_at, substr(m.content,1,50) AS preview " +
+      "FROM messages m WHERE m.role = 'user' ORDER BY m.id DESC LIMIT 8"
+    ).all();
+
     return NextResponse.json({
       ok: true,
       conexion: getConnectionState(),
+      recepcion,
+      entrantes,
       conteo,
       pendientes,
       fallidos,
