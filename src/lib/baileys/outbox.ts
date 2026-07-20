@@ -10,6 +10,7 @@ import pino from "pino";
 import fs from "fs";
 import path from "path";
 import { esNombreMediaSeguro } from "../media-path.js";
+import { recordarSaliente } from "./msg-cache.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
 
@@ -97,7 +98,11 @@ async function procesarPendientes(sock: WASocket): Promise<void> {
         } else {
           payload = { text: item.content };
         }
-        await sock.sendMessage(jid, payload);
+        const sent = await sock.sendMessage(jid, payload);
+        // Guardamos el mensaje enviado por si el contacto no logra descifrarlo y pide
+        // el reenvío (Baileys lo recupera con getMessage). Sin esto, ese reenvío falla
+        // y la sesión se desincroniza → se pierden mensajes ENTRANTES de ese contacto.
+        if (sent?.key?.id && sent.message) recordarSaliente(sent.key.id, sent.message);
         markOutboxSent(item.id);
         logger.debug({ id: item.id, jid, kind: item.kind }, "Outbox mensaje enviado");
       } catch (err) {

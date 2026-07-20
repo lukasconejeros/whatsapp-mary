@@ -14,6 +14,7 @@ import { Boom } from "@hapi/boom";
 import { setConnectionState, getConnectionState } from "../db.js";
 import { handleIncomingMessages } from "./handler.js";
 import { startOutboxLoop, stopOutboxLoop } from "./outbox.js";
+import { recuperarSaliente } from "./msg-cache.js";
 
 const AUTH_DIR = path.resolve(process.cwd(), "auth");
 const DATA_DIR = path.resolve(process.cwd(), "data");
@@ -52,6 +53,11 @@ export async function start(): Promise<void> {
     browser: Browsers.macOS("Desktop"), // Known fingerprint — custom triggers code 440 loop
     markOnlineOnConnect: false,
     syncFullHistory: false,
+    // Cuando un contacto NO pudo descifrar un mensaje NUESTRO y pide el reenvío,
+    // Baileys llama aquí para recuperarlo. Sin esto el reenvío falla y la sesión
+    // queda desincronizada → los mensajes SIGUIENTES de ese contacto llegan
+    // ilegibles ("Bad MAC") y se pierden.
+    getMessage: async (key) => recuperarSaliente(key.id),
   });
 
   // code 515 = pairing OK signal — not an error, ignore

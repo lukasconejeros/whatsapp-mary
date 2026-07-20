@@ -9,6 +9,8 @@ import {
   setCtwaReferral,
   setConversationPhoto,
   enqueueOutbox,
+  markMessageProcessed,
+  unmarkMessageProcessed,
 } from "../db.js";
 import { describirImagen, transcribirAudio } from "../media.js";
 import { generateReply } from "../ai.js";
@@ -171,10 +173,30 @@ export async function handleIncomingMessages(
   sock: WASocket,
   event: BaileysEventMap["messages.upsert"]
 ): Promise<void> {
-  if (event.type !== "notify") return;
+  // "notify" = mensaje en vivo. "append" = entrega DIFERIDA al reconectar (lo que llegó
+  // mientras el bot estaba caído, ej. durante un deploy). Antes se ignoraba el "append"
+  // y esos mensajes SE PERDÍAN para siempre — la causa principal de "no llegan todos".
+  if (event.type !== "notify" && event.type !== "append") return;
+  logger.info({ tipo: event.type, mensajes: event.messages.length }, "📥 messages.upsert");
 
   for (const msg of event.messages) {
     if (msg.key.fromMe) continue;
+
+    // Guardas para los "append": nada de historial antiguo (solo últimas 24h) y dedup
+    // por id de WhatsApp, para no re-guardar mensajes ya atendidos antes del reinicio.
+    const tsMsg = Number(msg.messageTimestamp ?? 0);
+    if (tsMsg && Date.now() / 1000 - tsMsg > 86400) {
+      logger.info(
+        { remoteJid: msg.key.remoteJid, edadH: Math.round((Date.now() / 1000 - tsMsg) / 3600) },
+        "Mensaje >24h — omitido"
+      );
+      continue;
+    }
+    const waId = msg.key.id;
+    if (waId && !markMessageProcessed(waId)) {
+      logger.info({ remoteJid: msg.key.remoteJid, waId }, "Mensaje ya procesado (dedup) — omitido");
+      continue;
+    }
 
     const remoteJid = msg.key.remoteJid;
     if (!remoteJid) continue;
@@ -205,7 +227,23 @@ export async function handleIncomingMessages(
       const m = await procesarMedia(sock, msg, inner);
       if (m) { text = m.text; media = m.media; logger.info({ remoteJid, media }, "📎 medio (foto/audio) recibido"); }
     }
-    if (!text) continue;
+    if (!text) {
+      // Antes esto era un `continue` MUDO: un PDF, una ubicación o un mensaje ilegible
+      // desaparecía sin dejar rastro y nadie sabía que ese cliente había escrito.
+      const tipos = Object.keys(msg.message ?? {});
+      logger.info(
+        { remoteJid, waId, tipos, innerTipos: inner ? Object.keys(inner) : [] },
+        "Mensaje sin texto extraíble — descartado"
+      );
+      // tipos vacío ⇔ msg.message vacío = mensaje del todo ILEGIBLE (Bad MAC). Baileys
+      // le pide el reenvío al remitente con el MISMO id; si dejáramos ese id marcado en
+      // el dedup, el reenvío ya descifrado se descartaría como "duplicado" y se perdería.
+      if (tipos.length === 0 && waId) {
+        unmarkMessageProcessed(waId);
+        logger.warn({ remoteJid, waId }, "Mensaje ilegible (Bad MAC) — liberado para aceptar el reenvío");
+      }
+      continue;
+    }
 
     // @lid: WhatsApp a veces entrega un identificador LARGUÍSIMO en vez del número real.
     // Baileys 6.7.x trae el número real en key.senderPn → lo preferimos como JID/teléfono

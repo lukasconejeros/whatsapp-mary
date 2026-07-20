@@ -239,6 +239,14 @@ CREATE TABLE IF NOT EXISTS push_subs (
   auth TEXT NOT NULL,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+-- Ids de mensajes de WhatsApp ya procesados. Permite atender los mensajes que
+-- WhatsApp re-entrega al reconectar (tipo "append", ej. tras un deploy) SIN
+-- duplicar los que ya se habían guardado.
+CREATE TABLE IF NOT EXISTS processed_msgs (
+  wa_id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
 `;
 
 interface Ctx {
@@ -563,6 +571,30 @@ export function listConversations(): ConversationListItem[] {
 
 export function setMode(conversationId: number, mode: ConversationMode): void {
   ctx().setModeStmt.run(mode, conversationId);
+}
+
+// Dedup de mensajes de WhatsApp por su id. Devuelve true si es NUEVO (y lo registra);
+// false si ya se había procesado. Gracias a esto podemos atender los mensajes que
+// WhatsApp re-entrega al reconectar (tipo "append") sin duplicar los ya guardados.
+export function markMessageProcessed(waId: string): boolean {
+  const r = ctx().db
+    .prepare("INSERT OR IGNORE INTO processed_msgs (wa_id) VALUES (?)")
+    .run(waId);
+  // Limpieza ocasional: ids de más de 7 días ya no sirven para deduplicar.
+  if (Math.random() < 0.01) {
+    ctx().db.prepare("DELETE FROM processed_msgs WHERE created_at < unixepoch() - 604800").run();
+  }
+  return r.changes > 0;
+}
+
+// Libera un id del dedup. Se usa cuando un mensaje llegó ILEGIBLE (Bad MAC): Baileys
+// emite un placeholder vacío con ese id Y pide el reenvío al remitente. Si dejáramos el
+// id marcado, el reenvío YA DESCIFRADO (mismo id) se descartaría como "duplicado" y el
+// mensaje se perdería. Al liberarlo, el reenvío se procesa normal y llega al panel.
+export function unmarkMessageProcessed(waId: string): void {
+  try {
+    ctx().db.prepare("DELETE FROM processed_msgs WHERE wa_id = ?").run(waId);
+  } catch { /* nunca bloquear el bot */ }
 }
 
 export function insertMessage(
