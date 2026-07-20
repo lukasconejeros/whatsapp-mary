@@ -30,7 +30,8 @@
     "test:lid": "tsx scripts/test-lid.ts",
     "test:seguimiento": "tsx scripts/test-seguimiento.ts",
     "typecheck": "tsc --noEmit",
-    "clean": "rimraf .next data auth"
+    "clean": "rimraf .next data auth",
+    "test:mensajes": "tsx scripts/test-mensajes-perdidos.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
