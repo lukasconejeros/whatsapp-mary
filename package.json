@@ -29,6 +29,7 @@
     "test:cerrado": "tsx scripts/test-cerrado.ts",
     "test:lid": "tsx scripts/test-lid.ts",
     "test:seguimiento": "tsx scripts/test-seguimiento.ts",
+    "test:monitor": "tsx scripts/test-monitor.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth",
     "test:mensajes": "tsx scripts/test-mensajes-perdidos.ts"

@@ -11,7 +11,10 @@ import {
   enqueueOutbox,
   markMessageProcessed,
   unmarkMessageProcessed,
+  recordLid,
+  resolverLid,
 } from "../db.js";
+import { fueEnvioOutbox } from "./eco.js";
 import { describirImagen, transcribirAudio } from "../media.js";
 import { generateReply } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
@@ -180,7 +183,39 @@ export async function handleIncomingMessages(
   logger.info({ tipo: event.type, mensajes: event.messages.length }, "📥 messages.upsert");
 
   for (const msg of event.messages) {
-    if (msg.key.fromMe) continue;
+    // ── MONITOR: mensajes SALIENTES (fromMe) ──────────────────────────────────
+    // (a) los que mandó el BOT por el outbox → ya están en el panel → ignorar el eco.
+    // (b) los que escribió MARY desde su WhatsApp/PC → NO están en el panel → guardarlos
+    //     como 'human' para que la conversación refleje lo que ella respondió.
+    if (msg.key.fromMe) {
+      const idSal = msg.key.id;
+      if (idSal && fueEnvioOutbox(idSal)) continue; // (a) eco del propio bot
+      const jidSal = msg.key.remoteJid;
+      if (!jidSal || jidSal.endsWith("@g.us") || jidSal.endsWith("@broadcast") || jidSal.endsWith("@newsletter")) continue;
+      if (!jidSal.endsWith("@s.whatsapp.net") && !jidSal.endsWith("@lid")) continue;
+      const tsSal = Number(msg.messageTimestamp ?? 0);
+      if (tsSal && Date.now() / 1000 - tsSal > 86400) continue; // no re-importar historial viejo en un append
+      if (idSal && !markMessageProcessed(idSal)) continue;       // dedup en reconexión
+      // Destinatario: número normal directo; @lid solo si ya sabemos su número real (si no,
+      // no abrir un chat con el número largo).
+      const baseSal = jidSal.split("@")[0].split(":")[0];
+      const phoneSal = jidSal.endsWith("@lid") ? resolverLid(baseSal) : baseSal;
+      if (!phoneSal) continue;
+      const innerSal = msg.message?.ephemeralMessage?.message ?? msg.message?.viewOnceMessage?.message ?? msg.message?.viewOnceMessageV2?.message ?? msg.message;
+      let textoSal = extraerTexto(innerSal);
+      let mediaSal: string | null = null;
+      if (!textoSal) { const m = await procesarMedia(sock, msg, innerSal); if (m) { textoSal = m.text; mediaSal = m.media; } }
+      if (!textoSal) continue;
+      try {
+        const jidGuardar = jidSal.endsWith("@lid") ? `${phoneSal}@s.whatsapp.net` : jidSal;
+        const convSal = getOrCreateConversation(phoneSal, undefined, jidGuardar);
+        insertMessage(convSal.id, "human", textoSal, mediaSal);
+        logger.info({ phone: phoneSal }, "💬 saliente desde otro dispositivo — guardado");
+      } catch (e) {
+        logger.warn({ err: String(e).slice(0, 80) }, "no se pudo guardar saliente de otro dispositivo");
+      }
+      continue;
+    }
 
     // Guardas para los "append": nada de historial antiguo (solo últimas 24h) y dedup
     // por id de WhatsApp, para no re-guardar mensajes ya atendidos antes del reinicio.
@@ -251,9 +286,13 @@ export async function handleIncomingMessages(
     // mensaje igual se guarda (no se pierde), solo se ve el número largo hasta que llegue
     // uno con número real (ahí la deduplicación por nombre lo asciende).
     const senderPn = (msg.key as { senderPn?: string }).senderPn;
-    const jidReal = remoteJid.endsWith("@lid") && senderPn && senderPn.endsWith("@s.whatsapp.net")
-      ? senderPn
-      : remoteJid;
+    let jidReal = remoteJid;
+    if (remoteJid.endsWith("@lid") && senderPn && senderPn.endsWith("@s.whatsapp.net")) {
+      jidReal = senderPn;
+      // Aprender @lid → número real: así reconocemos al mismo contacto cuando Mary le
+      // escriba (mensaje saliente cuyo destinatario es el @lid).
+      recordLid(remoteJid.split("@")[0], senderPn.split("@")[0].split(":")[0]);
+    }
 
     const phone = jidReal.split("@")[0].split(":")[0];
     const name = msg.pushName ?? undefined;

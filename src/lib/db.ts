@@ -247,6 +247,15 @@ CREATE TABLE IF NOT EXISTS processed_msgs (
   wa_id TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+-- Mapeo aprendido @lid → número real. Se llena cuando llega un mensaje por @lid que trae
+-- su senderPn (número real). Sirve para saber a quién le escribió Mary si el destinatario
+-- es @lid (mensaje saliente desde su teléfono).
+CREATE TABLE IF NOT EXISTS lid_map (
+  lid TEXT PRIMARY KEY,
+  phone TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
 `;
 
 interface Ctx {
@@ -585,6 +594,18 @@ export function markMessageProcessed(waId: string): boolean {
     ctx().db.prepare("DELETE FROM processed_msgs WHERE created_at < unixepoch() - 604800").run();
   }
   return r.changes > 0;
+}
+
+// Aprende el mapeo @lid → número real (cuando un entrante @lid trae su senderPn). `lid` y
+// `phone` son las partes numéricas (sin @…).
+export function recordLid(lid: string, phone: string): void {
+  if (!lid || !phone) return;
+  ctx().db.prepare("INSERT INTO lid_map (lid, phone) VALUES (?, ?) ON CONFLICT(lid) DO UPDATE SET phone = excluded.phone").run(lid, phone);
+}
+// Devuelve el número real de un @lid si ya se aprendió; null si no lo conocemos aún.
+export function resolverLid(lid: string): string | null {
+  const r = ctx().db.prepare("SELECT phone FROM lid_map WHERE lid = ?").get(lid) as { phone: string } | undefined;
+  return r?.phone ?? null;
 }
 
 // Libera un id del dedup. Se usa cuando un mensaje llegó ILEGIBLE (Bad MAC): Baileys
