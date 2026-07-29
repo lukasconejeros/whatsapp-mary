@@ -93,7 +93,8 @@ async function procesarMedia(
   if (!img && !aud && !vid && !sti) return null;
   try {
     const buffer = (await downloadMediaMessage(
-      { ...msg, message: inner },
+      // cast: la rama 7 tipa key como opcional en IWebMessageInfo pero exige WAMessage con key presente
+      { ...msg, message: inner } as Parameters<typeof downloadMediaMessage>[0],
       "buffer",
       {},
       { logger, reuploadRequest: sock.updateMediaMessage }
@@ -281,11 +282,12 @@ export async function handleIncomingMessages(
     }
 
     // @lid: WhatsApp a veces entrega un identificador LARGUÍSIMO en vez del número real.
-    // Baileys 6.7.x trae el número real en key.senderPn → lo preferimos como JID/teléfono
-    // para que el contacto muestre su número normal. Si NO viene, caemos al @lid: el
-    // mensaje igual se guarda (no se pierde), solo se ve el número largo hasta que llegue
+    // El número real viene en key.senderPn (Baileys 6) o key.remoteJidAlt (rama 7) → lo preferimos
+    // como JID/teléfono para que el contacto muestre su número normal. Si NO viene, caemos al @lid:
+    // el mensaje igual se guarda (no se pierde), solo se ve el número largo hasta que llegue
     // uno con número real (ahí la deduplicación por nombre lo asciende).
-    const senderPn = (msg.key as { senderPn?: string }).senderPn;
+    const kAlt = msg.key as { senderPn?: string; remoteJidAlt?: string };
+    const senderPn = kAlt.senderPn ?? kAlt.remoteJidAlt;
     let jidReal = remoteJid;
     if (remoteJid.endsWith("@lid") && senderPn && senderPn.endsWith("@s.whatsapp.net")) {
       jidReal = senderPn;

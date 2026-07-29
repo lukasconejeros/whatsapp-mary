@@ -1,11 +1,11 @@
 import {
   makeWASocket,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion,
   Browsers,
   DisconnectReason,
   type WASocket,
 } from "@whiskeysockets/baileys";
+import { obtenerVersionWA } from "./wa-version.js";
 import pino from "pino";
 import qrcodeTerminal from "qrcode-terminal";
 import fs from "fs";
@@ -36,15 +36,11 @@ export async function start(): Promise<void> {
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
-  // Always fetch latest version — WhatsApp rejects stale versions with code 405
-  let version: readonly [number, number, number] | undefined;
-  try {
-    const result = await fetchLatestBaileysVersion();
-    version = result.version;
-  } catch {
-    logger.warn("No se pudo obtener la versión de Baileys; usando versión interna");
-    version = undefined;
-  }
+  // La versión de WhatsApp Web que anunciamos decide si nos dejan entrar (code 405 = rechazada).
+  // wa-version.ts la resuelve por capas (entorno → memoria → fuente VIVA de WhatsApp → disco →
+  // fallback verificado) y nunca retrocede. Lección de la caída global del 28-jul-2026 (issue #2731).
+  const { version, origen } = await obtenerVersionWA();
+  logger.info({ version: version.join("."), origen }, "Versión de WhatsApp Web a anunciar");
 
   const sock = makeWASocket({
     version,
