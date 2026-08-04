@@ -32,7 +32,9 @@
     "test:monitor": "tsx scripts/test-monitor.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf .next data auth",
-    "test:mensajes": "tsx scripts/test-mensajes-perdidos.ts"
+    "test:mensajes": "tsx scripts/test-mensajes-perdidos.ts",
+    "test:recordatorios": "tsx scripts/test-recordatorios.ts",
+    "humo:recordatorios": "tsx scripts/humo-recordatorios.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

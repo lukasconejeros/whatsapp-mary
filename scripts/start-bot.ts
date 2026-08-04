@@ -2,6 +2,7 @@ import "./env-loader.js"; // FIRST import — loads .env.local before anything e
 import pino from "pino";
 import { start, watchRestartFlag } from "../src/lib/baileys/client.js";
 import { startSeguimientoLoop } from "../src/lib/seguimiento-loop.js";
+import { startRecordatoriosLoop } from "../src/lib/recordatorios-loop.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
 
@@ -23,3 +24,4 @@ process.on("SIGTERM", () => {
 await start();
 watchRestartFlag();
 startSeguimientoLoop(); // campaña de seguimiento: drena la cola con pausas + tope diario
+startRecordatoriosLoop(); // avisos del calendario: resumen de la víspera + 5 h antes

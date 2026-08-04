@@ -325,6 +325,8 @@ function build(): Ctx {
   for (const col of ["email", "estado", "horario", "alumnos"]) addColumnaSiFalta(db, "clientes", col, "TEXT");
   addColumnaSiFalta(db, "clases", "fecha", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS idx_clases_fecha ON clases(fecha)");
+  // Marca del push "5 h antes" (recordatorios del calendario, 04-08-2026).
+  addColumnaSiFalta(db, "clases", "aviso_5h", "INTEGER NOT NULL DEFAULT 0");
   addColumnaSiFalta(db, "outbox", "kind", "TEXT NOT NULL DEFAULT 'text'");
   addColumnaSiFalta(db, "outbox", "media", "TEXT");
   addColumnaSiFalta(db, "outbox", "attempts", "INTEGER NOT NULL DEFAULT 0");
@@ -1033,12 +1035,14 @@ export function upsertCostoFromAirtable(d: CostoInput & { airtableId: string }):
 export interface Clase {
   id: number; fecha: string | null; dia: string; profe: string; hora: string | null;
   alumnos: (string | number)[]; nota: string | null; created_at: number;
+  /** 0/1 — ya salió el push de "5 h antes" (idempotencia del loop de avisos). */
+  aviso_5h: number;
 }
 export interface ClaseInput { fecha?: string; dia: string; profe: string; hora?: string; alumnos?: (string | number)[]; nota?: string }
 
 interface ClaseRow {
   id: number; fecha: string | null; dia: string; profe: string; hora: string | null;
-  alumnos: string | null; nota: string | null; created_at: number;
+  alumnos: string | null; nota: string | null; created_at: number; aviso_5h: number;
 }
 function parseClase(r: ClaseRow): Clase {
   let alumnos: (string | number)[] = [];
@@ -1066,9 +1070,24 @@ export function addClase(d: ClaseInput): number {
   return r.lastInsertRowid as number;
 }
 export function updateClase(id: number, d: ClaseInput): void {
+  // Si se mueve de día u hora, el aviso vuelve a abrirse: ya no es el mismo
+  // horario del que se avisó.
+  const antes = ctx().db.prepare("SELECT fecha, hora FROM clases WHERE id=?").get(id) as
+    | { fecha: string | null; hora: string | null } | undefined;
+  const movida = !!antes && (antes.fecha !== (d.fecha ?? null) || antes.hora !== (d.hora ?? null));
   ctx().db
-    .prepare("UPDATE clases SET fecha=?, dia=?, profe=?, hora=?, alumnos=?, nota=? WHERE id=?")
+    .prepare(
+      `UPDATE clases SET fecha=?, dia=?, profe=?, hora=?, alumnos=?, nota=?${movida ? ", aviso_5h=0" : ""} WHERE id=?`
+    )
     .run(d.fecha ?? null, d.dia, d.profe, d.hora ?? null, JSON.stringify(d.alumnos ?? []), d.nota ?? null, id);
+}
+
+/** Deja constancia de que ya salió el aviso de 5 h de esas filas. */
+export function marcarAviso5h(ids: number[]): void {
+  if (!ids.length) return;
+  const stmt = ctx().db.prepare("UPDATE clases SET aviso_5h = 1 WHERE id = ?");
+  const tx = ctx().db.transaction((lista: number[]) => { for (const id of lista) stmt.run(id); });
+  tx(ids);
 }
 export function deleteClase(id: number): void {
   ctx().db.prepare("DELETE FROM clases WHERE id=?").run(id);
