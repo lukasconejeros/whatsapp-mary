@@ -50,6 +50,15 @@ export function esMontoEsperado(monto: number): boolean {
   return MONTOS_ESPERADOS.includes(monto);
 }
 
+/**
+ * ¿El que pagó llegó por un anuncio de Meta? Regla de Lukas (05-08-2026): si la
+ * conversación está en la pestaña Meta/Seguimiento sí; si ya es cliente de Arteluk no.
+ * Esas pestañas son la categoría 'potencial'; 'arteluk' y 'mary' no. Ante la duda, no.
+ */
+export function vinoDeMeta(categoria: string | null | undefined): boolean {
+  return categoria === "potencial";
+}
+
 /** Fecha YYYY-MM-DD creíble: bien formada, no futura y no más vieja que DIAS_ATRAS_OK. */
 function fechaCreible(fecha: unknown, hoy: string): string | null {
   if (typeof fecha !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())) return null;

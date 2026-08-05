@@ -14,6 +14,63 @@ const VISION_MODEL = process.env.ANTHROPIC_VISION_MODEL ?? "claude-haiku-4-5-202
 
 const MIME_IMG_OK = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
+// Mira una imagen y decide si es un COMPROBANTE DE TRANSFERENCIA, sacando monto,
+// fecha y nombre. Devuelve el texto crudo del modelo (JSON) para que la lógica pura de
+// comprobante.ts lo valide; null ante cualquier error, y entonces no se propone nada.
+// Deliberadamente severo: si duda, tiene que decir es_comprobante=false. Un falso
+// positivo le ensucia las cifras del negocio a Mary; un falso negativo solo da trabajo.
+export async function leerComprobante(buffer: Buffer, mime: string): Promise<string | null> {
+  try {
+    const key = process.env.ANTHROPIC_API_KEY?.trim();
+    if (!key) return null;
+    const tipo = MIME_IMG_OK.has(mime) ? mime : "image/jpeg";
+    const res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        max_tokens: 300,
+        system:
+          "Miras imágenes que llegan al WhatsApp de una academia de arte y decides si son " +
+          "COMPROBANTES DE TRANSFERENCIA BANCARIA o de pago (transferencia, depósito, Mercado " +
+          "Pago, caja vecina). Respondes SOLO un JSON, sin explicar nada:\n" +
+          '{"es_comprobante": true|false, "monto": <número o null>, "fecha": "YYYY-MM-DD" o null, ' +
+          '"nombre": "<quien transfirió>" o null, "banco": "<banco>" o null}\n' +
+          "Reglas estrictas:\n" +
+          "- es_comprobante=true SOLO si la imagen es la constancia de un pago YA HECHO, con su " +
+          "monto visible. Un cuadro, un dibujo, la foto de un niño, un cartel de precios, una " +
+          "captura de conversación o la boleta de otra cosa NO son comprobantes.\n" +
+          "- Si dudas, responde es_comprobante=false. Es preferible fallar por no reconocerlo.\n" +
+          "- El monto es el TRANSFERIDO, en pesos chilenos, sin puntos ni símbolos. Si no lo lees " +
+          "con claridad pon null; NUNCA lo adivines ni lo redondees.\n" +
+          "- La fecha es la del comprobante. Si no aparece, null.",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: tipo, data: buffer.toString("base64") } },
+              { type: "text", text: "¿Es un comprobante de transferencia? Responde solo el JSON." },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status, body: (await res.text()).slice(0, 160) }, "leerComprobante: error API");
+      return null;
+    }
+    const data = (await res.json()) as { content?: { type?: string; text?: string }[] };
+    return data.content?.find((b) => b.type === "text")?.text?.trim() || null;
+  } catch (e) {
+    logger.warn({ err: String(e).slice(0, 120) }, "leerComprobante falló");
+    return null;
+  }
+}
+
 // Describe en español, breve y factual, una imagen que envió alguien a la academia
 // de arte (un cuadro, un dibujo, un comprobante de pago, etc.). Usa fetch directo a
 // la API de Anthropic (Mary no tiene el SDK). Devuelve null ante cualquier error.

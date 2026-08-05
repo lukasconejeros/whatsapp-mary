@@ -3,7 +3,7 @@
 // Por eso lo que se prueba aquí es sobre todo cuándo NO hay que proponer nada.
 import "./env-loader.js";
 import {
-  normalizarMonto, esMontoEsperado, interpretarComprobante, MONTOS_ESPERADOS,
+  normalizarMonto, esMontoEsperado, interpretarComprobante, MONTOS_ESPERADOS, vinoDeMeta,
 } from "../src/lib/comprobante.js";
 
 let pass = 0, fail = 0;
@@ -80,6 +80,14 @@ console.log("\n— monto no esperado —");
 const raro = interpretarComprobante(ok({ monto: 37500 }), HOY);
 check("monto raro igual propone borrador", raro !== null && raro.monto === 37500);
 check("pero queda marcado como NO esperado", raro?.esperado === false);
+
+// Regla de Lukas: "si la conversación está en la pestaña Meta/Seguimiento sí;
+// si ya es cliente Arteluk no". La familia completa de categorías es mary|arteluk|potencial.
+console.log("\n— ¿el que pagó vino de Meta? —");
+check("un potencial (pestaña Meta/Seguimiento) SÍ", vinoDeMeta("potencial"));
+check("un cliente de Arteluk NO", !vinoDeMeta("arteluk"));
+check("un contacto propio de Mary NO", !vinoDeMeta("mary"));
+check("categoría desconocida NO (ante la duda, no)", !vinoDeMeta("loquesea"));
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} pasaron, ${fail} fallaron\n`);
 process.exit(fail === 0 ? 0 : 1);

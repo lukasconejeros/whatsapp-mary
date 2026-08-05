@@ -3,6 +3,7 @@ import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import {
   getOrCreateConversation,
   getConversationById,
+  addBorradorComprobante,
   insertMessage,
   getRecentHistory,
   setCategoria,
@@ -15,7 +16,9 @@ import {
   resolverLid,
 } from "../db.js";
 import { fueEnvioOutbox } from "./eco.js";
-import { describirImagen, transcribirAudio } from "../media.js";
+import { describirImagen, transcribirAudio, leerComprobante } from "../media.js";
+import { interpretarComprobante, vinoDeMeta, type BorradorComprobante } from "../comprobante.js";
+import { todaySantiago } from "../fechas.js";
 import { generateReply } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { enviarPush } from "../push.js";
@@ -84,7 +87,7 @@ async function procesarMedia(
   sock: WASocket,
   msg: proto.IWebMessageInfo,
   inner: proto.IMessage | null | undefined
-): Promise<{ text: string; media: string | null } | null> {
+): Promise<{ text: string; media: string | null; comprobante: BorradorComprobante | null } | null> {
   if (!inner) return null;
   const img = inner.imageMessage;
   const aud = inner.audioMessage;
@@ -116,18 +119,22 @@ async function procesarMedia(
       logger.warn({ err: String(e).slice(0, 80) }, "no se pudo guardar el medio");
     }
     if (img) {
-      const desc = await describirImagen(buffer, img.mimetype ?? "image/jpeg");
+      const mime = img.mimetype ?? "image/jpeg";
+      const desc = await describirImagen(buffer, mime);
       const cap = (img.caption ?? "").trim();
       const text = [cap, desc].filter(Boolean).join(" — ") || "📷 Foto";
-      return { text, media };
+      // ¿Es un comprobante de transferencia? Solo se PROPONE: quien lo aprueba es Mary.
+      const crudo = await leerComprobante(buffer, mime);
+      const comprobante = crudo ? interpretarComprobante(crudo, todaySantiago()) : null;
+      return { text, media, comprobante };
     }
-    if (sti) return { text: "🌟 Sticker", media };
+    if (sti) return { text: "🌟 Sticker", media, comprobante: null };
     if (vid) {
       const cap = (vid.caption ?? "").trim();
-      return { text: cap || "🎥 Video", media };
+      return { text: cap || "🎥 Video", media, comprobante: null };
     }
     const txt = await transcribirAudio(buffer, aud!.mimetype ?? "audio/ogg");
-    return { text: txt || "🎤 Audio", media };
+    return { text: txt || "🎤 Audio", media, comprobante: null };
   } catch (e) {
     logger.warn({ err: String(e).slice(0, 120) }, "procesarMedia falló");
     return null;
@@ -259,9 +266,18 @@ export async function handleIncomingMessages(
     // texto y guarda el archivo para verlo/escucharlo en el panel).
     let text = extraerTexto(inner);
     let media: string | null = null;
+    let comprobante: BorradorComprobante | null = null;
     if (!text) {
       const m = await procesarMedia(sock, msg, inner);
-      if (m) { text = m.text; media = m.media; logger.info({ remoteJid, media }, "📎 medio (foto/audio) recibido"); }
+      if (m) { text = m.text; media = m.media; comprobante = m.comprobante; logger.info({ remoteJid, media }, "📎 medio (foto/audio) recibido"); }
+    } else if (inner?.imageMessage) {
+      // Foto CON pie de texto: extraerTexto() se queda con el caption, así que este
+      // camino NUNCA descargaba el archivo y la foto se perdía para el panel. Es
+      // justo como llega un comprobante ("te transferí, aquí la foto"), así que aquí
+      // sí se descarga y se mira, pero el texto del mensaje se deja intacto (el pie
+      // que escribió la persona) para no cambiarle el historial a la IA.
+      const m = await procesarMedia(sock, msg, inner);
+      if (m) { media = m.media; comprobante = m.comprobante; logger.info({ remoteJid, media }, "📎 foto con pie de texto — archivo guardado"); }
     }
     if (!text) {
       // Antes esto era un `continue` MUDO: un PDF, una ubicación o un mensaje ilegible
@@ -312,6 +328,28 @@ export async function handleIncomingMessages(
       if (referral) setCtwaReferral(convo.id, referral);
       const categoria = classifyCategoria({ phone, ctwaReferral: referral });
       setCategoria(convo.id, categoria, false);
+    }
+
+    // Comprobante de transferencia: se PROPONE en la bandeja de Finanzas y ahí lo aprueba
+    // Mary. Nunca entra solo a Ingresos (decisión de Lukas, 05-08-2026). Va después de
+    // clasificar para saber si el que pagó venía de un anuncio de Meta.
+    if (comprobante) {
+      try {
+        const cat = getConversationById(convo.id)?.categoria;
+        addBorradorComprobante({
+          conversationId: convo.id,
+          media,
+          monto: comprobante.monto,
+          fecha: comprobante.fecha,
+          nombre: comprobante.nombre,
+          banco: comprobante.banco,
+          esperado: comprobante.esperado,
+          deMeta: vinoDeMeta(cat),
+        });
+        logger.info({ phone, monto: comprobante.monto }, "🧾 comprobante detectado — borrador a la espera de Mary");
+      } catch (e) {
+        logger.warn({ err: String(e).slice(0, 120) }, "no se pudo guardar el borrador de comprobante");
+      }
     }
 
     const fresh = getConversationById(convo.id);
