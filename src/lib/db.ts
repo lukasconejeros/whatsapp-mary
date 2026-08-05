@@ -335,6 +335,27 @@ function build(): Ctx {
   addColumnaSiFalta(db, "costos", "mp_id", "TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ingresos_mp ON ingresos(mp_id)");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_costos_mp ON costos(mp_id)");
+  // Comprobantes de transferencia (05-08-2026): la foto que respalda el ingreso y si
+  // el que pagó venía de Meta. de_meta se puede corregir a mano desde Finanzas.
+  addColumnaSiFalta(db, "ingresos", "media", "TEXT");
+  addColumnaSiFalta(db, "ingresos", "de_meta", "INTEGER");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS comprobantes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+      media TEXT,
+      monto INTEGER NOT NULL,
+      fecha TEXT NOT NULL,
+      nombre TEXT,
+      banco TEXT,
+      esperado INTEGER NOT NULL DEFAULT 0,
+      de_meta INTEGER NOT NULL DEFAULT 0,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      ingreso_id INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+    CREATE INDEX IF NOT EXISTS idx_comprobantes_estado ON comprobantes(estado, created_at);
+  `);
 
   return {
     db,
@@ -925,6 +946,8 @@ export function searchClientes(term: string): Cliente[] {
 export interface Ingreso {
   id: number; fecha: string; apoderado: string | null; monto: number;
   tipo: string | null; detalle: string | null; airtable_id: string | null; created_at: number;
+  media?: string | null;   // foto del comprobante que respalda el ingreso
+  de_meta?: number | null; // 1 = el que pagó llegó por un anuncio de Meta (editable a mano)
 }
 export interface Costo {
   id: number; fecha: string; tipo: string | null; cantidad: number | null; valor: number;
@@ -974,6 +997,113 @@ export function updateIngreso(id: number, d: IngresoInput): void {
 }
 export function deleteIngreso(id: number): void {
   ctx().db.prepare("DELETE FROM ingresos WHERE id=?").run(id);
+}
+
+/** Corrige a mano si ese ingreso vino o no de un anuncio de Meta. */
+export function setIngresoDeMeta(id: number, deMeta: boolean): void {
+  ctx().db.prepare("UPDATE ingresos SET de_meta=? WHERE id=?").run(deMeta ? 1 : 0, id);
+}
+
+// ── Borradores de comprobante de transferencia (05-08-2026) ───────────────
+// Una foto que PARECE comprobante no entra a Ingresos: queda aquí esperando que Mary
+// la apruebe de un toque. Decisión de Lukas: nada automático, él ya lo intentó una vez
+// y "se iba cualquier cosa". El ingreso nace SOLO al aprobar.
+
+export type EstadoComprobante = "pendiente" | "aprobado" | "descartado";
+
+export interface Comprobante {
+  id: number;
+  conversation_id: number;
+  media: string | null;
+  monto: number;
+  fecha: string;
+  nombre: string | null;
+  banco: string | null;
+  esperado: number;
+  de_meta: number;
+  estado: EstadoComprobante;
+  ingreso_id: number | null;
+  created_at: number;
+}
+
+/** Lo que ve Mary en la bandeja: el borrador + de qué chat salió. */
+export interface ComprobantePendiente extends Comprobante {
+  contacto: string | null;
+  telefono: string;
+}
+
+export function addBorradorComprobante(d: {
+  conversationId: number; media: string | null; monto: number; fecha: string;
+  nombre: string | null; banco: string | null; esperado: boolean; deMeta: boolean;
+}): number {
+  const r = ctx()
+    .db.prepare(
+      `INSERT INTO comprobantes (conversation_id, media, monto, fecha, nombre, banco, esperado, de_meta)
+       VALUES (?,?,?,?,?,?,?,?)`
+    )
+    .run(d.conversationId, d.media, Math.round(d.monto), d.fecha, d.nombre, d.banco,
+         d.esperado ? 1 : 0, d.deMeta ? 1 : 0);
+  return r.lastInsertRowid as number;
+}
+
+export function getBorradorComprobante(id: number): Comprobante | null {
+  return (ctx().db.prepare("SELECT * FROM comprobantes WHERE id=?").get(id) as Comprobante | undefined) ?? null;
+}
+
+export function listBorradoresPendientes(): ComprobantePendiente[] {
+  return ctx()
+    .db.prepare(
+      `SELECT b.*, c.name AS contacto, c.phone AS telefono
+         FROM comprobantes b JOIN conversations c ON c.id = b.conversation_id
+        WHERE b.estado = 'pendiente'
+        ORDER BY b.created_at DESC, b.id DESC`
+    )
+    .all() as ComprobantePendiente[];
+}
+
+/**
+ * Aprueba el borrador y recién ahí crea el ingreso, con la foto adjunta.
+ * Devuelve el id del ingreso, o null si el borrador no existe o ya fue descartado.
+ * Es idempotente: un doble toque en el botón devuelve el mismo ingreso, no dos.
+ */
+export function aprobarBorradorComprobante(
+  id: number,
+  d: { monto?: number; fecha?: string; apoderado?: string; tipo?: string; detalle?: string } = {}
+): number | null {
+  const c = ctx();
+  const b = getBorradorComprobante(id);
+  if (!b) return null;
+  if (b.estado === "descartado") return null;
+  if (b.estado === "aprobado" && b.ingreso_id) return b.ingreso_id;
+
+  const conv = c.db.prepare("SELECT name FROM conversations WHERE id=?").get(b.conversation_id) as
+    | { name: string | null }
+    | undefined;
+
+  const tx = c.db.transaction(() => {
+    const r = c.db
+      .prepare(
+        `INSERT INTO ingresos (fecha, apoderado, monto, tipo, detalle, media, de_meta)
+         VALUES (?,?,?,?,?,?,?)`
+      )
+      .run(
+        d.fecha ?? b.fecha,
+        d.apoderado ?? b.nombre ?? conv?.name ?? null,
+        Math.round(d.monto ?? b.monto),
+        d.tipo ?? null,
+        d.detalle ?? null,
+        b.media,
+        b.de_meta
+      );
+    const ingresoId = r.lastInsertRowid as number;
+    c.db.prepare("UPDATE comprobantes SET estado='aprobado', ingreso_id=? WHERE id=?").run(ingresoId, id);
+    return ingresoId;
+  });
+  return tx();
+}
+
+export function descartarBorradorComprobante(id: number): void {
+  ctx().db.prepare("UPDATE comprobantes SET estado='descartado' WHERE id=? AND estado='pendiente'").run(id);
 }
 export function upsertIngresoFromAirtable(d: IngresoInput & { airtableId: string }): void {
   ctx().db
