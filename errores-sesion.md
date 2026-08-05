@@ -156,3 +156,43 @@ porque viven solo en la ruta del bot (`tsx`).
 **Solución**: En archivos de `src/lib/` que importe la web (los que llegan desde una ruta
 `/api/*`), usar imports **sin extensión** (`from "./phone"`), no `.js`. Es válido con
 `moduleResolution: "bundler"` y lo resuelven tanto Turbopack como `tsx`.
+
+---
+
+## #15 — El botón "Generar código QR nuevo" no hace NADA (panel girando para siempre)
+
+**Síntoma** (04-ago-2026, Arteluk y Conejeros a la vez): el panel de Conexión muestra
+"Desconectado" y la tarjeta gira eternamente en "Generando código QR…". Apretar el botón
+no cambia nada, ni tras recargar ni tras reiniciar el servicio.
+
+**Cómo se midió** (sin credenciales del panel): `GET /api/diag-envio?token=…` devuelve
+`connection_state`. El campo `updated_at` llevaba **7 días congelado** en `disconnected`
+con `phone: null`. Como `setConnectionState` escribe `updated_at = unixepoch()` en CADA
+escritura, un valor congelado prueba que nadie tocó ese estado: ni el bot ni el botón.
+
+**Causa raíz — DOS fallos encadenados:**
+
+1. **El botón moría en el volumen montado.** `/api/connection/disconnect` hacía
+   `fs.rmSync(AUTH_DIR, {recursive:true, force:true})`. En producción `auth/` es
+   `/app/auth`, un **volumen montado de Docker**: borrar el punto de montaje lanza
+   `EBUSY: resource busy`. Esa línea iba **antes** de `fs.writeFileSync(RESTART_FLAG)`,
+   así que la excepción abortaba la petición y la señal que vigila el bot **nunca se
+   escribía**. La misma línea estaba en `watchRestartFlag()` de `client.ts`, donde el
+   EBUSY cae dentro de un `setInterval` y puede tumbar el proceso del bot.
+2. **Tras un logout (code 401) el bot se aparca para siempre.** En `client.ts`, la rama
+   `DisconnectReason.loggedOut` marca `disconnected` y **no vuelve a llamar a `start()`**,
+   que es lo único que emite un QR. Con las credenciales viejas dentro de `auth/`, cada
+   reinicio del contenedor da 401 a los ~5 s y se vuelve a aparcar. Medido en vivo tras
+   un despliegue: `connecting` → `disconnected` en 5 segundos, y a dormir.
+
+**Solución**: `src/lib/reinicio-qr.ts` — `vaciarAuth()` borra el **contenido** de `auth/`
+(nunca la carpeta) y nunca lanza; `pedirReinicioQR()` escribe la señal siempre, aunque la
+limpieza falle. Usado por la ruta API y por `watchRestartFlag`. Ya estaba resuelto así en
+`whatsapp-monaco` desde el 28-jul-2026; el arreglo nunca se portó aquí.
+Test: `npm run test:qr` (7 checks).
+
+**Pendiente**: el punto 2 (que el bot pida QR solo tras un 401) sigue sin arreglar; hoy
+la única salida es el botón.
+
+**Cómo reconocerlo**: panel girando en "Generando código QR…" + `updated_at` de
+`connection_state` que no se mueve al apretar el botón = la ruta está reventando.
