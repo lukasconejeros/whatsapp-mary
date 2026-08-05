@@ -12,6 +12,7 @@ import fs from "fs";
 import path from "path";
 import { Boom } from "@hapi/boom";
 import { setConnectionState, getConnectionState } from "../db.js";
+import { vaciarAuth } from "../reinicio-qr.js";
 import { handleIncomingMessages } from "./handler.js";
 import { startOutboxLoop, stopOutboxLoop } from "./outbox.js";
 import { recuperarSaliente } from "./msg-cache.js";
@@ -150,7 +151,9 @@ export function watchRestartFlag(): void {
       stopOutboxLoop();
       handle?.sock.end(undefined);
       handle = null;
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      // Vaciar el CONTENIDO, no la carpeta: /app/auth es un volumen montado y rmSync
+      // sobre el punto de montaje lanza EBUSY dentro del setInterval → tumbaba el motor.
+      vaciarAuth(AUTH_DIR);
       start().catch((err) => logger.error({ err }, "Error al reconectar"));
     }
   }, 1000);
