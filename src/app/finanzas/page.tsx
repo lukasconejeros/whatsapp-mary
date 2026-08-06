@@ -138,8 +138,8 @@ export default function FinanzasPage() {
       <AppNav />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Cabecera con selector de mes */}
-        <header className="flex items-center gap-3 shrink-0" style={{ height: 48, padding: '0 20px', background: '#FFFFFF', borderBottom: '1px solid #D3E7DE' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#054D44' }}>Finanzas</span>
+        <header className="fin-header flex items-center gap-3 shrink-0" style={{ height: 48, padding: '0 20px', background: '#FFFFFF', borderBottom: '1px solid #D3E7DE' }}>
+          <span className="fin-title" style={{ fontSize: 13, fontWeight: 600, color: '#054D44' }}>Finanzas</span>
           <div className="flex items-center gap-1" style={{ marginLeft: 8 }}>
             <button onClick={() => setMes(m => shiftMonth(m, -1))} style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#00A884' }}><ChevronLeft size={18} /></button>
             <span style={{ fontSize: 13, fontWeight: 600, color: '#054D44', minWidth: 130, textAlign: 'center' }}>{monthLabel(mes)}</span>
@@ -148,7 +148,7 @@ export default function FinanzasPage() {
           <div className="flex-1" />
           <button onClick={() => { setShowImport(true); setImportResult(null) }} className="flex items-center gap-1.5" title="Importar movimientos desde la cartola de MercadoPago"
             style={{ height: 30, padding: '0 12px', borderRadius: 8, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <Upload size={13} /> Importar cartola
+            <Upload size={13} /> <span className="fin-import-label">Importar cartola</span>
           </button>
         </header>
 
@@ -218,23 +218,25 @@ export default function FinanzasPage() {
                 {openTipo === tipo && (
                   <div style={{ borderTop: '1px solid #E7F1EC' }}>
                     {g.items.map(r => (
-                      <div key={r.id} className="flex items-center gap-3" style={{ padding: '8px 16px', borderBottom: '1px solid #F3F9F6', fontSize: 12 }}>
-                        <span style={{ color: '#667781', width: 78 }}>{r.fecha}</span>
-                        <span style={{ flex: 1, color: '#6B5563' }}>{r.detalle || r.apoderado || r.notas || '—'}</span>
-                        {tab === 'ganancias' && r.media && (
-                          <button onClick={() => setFotoIngreso(r.media!)} title="Ver el comprobante"
-                            style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'zoom-in', color: '#5FB89E' }}><ImageIcon size={14} /></button>
-                        )}
-                        {tab === 'ganancias' && (
-                          <button onClick={() => toggleMeta(r)} title={r.de_meta ? 'Vino de un anuncio de Meta (toca para quitarlo)' : 'No vino de Meta (toca para marcarlo)'}
-                            style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
-                              border: r.de_meta ? '1px solid #00A884' : '1px solid #D3E7DE', background: r.de_meta ? '#00A884' : '#fff', color: r.de_meta ? '#fff' : '#B0BEC5' }}>
-                            Meta
-                          </button>
-                        )}
-                        <span style={{ color: '#054D44', fontWeight: 600 }}>{formatCLP(amount(r))}</span>
-                        <button onClick={() => openEdit(r)} title="Editar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#5FB89E' }}><Pencil size={14} /></button>
-                        <button onClick={() => del(r)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#5FB89E' }}><Trash2 size={14} /></button>
+                      <div key={r.id} className="fin-row" style={{ padding: '8px 16px', borderBottom: '1px solid #F3F9F6', fontSize: 12 }}>
+                        <span className="fin-fecha" style={{ color: '#667781', width: 78 }}>{r.fecha}</span>
+                        <span className="fin-detalle" style={{ flex: 1, color: '#6B5563' }}>{r.detalle || r.apoderado || r.notas || '—'}</span>
+                        <span className="fin-monto" style={{ color: '#054D44', fontWeight: 600 }}>{formatCLP(amount(r))}</span>
+                        <div className="fin-acciones">
+                          {tab === 'ganancias' && r.media && (
+                            <button onClick={() => setFotoIngreso(r.media!)} title="Ver el comprobante"
+                              style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'zoom-in', color: '#5FB89E' }}><ImageIcon size={16} /></button>
+                          )}
+                          {tab === 'ganancias' && (
+                            <button onClick={() => toggleMeta(r)} title={r.de_meta ? 'Vino de un anuncio de Meta (toca para quitarlo)' : 'No vino de Meta (toca para marcarlo)'}
+                              style={{ fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                                border: r.de_meta ? '1px solid #00A884' : '1px solid #D3E7DE', background: r.de_meta ? '#00A884' : '#fff', color: r.de_meta ? '#fff' : '#B0BEC5' }}>
+                              Meta
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(r)} title="Editar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#5FB89E' }}><Pencil size={16} /></button>
+                          <button onClick={() => del(r)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#5FB89E' }}><Trash2 size={16} /></button>
+                        </div>
                       </div>
                     ))}
                   </div>

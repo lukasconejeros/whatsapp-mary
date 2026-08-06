@@ -22,6 +22,9 @@ export const COSTO_TIPOS = [
   "Publicidad (gasto)",
   "convenio estacionamiento",
   "gastos",
+  // Lo que Mary aparta cada mes. Decisión de Lukas (05-08-2026): va como una
+  // categoría más de Costos, sin pestaña aparte, para que descuente de la ganancia.
+  "Ahorro",
 ] as const;
 
 export function formatCLP(n: number): string {

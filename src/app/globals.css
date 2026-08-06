@@ -158,6 +158,50 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .cal-cell .cal-ev-dots { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 2px; }
 }
 
+/* ── Finanzas en el teléfono (Mary no usa computador) ────────────────────── */
+/* Bandeja de comprobantes: en PC cada uno es una fila; en teléfono se apila para
+   que la foto se vea grande y los botones se puedan tocar con el pulgar. */
+.comp-card { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.comp-foto { width: 56px; height: 56px; }
+.comp-quien { min-width: 130px; flex: 1; }
+.comp-campos { display: flex; align-items: center; gap: 8px; }
+.comp-acciones { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.comp-aprobar, .comp-descartar { min-height: 34px; }
+
+@media (max-width: 767px) {
+  .comp-card { display: grid; grid-template-columns: 76px 1fr; grid-template-areas: "foto quien" "campos campos" "acciones acciones"; gap: 10px; }
+  .comp-card > .comp-fotoslot { grid-area: foto; }
+  .comp-foto { width: 76px !important; height: 76px !important; }
+  .comp-quien { grid-area: quien; min-width: 0; align-self: center; }
+  .comp-campos { grid-area: campos; flex-wrap: wrap; }
+  .comp-campos input { flex: 1; min-width: 110px; }
+  .comp-campos select { flex: 2; min-width: 150px; max-width: none !important; }
+  .comp-acciones { grid-area: acciones; margin-left: 0; }
+  /* Dedos, no cursor: el botón principal ancho y ambos altos de verdad */
+  .comp-aprobar { flex: 1; justify-content: center; min-height: 46px; font-size: 15px !important; }
+  .comp-descartar { min-height: 46px; min-width: 52px; justify-content: center; }
+}
+
+/* Lista de movimientos: en teléfono la fila se parte en dos líneas en vez de
+   apretujar fecha, nombre, marcas y monto en una sola. */
+.fin-row { display: flex; align-items: center; gap: 12px; }
+.fin-row .fin-acciones { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 767px) {
+  .fin-row { flex-wrap: wrap; gap: 4px 10px; padding: 10px 14px !important; }
+  .fin-row .fin-fecha { order: 1; width: auto !important; }
+  .fin-row .fin-monto { order: 2; margin-left: auto; font-size: 14px !important; }
+  .fin-row .fin-detalle { order: 3; flex: 1 0 100%; }
+  .fin-row .fin-acciones { order: 4; margin-left: auto; gap: 12px; }
+  .fin-row .fin-acciones button { min-width: 36px; min-height: 36px; justify-content: center; }
+}
+
+/* Cabecera de Finanzas: en teléfono no cabe el título junto al selector de mes */
+@media (max-width: 767px) {
+  .fin-header { padding: 0 12px !important; gap: 8px !important; }
+  .fin-header .fin-title { display: none; }
+  .fin-header .fin-import-label { display: none; }
+}
+
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #D3E7DE; min-height: 0; }
