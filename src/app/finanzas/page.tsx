@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import MetricasTab from '@/components/MetricasTab'
+import BandejaComprobantes from '@/components/BandejaComprobantes'
 import { INGRESO_TIPOS, COSTO_TIPOS, formatCLP, currentMonth, shiftMonth, monthLabel } from '@/lib/finanzas'
-import { Plus, ChevronLeft, ChevronRight, Trash2, Pencil, X, Upload } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Trash2, Pencil, X, Upload, Image as ImageIcon } from 'lucide-react'
 
-type Mov = { id: number; fecha: string; tipo: string | null; detalle?: string | null; apoderado?: string | null; notas?: string | null; monto?: number; valor?: number; cantidad?: number | null }
+type Mov = { id: number; fecha: string; tipo: string | null; detalle?: string | null; apoderado?: string | null; notas?: string | null; monto?: number; valor?: number; cantidad?: number | null; media?: string | null; de_meta?: number | null }
 
 export default function FinanzasPage() {
   const [mes, setMes] = useState(currentMonth())
@@ -20,6 +21,7 @@ export default function FinanzasPage() {
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0, 10), tipo: '', monto: '', detalle: '' })
   const [guardando, setGuardando] = useState(false)
+  const [fotoIngreso, setFotoIngreso] = useState<string | null>(null) // comprobante que respalda un ingreso ya aprobado
   const [showImport, setShowImport] = useState(false)
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
@@ -105,6 +107,23 @@ export default function FinanzasPage() {
     finally { setGuardando(false) }
   }
 
+  // Corrige a mano si ese ingreso vino de un anuncio de Meta. Se pinta al toque y
+  // se deshace solo si el servidor lo rechaza (así no queda una marca falsa a la vista).
+  async function toggleMeta(r: Mov) {
+    const nuevo = !r.de_meta
+    setIngresos(p => p.map(x => x.id === r.id ? { ...x, de_meta: nuevo ? 1 : 0 } : x))
+    try {
+      const d = await fetch(`/api/ingresos/${r.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deMeta: nuevo }),
+      }).then(x => x.json())
+      if (!d.ok) throw new Error()
+    } catch {
+      setIngresos(p => p.map(x => x.id === r.id ? { ...x, de_meta: nuevo ? 0 : 1 } : x))
+      alert('No se pudo guardar la marca de Meta. Reintenta.')
+    }
+  }
+
   async function del(r: Mov) {
     if (!confirm('¿Borrar este registro? No se puede deshacer.')) return
     const url = tab === 'ganancias' ? `/api/ingresos/${r.id}` : `/api/costos/${r.id}`
@@ -134,6 +153,9 @@ export default function FinanzasPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '18px 20px' }}>
+          {/* Comprobantes de transferencia esperando el visto bueno de Mary */}
+          {tab === 'ganancias' && <BandejaComprobantes onCambio={load} />}
+
           {/* Resumen del mes (solo Ganancias/Costos; Métricas tiene su propio filtro) */}
           {tab !== 'metricas' && (
           <div className="flex gap-3" style={{ marginBottom: 18, flexWrap: 'wrap' }}>
@@ -199,6 +221,17 @@ export default function FinanzasPage() {
                       <div key={r.id} className="flex items-center gap-3" style={{ padding: '8px 16px', borderBottom: '1px solid #F3F9F6', fontSize: 12 }}>
                         <span style={{ color: '#667781', width: 78 }}>{r.fecha}</span>
                         <span style={{ flex: 1, color: '#6B5563' }}>{r.detalle || r.apoderado || r.notas || '—'}</span>
+                        {tab === 'ganancias' && r.media && (
+                          <button onClick={() => setFotoIngreso(r.media!)} title="Ver el comprobante"
+                            style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'zoom-in', color: '#5FB89E' }}><ImageIcon size={14} /></button>
+                        )}
+                        {tab === 'ganancias' && (
+                          <button onClick={() => toggleMeta(r)} title={r.de_meta ? 'Vino de un anuncio de Meta (toca para quitarlo)' : 'No vino de Meta (toca para marcarlo)'}
+                            style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+                              border: r.de_meta ? '1px solid #00A884' : '1px solid #D3E7DE', background: r.de_meta ? '#00A884' : '#fff', color: r.de_meta ? '#fff' : '#B0BEC5' }}>
+                            Meta
+                          </button>
+                        )}
                         <span style={{ color: '#054D44', fontWeight: 600 }}>{formatCLP(amount(r))}</span>
                         <button onClick={() => openEdit(r)} title="Editar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#5FB89E' }}><Pencil size={14} /></button>
                         <button onClick={() => del(r)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#5FB89E' }}><Trash2 size={14} /></button>
@@ -238,6 +271,16 @@ export default function FinanzasPage() {
               style={{ width: '100%', margin: '4px 0 16px', padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13 }} />
             <button type="submit" disabled={guardando} style={{ width: '100%', padding: '10px', borderRadius: 9, border: 'none', background: '#00A884', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
           </form>
+        </div>
+      )}
+
+      {/* El comprobante de un ingreso ya aprobado, en grande */}
+      {fotoIngreso && (
+        <div onClick={() => setFotoIngreso(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(6,77,68,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 20, cursor: 'zoom-out' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/media/${fotoIngreso}`} alt="Comprobante"
+            style={{ maxWidth: '92vw', maxHeight: '88vh', borderRadius: 12, boxShadow: '0 20px 50px rgba(0,0,0,0.35)' }} />
         </div>
       )}
 

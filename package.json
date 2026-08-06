@@ -36,6 +36,7 @@
     "test:recordatorios": "tsx scripts/test-recordatorios.ts",
     "test:comprobante": "tsx scripts/test-comprobante.ts",
     "test:comprobantes-db": "tsx scripts/test-comprobantes-db.ts",
+    "test:comprobantes-api": "tsx scripts/test-comprobantes-api.ts",
     "test:qr": "tsx scripts/test-regenerar-qr.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts"
   },
