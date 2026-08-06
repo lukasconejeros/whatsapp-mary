@@ -1,9 +1,11 @@
 // Tool registry — agregar definición Y handler por cada nueva tool
 
+// Arteluk (06-08-2026): fuera 'agendar' y 'calificar'. La primera creaba un evento en
+// el Google Calendar de Orion y mandaba un email de demo; la segunda pregunta si el
+// lead factura más de 5.000€/mes. Ninguna tiene sentido en el taller de arte, y el bot
+// no debe poder llamarlas ni por error. Los archivos siguen en disco para el kit.
 import { guardarLeadDefinition, guardarLead } from "./guardar-lead.js";
-import { calificarDefinition, calificar } from "./calificar.js";
 import { derivarHumanoDefinition, derivarHumano } from "./derivar-humano.js";
-import { agendarDefinition, agendar } from "./agendar.js";
 import { silenciarDefinition, silenciar } from "./silenciar.js";
 import { marcarInteresDefinition, marcarInteres } from "./marcar-interes.js";
 
@@ -15,18 +17,14 @@ type Handler = (args: Record<string, unknown>, ctx: ToolContext) => Promise<Reco
 
 export const toolDefinitions: ToolDef[] = [
   silenciarDefinition,
-  calificarDefinition,
   marcarInteresDefinition,
-  agendarDefinition,
   guardarLeadDefinition,
   derivarHumanoDefinition,
 ];
 
 const handlers: Record<string, Handler> = {
   silenciar:      (args, ctx) => silenciar({ ...args, conversationId: ctx.conversationId }),
-  calificar:      (args, ctx) => calificar({ ...args, conversationId: ctx.conversationId }),
   marcar_interes: (args, ctx) => marcarInteres({ ...args, conversationId: ctx.conversationId }),
-  agendar:        (args, ctx) => agendar(args, { conversationId: ctx.conversationId }),
   guardarLead:    (args, ctx) => guardarLead({ ...args, conversationId: ctx.conversationId }),
   derivarHumano:  (args, ctx) => derivarHumano({ ...args, conversationId: ctx.conversationId }),
 };

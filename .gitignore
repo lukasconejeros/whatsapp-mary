@@ -19,8 +19,11 @@ auth/
 .restart
 secrets/
 
-# Configuración personal del negocio (NO versionar)
-prompts/negocio.md
+# El cerebro del bot SÍ se versiona (06-08-2026). Venía ignorado del kit, donde cada
+# usuario escribe el suyo; pero este repo es la app de Arteluk y nada más, y si el
+# archivo no viaja al deploy el bot se queda sin cerebro (cae al texto genérico de
+# system-prompt.ts). No lleva claves: son los precios y horarios que ya están en la web.
+# prompts/negocio.md
 
 # Logs
 logs/

@@ -38,6 +38,8 @@
     "test:comprobantes-db": "tsx scripts/test-comprobantes-db.ts",
     "test:comprobantes-api": "tsx scripts/test-comprobantes-api.ts",
     "test:qr": "tsx scripts/test-regenerar-qr.ts",
+    "test:cerebro": "tsx scripts/test-cerebro-arteluk.ts",
+    "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts"
   },
   "dependencies": {
