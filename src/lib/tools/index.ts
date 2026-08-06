@@ -4,10 +4,13 @@
 // el Google Calendar de Orion y mandaba un email de demo; la segunda pregunta si el
 // lead factura más de 5.000€/mes. Ninguna tiene sentido en el taller de arte, y el bot
 // no debe poder llamarlas ni por error. Los archivos siguen en disco para el kit.
-import { guardarLeadDefinition, guardarLead } from "./guardar-lead.js";
-import { derivarHumanoDefinition, derivarHumano } from "./derivar-humano.js";
-import { silenciarDefinition, silenciar } from "./silenciar.js";
-import { marcarInteresDefinition, marcarInteres } from "./marcar-interes.js";
+// Sin extensión .js: desde el 06-08 esta cadena también la compila Next, porque el
+// chat de ensayo muestra las mismas herramientas que usa el bot. tsx (start:bot) las
+// resuelve igual con o sin extensión.
+import { guardarLeadDefinition, guardarLead } from "./guardar-lead";
+import { derivarHumanoDefinition, derivarHumano } from "./derivar-humano";
+import { silenciarDefinition, silenciar } from "./silenciar";
+import { marcarInteresDefinition, marcarInteres } from "./marcar-interes";
 
 export type ToolContext = { conversationId: number; phone?: string };
 

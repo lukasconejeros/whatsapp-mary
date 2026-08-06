@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessagesSquare, Wallet, CalendarDays, Plug, Brush } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot } from 'lucide-react'
 
 const items = [
   { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
   { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
   { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
+  { href: '/ensayo',     Icon: Bot,           label: 'Bot'        },
   { href: '/conexion',   Icon: Plug,          label: 'Conexión'   },
 ]
 

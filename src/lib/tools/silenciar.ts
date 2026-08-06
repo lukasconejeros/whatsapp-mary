@@ -1,4 +1,4 @@
-import { setMode } from "../db.js";
+import { setMode } from "../db";
 
 export const silenciarDefinition = {
   type: "function" as const,

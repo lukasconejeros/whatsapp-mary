@@ -1,4 +1,4 @@
-import { setEstado } from "../db.js";
+import { setEstado } from "../db";
 
 export const marcarInteresDefinition = {
   type: "function" as const,

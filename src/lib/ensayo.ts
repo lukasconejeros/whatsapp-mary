@@ -7,8 +7,9 @@
  * se ejecuta de verdad**. No se apaga ninguna conversación, no se deriva a nadie, no
  * se guarda ningún lead. Se anota lo que HABRÍA pasado y se le muestra a Mary.
  */
-import { buildSystemPrompt } from "./system-prompt.js";
-import { toolDefinitions } from "./tools/index.js";
+// Sin extensión .js: este módulo lo importan la API de Next y los scripts (db.ts hace igual).
+import { buildSystemPrompt } from "./system-prompt";
+import { toolDefinitions } from "./tools/index";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_VUELTAS = 6;

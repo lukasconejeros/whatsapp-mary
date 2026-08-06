@@ -215,6 +215,19 @@ CREATE TABLE IF NOT EXISTS chat_mensajes (
 );
 CREATE INDEX IF NOT EXISTS idx_chat_mensajes_created ON chat_mensajes(created_at);
 
+-- Chat de ENSAYO: Mary practica con el bot haciéndose pasar por un apoderado.
+-- Vive aparte de 'messages' a propósito: nada de lo que pase aquí puede mezclarse
+-- con una conversación real ni contarse en el embudo o las métricas.
+CREATE TABLE IF NOT EXISTS ensayo_mensajes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rol TEXT NOT NULL CHECK(rol IN ('apoderado','bot')),
+  texto TEXT NOT NULL,
+  acciones TEXT,                              -- JSON: lo que HABRÍA hecho, sin hacerlo
+  malo INTEGER NOT NULL DEFAULT 0,            -- Mary marcó "esto yo no lo diría"
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_ensayo_created ON ensayo_mensajes(created_at);
+
 -- Feedbacks/felicitaciones que Mary manda a los apoderados desde el Asistente.
 -- estado: 'borrador' (esperando confirmación) | 'ambiguo' (varios candidatos) |
 --         'sin_destinatario' (no se encontró) | 'enviado' | 'cancelado'.
@@ -1287,6 +1300,55 @@ export function listChatMensajes(limit = 50): ChatMensaje[] {
     .prepare("SELECT * FROM chat_mensajes ORDER BY id DESC LIMIT ?")
     .all(limit) as ChatMensaje[];
   return rows.reverse();
+}
+
+// ── Chat de ENSAYO: Mary practica con el bot ───────────────────────────────
+
+export interface EnsayoMensaje {
+  id: number;
+  rol: "apoderado" | "bot";
+  texto: string;
+  acciones: string | null;
+  malo: number;
+  created_at: number;
+}
+
+export function addEnsayoMensaje(
+  rol: "apoderado" | "bot",
+  texto: string,
+  acciones?: string[]
+): number {
+  const r = ctx().db
+    .prepare("INSERT INTO ensayo_mensajes (rol, texto, acciones) VALUES (?,?,?)")
+    .run(rol, texto, acciones?.length ? JSON.stringify(acciones) : null);
+  return r.lastInsertRowid as number;
+}
+
+export function listEnsayoMensajes(limit = 200): EnsayoMensaje[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM ensayo_mensajes ORDER BY id DESC LIMIT ?")
+    .all(limit) as EnsayoMensaje[];
+  return rows.reverse();
+}
+
+/** "Empezar de nuevo": borra el ensayo entero. No toca ninguna conversación real. */
+export function limpiarEnsayo(): number {
+  return ctx().db.prepare("DELETE FROM ensayo_mensajes").run().changes;
+}
+
+/** "Esto yo no lo diría": Mary marca (o desmarca) una respuesta del bot. */
+export function marcarEnsayoMalo(id: number, malo: boolean): boolean {
+  const r = ctx().db
+    .prepare("UPDATE ensayo_mensajes SET malo = ? WHERE id = ? AND rol = 'bot'")
+    .run(malo ? 1 : 0, id);
+  return r.changes > 0;
+}
+
+/** Las respuestas que Mary marcó, para afinar el cerebro con ellas. */
+export function listEnsayoMalos(): EnsayoMensaje[] {
+  return ctx().db
+    .prepare("SELECT * FROM ensayo_mensajes WHERE malo = 1 ORDER BY id DESC")
+    .all() as EnsayoMensaje[];
 }
 
 // ── Feedbacks: mensajes con fotos que Mary manda a los apoderados ──────────

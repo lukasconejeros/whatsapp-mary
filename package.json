@@ -39,6 +39,7 @@
     "test:comprobantes-api": "tsx scripts/test-comprobantes-api.ts",
     "test:qr": "tsx scripts/test-regenerar-qr.ts",
     "test:cerebro": "tsx scripts/test-cerebro-arteluk.ts",
+    "test:ensayo": "tsx scripts/test-ensayo.ts",
     "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts"
   },

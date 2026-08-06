@@ -1,4 +1,4 @@
-import { upsertLead } from "../db.js";
+import { upsertLead } from "../db";
 
 export const guardarLeadDefinition = {
   type: "function" as const,
