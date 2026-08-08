@@ -123,9 +123,9 @@ export default function EnsayoPage() {
               Esto es solo una práctica. A los apoderados de verdad les sigues contestando tú.
             </div>
             <button onClick={() => setConEspera(v => !v)}
-              title={conEspera ? 'Ahora se demora lo mismo que en WhatsApp' : 'Ahora contesta al tiro'}
+              title={conEspera ? 'Se toma unos segundos, como una persona (en WhatsApp de verdad espera más)' : 'Ahora contesta al tiro'}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '1px solid #D3E7DE', background: conEspera ? '#F3F9F6' : '#fff', color: '#008069', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-              {conEspera ? <><Clock size={13} /> Se demora como en WhatsApp</> : <><Zap size={13} /> Contesta al tiro</>}
+              {conEspera ? <><Clock size={13} /> Se demora unos segundos</> : <><Zap size={13} /> Contesta al tiro</>}
             </button>
           </div>
         </header>

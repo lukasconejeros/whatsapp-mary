@@ -3,7 +3,7 @@ import {
   addEnsayoMensaje, listEnsayoMensajes, limpiarEnsayo,
   marcarEnsayoMalo, listEnsayoMalos, getMessages, getOrCreateConversation,
 } from "../src/lib/db.js";
-import { simularHerramienta, demoraRealMs } from "../src/lib/ensayo.js";
+import { simularHerramienta, demoraEnsayoMs } from "../src/lib/ensayo.js";
 
 let pass = 0, fail = 0;
 function check(n: string, c: boolean) { if (c) { console.log(`  ✅ ${n}`); pass++; } else { console.log(`  ❌ ${n}`); fail++; } }
@@ -48,11 +48,16 @@ check("marcar interés avisa", simularHerramienta("marcar_interes", {}).aviso.in
 check("guardar datos nombra a la persona", simularHerramienta("guardarLead", { nombre: "Carolina" }).aviso.includes("Carolina"));
 check("una herramienta desconocida no revienta", simularHerramienta("inventada", {}).resultado.ok === false);
 
-console.log("\n— La demora es la real del bot, no una inventada —");
-const d = demoraRealMs(0);
-check("nunca contesta al instante", d >= 25000);
-check("cae en el rango real (25-29 s)", d >= 25000 && demoraRealMs(1) <= 29000);
-check("varía entre una respuesta y otra", demoraRealMs(0) !== demoraRealMs(1));
+console.log("\n— La demora del ensayo es corta: es una prueba, no WhatsApp —");
+const d = demoraEnsayoMs(0);
+check("nunca contesta al instante", d >= 4000);
+check("es la demora corta del ensayo (4-6,5 s)", d >= 4000 && demoraEnsayoMs(1) <= 6500);
+check("varía entre una respuesta y otra", demoraEnsayoMs(0) !== demoraEnsayoMs(1));
+// El ensayo NO debe volver a colgarse del ritmo de producción: en la prueba se
+// escribe UN mensaje suelto y nadie va a esperar medio minuto la respuesta.
+process.env.REPLY_DEBOUNCE_MS = "25000";
+check("no se contagia del debounce de WhatsApp (25 s)", demoraEnsayoMs(1) <= 6500);
+delete process.env.REPLY_DEBOUNCE_MS;
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

@@ -64,19 +64,21 @@ export function simularHerramienta(
   }
 }
 
-// ── El ritmo real ─────────────────────────────────────────────────────────────
-// No es un número inventado: son los mismos valores que usa el bot en WhatsApp
-// (handler.ts). Espera a que la persona termine de escribir y luego "tipea".
+// ── El ritmo del ensayo ───────────────────────────────────────────────────────
+// A PROPÓSITO no es el de WhatsApp. Allá el bot espera 25 s a que la persona
+// termine de escribir todos sus mensajes (handler.ts, REPLY_DEBOUNCE_MS); aquí
+// se escribe un mensaje suelto para probar y nadie va a esperar medio minuto
+// para ver si contesta. ~5 s: lo justo para que no parezca una máquina.
 function numEnv(name: string, def: number): number {
   const v = parseInt(process.env[name] ?? "", 10);
   return Number.isFinite(v) ? v : def;
 }
 
-export function demoraRealMs(aleatorio = Math.random()): number {
-  const debounce = numEnv("REPLY_DEBOUNCE_MS", 25000);
-  const min = numEnv("REPLY_DELAY_MIN", 1000);
-  const max = numEnv("REPLY_DELAY_MAX", 3500);
-  return Math.round(debounce + min + aleatorio * (max - min));
+export function demoraEnsayoMs(aleatorio = Math.random()): number {
+  const espera = numEnv("ENSAYO_DEBOUNCE_MS", 3000);
+  const min = numEnv("ENSAYO_DELAY_MIN", 1000);
+  const max = numEnv("ENSAYO_DELAY_MAX", 3500);
+  return Math.round(espera + min + aleatorio * (max - min));
 }
 
 // ── El motor ──────────────────────────────────────────────────────────────────
@@ -160,5 +162,5 @@ export async function responderEnsayo(turnos: TurnoEnsayo[]): Promise<RespuestaE
     messages.push({ role: "user", content: resultados });
   }
 
-  return { texto, acciones, demoraMs: demoraRealMs() };
+  return { texto, acciones, demoraMs: demoraEnsayoMs() };
 }
