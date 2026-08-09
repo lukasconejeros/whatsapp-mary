@@ -135,7 +135,9 @@ export default function AudiosMaryPage() {
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#054D44' }}>¿Cuándo hay que mandarlo?</label>
-              <input value={cuando} onChange={e => setCuando(e.target.value)} placeholder="cuando preguntan por niños con autismo" style={caja} />
+              {/* Caja de dos líneas: en el teléfono una sola línea le corta la frase y no puede releer lo que escribió. */}
+              <textarea value={cuando} onChange={e => setCuando(e.target.value)} rows={2}
+                placeholder="cuando preguntan por niños con autismo" style={{ ...caja, resize: 'vertical' }} />
             </div>
             <button onClick={grabar} disabled={guardando}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '13px 16px', borderRadius: 12, border: 'none', background: grabando ? '#B03A3A' : '#00A884', color: '#fff', fontSize: 15, fontWeight: 700, cursor: guardando ? 'default' : 'pointer', fontFamily: 'inherit' }}>
@@ -162,8 +164,9 @@ export default function AudiosMaryPage() {
                     <Trash2 size={16} />
                   </button>
                 </div>
-                <input defaultValue={a.cuando_usarlo} placeholder="¿Cuándo hay que mandarlo?"
-                  onBlur={e => guardarCampo(a.id, { cuando_usarlo: e.target.value })} style={{ ...caja, background: '#fff' }} />
+                <textarea defaultValue={a.cuando_usarlo} placeholder="¿Cuándo hay que mandarlo?" rows={2}
+                  onBlur={e => guardarCampo(a.id, { cuando_usarlo: e.target.value })}
+                  style={{ ...caja, background: '#fff', resize: 'vertical' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <audio controls src={`/api/media/${a.archivo}`} style={{ height: 36, maxWidth: 280, width: '100%' }} />
                   <span style={{ fontSize: 11, color: '#8696A0' }}>{a.segundos} s</span>
