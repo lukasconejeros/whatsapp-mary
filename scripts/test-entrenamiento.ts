@@ -6,7 +6,7 @@ import {
   addAudioMary, listAudiosMary, updateAudioMary, deleteAudioMary,
   type AudioMary,
 } from "../src/lib/db.js";
-import { simularHerramienta, definicionProponerAudio } from "../src/lib/ensayo.js";
+import { simularHerramienta, definicionProponerAudio, armarInforme } from "../src/lib/ensayo.js";
 
 let pass = 0, fail = 0;
 function check(n: string, c: boolean) { if (c) { console.log(`  ✅ ${n}`); pass++; } else { console.log(`  ❌ ${n}`); fail++; } }
@@ -77,6 +77,17 @@ check("sin audios grabados la herramienta ni se ofrece", definicionProponerAudio
 const def = definicionProponerAudio(audios);
 check("la descripción lleva las palabras de Mary", def!.description.includes("cuando preguntan por niños con autismo"));
 check("y el título para que elija", def!.description.includes("el del autismo"));
+
+console.log("\n— Descargar todo: la tarde entera en un archivo —");
+const idAudioInforme = addAudioMary({ archivo: "mary_informe.ogg", titulo: "el de los valores", cuando_usarlo: "cuando preguntan cuánto cuesta", segundos: 12 });
+const informe = armarInforme(listEnsayoTodo(), listAudiosMary());
+check("trae lo que escribió Mary haciendo de apoderado", informe.includes("Hola, cuánto cuesta"));
+check("trae las respuestas del bot", informe.includes("¿Para quién sería la clase?"));
+check("separa por práctica", informe.includes("Práctica 1"));
+check("trae más de una práctica", informe.includes(`Práctica ${sesionEnsayoActual()}`));
+check("marca el audio de la corrección", informe.includes("correccion_test.ogg"));
+check("lista los audios con su cuándo usarlo", informe.includes("el de los valores") && informe.includes("cuando preguntan cuánto cuesta"));
+deleteAudioMary(idAudioInforme);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

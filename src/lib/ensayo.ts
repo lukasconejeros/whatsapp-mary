@@ -10,7 +10,7 @@
 // Sin extensión .js: este módulo lo importan la API de Next y los scripts (db.ts hace igual).
 import { buildSystemPrompt } from "./system-prompt";
 import { toolDefinitions } from "./tools/index";
-import type { AudioMary } from "./db";
+import type { AudioMary, EnsayoMensaje } from "./db";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_VUELTAS = 6;
@@ -102,6 +102,39 @@ export function simularHerramienta(
         resultado: { ok: false, message: "Herramienta desconocida: " + nombre },
       };
   }
+}
+
+// ── Lo que leemos nosotros después ────────────────────────────────────────────
+/**
+ * La tarde entera en texto plano: cada pregunta, cada respuesta, cada corrección de
+ * Mary y sus audios con el "cuándo usarlo" en sus palabras. Es el material con el que
+ * armamos el cerebro definitivo del bot.
+ */
+export function armarInforme(mensajes: EnsayoMensaje[], audios: AudioMary[]): string {
+  const l: string[] = ["ENTRENAMIENTO DEL BOT DE ARTELUK", ""];
+  let sesion = -1;
+  for (const m of mensajes) {
+    if (m.sesion_id !== sesion) {
+      sesion = m.sesion_id;
+      l.push("", `── Práctica ${sesion} ──`, "");
+    }
+    l.push(`${m.rol === "apoderado" ? "MARY (haciendo de apoderado)" : "BOT"}: ${m.texto || "(no contestó nada)"}`);
+    if (m.acciones) {
+      try {
+        for (const a of JSON.parse(m.acciones) as string[]) l.push(`   [${a}]`);
+      } catch { /* acciones ilegibles: se omiten, el informe igual sale */ }
+    }
+    if (m.malo) l.push("   ⚠️ Mary marcó: esto yo no lo diría");
+    if (m.correccion) l.push(`   ✏️ Tú dirías: ${m.correccion}`);
+    if (m.correccion_audio) l.push(`   🎤 Lo dijo hablando: ${m.correccion_audio} (${m.correccion_seg ?? 0} s)`);
+  }
+  l.push("", "", "── AUDIOS DE MARY ──", "");
+  if (!audios.length) l.push("(todavía no grabó ninguno)");
+  for (const a of audios) {
+    l.push(`• "${a.titulo}" — archivo ${a.archivo} (${a.segundos} s)`);
+    l.push(`  CUÁNDO USARLO (palabras de Mary): ${a.cuando_usarlo || "no lo escribió"}`);
+  }
+  return l.join("\n");
 }
 
 // ── El ritmo del ensayo ───────────────────────────────────────────────────────
