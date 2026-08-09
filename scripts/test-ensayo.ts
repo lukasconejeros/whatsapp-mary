@@ -1,6 +1,6 @@
 import "./env-loader.js";
 import {
-  addEnsayoMensaje, listEnsayoMensajes, limpiarEnsayo,
+  addEnsayoMensaje, listEnsayoMensajes, archivarEnsayo,
   marcarEnsayoMalo, listEnsayoMalos, getMessages, getOrCreateConversation,
 } from "../src/lib/db.js";
 import { simularHerramienta, demoraEnsayoMs } from "../src/lib/ensayo.js";
@@ -10,7 +10,7 @@ function check(n: string, c: boolean) { if (c) { console.log(`  ✅ ${n}`); pass
 
 console.log("\n🧪 TEST chat de ensayo\n");
 
-limpiarEnsayo();
+archivarEnsayo();
 
 console.log("— Guardar y leer la práctica —");
 addEnsayoMensaje("apoderado", "Hola, quiero información");
@@ -35,7 +35,9 @@ const conv = getOrCreateConversation("56900000009", "Contacto real de prueba");
 const antes = getMessages(conv.id).length;
 addEnsayoMensaje("apoderado", "otro mensaje de práctica");
 check("la conversación real no cambia", getMessages(conv.id).length === antes);
-check("empezar de nuevo borra la práctica", limpiarEnsayo() > 0 && listEnsayoMensajes().length === 0);
+// Ojo: "empezar de nuevo" ya NO borra (09-08-2026). Archiva la práctica y deja la
+// pantalla limpia; lo de Mary no se puede perder con un botón.
+check("empezar de nuevo NO borra nada, archiva", archivarEnsayo().archivados > 0 && listEnsayoMensajes().length === 0);
 check("y la conversación real sigue intacta", getMessages(conv.id).length === antes);
 
 console.log("\n— Las herramientas se simulan, no se ejecutan —");

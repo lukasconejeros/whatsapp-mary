@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addEnsayoMensaje,
   listEnsayoMensajes,
-  limpiarEnsayo,
+  archivarEnsayo,
   marcarEnsayoMalo,
   type EnsayoMensaje,
 } from "@/lib/db";
@@ -54,10 +54,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** Empezar de nuevo. Solo borra el ensayo: ninguna conversación real se toca. */
+/**
+ * Empezar de nuevo: deja la pantalla limpia SIN borrar la práctica — queda archivada
+ * con su número de sesión. Son horas de trabajo de Mary: no se pierden con un botón.
+ */
 export async function DELETE() {
-  const borrados = limpiarEnsayo();
-  return NextResponse.json({ ok: true, borrados });
+  const { archivados, sesion } = archivarEnsayo();
+  return NextResponse.json({ ok: true, archivados, sesion });
 }
 
 /** "Esto yo no lo diría" — Mary marca una respuesta del bot. */

@@ -340,6 +340,10 @@ function build(): Ctx {
   db.exec("CREATE INDEX IF NOT EXISTS idx_clases_fecha ON clases(fecha)");
   // Marca del push "5 h antes" (recordatorios del calendario, 04-08-2026).
   addColumnaSiFalta(db, "clases", "aviso_5h", "INTEGER NOT NULL DEFAULT 0");
+  // Entrenamiento de Mary (09-08-2026): la práctica se ARCHIVA por sesión, nunca se
+  // borra. Lo que ya existía queda en la sesión 1.
+  addColumnaSiFalta(db, "ensayo_mensajes", "sesion_id", "INTEGER NOT NULL DEFAULT 1");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_ensayo_sesion ON ensayo_mensajes(sesion_id, id)");
   addColumnaSiFalta(db, "outbox", "kind", "TEXT NOT NULL DEFAULT 'text'");
   addColumnaSiFalta(db, "outbox", "media", "TEXT");
   addColumnaSiFalta(db, "outbox", "attempts", "INTEGER NOT NULL DEFAULT 0");
@@ -1310,7 +1314,19 @@ export interface EnsayoMensaje {
   texto: string;
   acciones: string | null;
   malo: number;
+  sesion_id: number;
   created_at: number;
+}
+
+// La tarde de entrenamiento de Mary son horas de trabajo suyo: NADA de lo que pase
+// aquí se borra. "Empezar de nuevo" sube el número de práctica y deja la pantalla
+// limpia; las filas viejas siguen en la tabla con su sesión.
+const CLAVE_SESION_ENSAYO = "ensayo_sesion";
+
+/** Número de la práctica en curso. Las anteriores quedan archivadas, no borradas. */
+export function sesionEnsayoActual(): number {
+  const n = parseInt(getConfig(CLAVE_SESION_ENSAYO, "1"), 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 export function addEnsayoMensaje(
@@ -1319,21 +1335,38 @@ export function addEnsayoMensaje(
   acciones?: string[]
 ): number {
   const r = ctx().db
-    .prepare("INSERT INTO ensayo_mensajes (rol, texto, acciones) VALUES (?,?,?)")
-    .run(rol, texto, acciones?.length ? JSON.stringify(acciones) : null);
+    .prepare("INSERT INTO ensayo_mensajes (rol, texto, acciones, sesion_id) VALUES (?,?,?,?)")
+    .run(rol, texto, acciones?.length ? JSON.stringify(acciones) : null, sesionEnsayoActual());
   return r.lastInsertRowid as number;
 }
 
+/** Lo que se ve en pantalla: SOLO la práctica en curso. */
 export function listEnsayoMensajes(limit = 200): EnsayoMensaje[] {
   const rows = ctx().db
-    .prepare("SELECT * FROM ensayo_mensajes ORDER BY id DESC LIMIT ?")
-    .all(limit) as EnsayoMensaje[];
+    .prepare("SELECT * FROM ensayo_mensajes WHERE sesion_id = ? ORDER BY id DESC LIMIT ?")
+    .all(sesionEnsayoActual(), limit) as EnsayoMensaje[];
   return rows.reverse();
 }
 
-/** "Empezar de nuevo": borra el ensayo entero. No toca ninguna conversación real. */
-export function limpiarEnsayo(): number {
-  return ctx().db.prepare("DELETE FROM ensayo_mensajes").run().changes;
+/** TODO lo que Mary ha entrenado, todas las prácticas. Es lo que leemos nosotros después. */
+export function listEnsayoTodo(): EnsayoMensaje[] {
+  return ctx().db
+    .prepare("SELECT * FROM ensayo_mensajes ORDER BY id ASC")
+    .all() as EnsayoMensaje[];
+}
+
+/**
+ * "Empezar de nuevo": deja la pantalla limpia SIN borrar nada. Sube el número de
+ * práctica; lo anterior queda archivado y se lee con listEnsayoTodo().
+ */
+export function archivarEnsayo(): { archivados: number; sesion: number } {
+  const actual = sesionEnsayoActual();
+  const n = ctx().db
+    .prepare("SELECT COUNT(*) AS n FROM ensayo_mensajes WHERE sesion_id = ?")
+    .get(actual) as { n: number };
+  const nueva = actual + 1;
+  setConfig(CLAVE_SESION_ENSAYO, String(nueva));
+  return { archivados: n.n, sesion: nueva };
 }
 
 /** "Esto yo no lo diría": Mary marca (o desmarca) una respuesta del bot. */

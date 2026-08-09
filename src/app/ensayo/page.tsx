@@ -85,7 +85,7 @@ export default function EnsayoPage() {
   }
 
   async function empezarDeNuevo() {
-    if (!confirm('¿Borramos esta práctica y empezamos de nuevo?')) return
+    if (!confirm('Empezamos una práctica nueva. Lo que hiciste hasta ahora queda guardado, no se pierde.')) return
     await fetch('/api/ensayo', { method: 'DELETE' })
     setMsgs([])
     setError('')
@@ -112,7 +112,7 @@ export default function EnsayoPage() {
                 Escribe como si fueras un apoderado que recién llega, y mira cómo contesta.
               </p>
             </div>
-            <button onClick={empezarDeNuevo} title="Borrar esta práctica"
+            <button onClick={empezarDeNuevo} title="Empieza una práctica nueva. Lo anterior queda guardado"
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
               <RotateCcw size={14} /> Empezar de nuevo
             </button>
