@@ -34,10 +34,19 @@ export type RespuestaEnsayo = {
  * únicamente puede elegir un id de la lista que grabó ella: no inventa audios ni
  * situaciones. Si no ha grabado ninguno, la herramienta ni se ofrece.
  */
+/**
+ * Cómo se nombra un audio: por lo que Mary escribió en "cuándo hay que mandarlo", que
+ * desde el 09-08-2026 es lo único que se le pide. Los audios de antes, que llevaban un
+ * nombre aparte, caen a ese nombre para no quedar anónimos.
+ */
+function comoSeLlama(a: AudioMary): string {
+  return a.cuando_usarlo.trim() || a.titulo.trim() || `audio ${a.id}`;
+}
+
 export function definicionProponerAudio(audios: AudioMary[]) {
   if (!audios.length) return null;
   const lista = audios
-    .map((a) => `- id ${a.id}: "${a.titulo}" — ${a.cuando_usarlo || "sin indicación"}`)
+    .map((a) => `- id ${a.id}: ${comoSeLlama(a)}`)
     .join("\n");
   return {
     name: "proponerAudio",
@@ -92,8 +101,8 @@ export function simularHerramienta(
         };
       }
       return {
-        aviso: `Aquí te habría propuesto este audio tuyo: "${audio.titulo}". Tú decides si se manda.`,
-        resultado: { ok: true, propuesto: audio.titulo },
+        aviso: `Aquí te habría propuesto este audio tuyo: "${comoSeLlama(audio)}". Tú decides si se manda.`,
+        resultado: { ok: true, propuesto: comoSeLlama(audio) },
       };
     }
     default:
@@ -131,8 +140,8 @@ export function armarInforme(mensajes: EnsayoMensaje[], audios: AudioMary[]): st
   l.push("", "", "── AUDIOS DE MARY ──", "");
   if (!audios.length) l.push("(todavía no grabó ninguno)");
   for (const a of audios) {
-    l.push(`• "${a.titulo}" — archivo ${a.archivo} (${a.segundos} s)`);
-    l.push(`  CUÁNDO USARLO (palabras de Mary): ${a.cuando_usarlo || "no lo escribió"}`);
+    l.push(`• CUÁNDO USARLO (palabras de Mary): ${comoSeLlama(a)}`);
+    l.push(`  archivo ${a.archivo} (${a.segundos} s)`);
   }
   return l.join("\n");
 }

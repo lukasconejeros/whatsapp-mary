@@ -7,14 +7,14 @@ import { Mic, Trash2, ArrowLeft, Square } from 'lucide-react'
 type Audio = {
   id: number
   archivo: string
-  titulo: string
   cuando_usarlo: string
   segundos: number
 }
 
 export default function AudiosMaryPage() {
   const [audios, setAudios] = useState<Audio[]>([])
-  const [titulo, setTitulo] = useState('')
+  // Una sola caja a propósito (09-08-2026): antes se le pedía también un nombre y con
+  // las dos juntas no se entendía cuál era cuál. Ahora solo "cuándo hay que mandarlo".
   const [cuando, setCuando] = useState('')
   const [grabando, setGrabando] = useState(false)
   const [segGrab, setSegGrab] = useState(0)
@@ -25,9 +25,9 @@ export default function AudiosMaryPage() {
   const chunksRef = useRef<Blob[]>([])
   const inicioRef = useRef(0)
   const cronoRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  // El título y el "cuándo usarlo" se leen al PARAR de grabar, no al empezar:
-  // sin esto, el onstop se queda con el texto viejo de cuando arrancó la grabación.
-  const datosRef = useRef({ titulo: '', cuando: '' })
+  // El "cuándo usarlo" se lee al PARAR de grabar, no al empezar: sin esto, el onstop
+  // se queda con el texto viejo de cuando arrancó la grabación.
+  const datosRef = useRef({ cuando: '' })
 
   const cargar = useCallback(async () => {
     try {
@@ -45,12 +45,12 @@ export default function AudiosMaryPage() {
     if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop()
   }, [])
 
-  useEffect(() => { datosRef.current = { titulo, cuando } }, [titulo, cuando])
+  useEffect(() => { datosRef.current = { cuando } }, [cuando])
 
   async function grabar() {
     if (grabando) { recRef.current?.stop(); return }
     setError('')
-    if (!titulo.trim()) { setError('Primero ponle un nombre, para que después sepas cuál es.'); return }
+    if (!cuando.trim()) { setError('Primero escribe cuándo hay que mandarlo, así el bot sabe cuál es.'); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
@@ -64,14 +64,13 @@ export default function AudiosMaryPage() {
         const segundos = Math.max(1, Math.round((Date.now() - inicioRef.current) / 1000))
         const fd = new FormData()
         fd.append('file', new Blob(chunksRef.current, { type: mime }), 'audio')
-        fd.append('titulo', datosRef.current.titulo)
         fd.append('cuando_usarlo', datosRef.current.cuando)
         fd.append('segundos', String(segundos))
         setGuardando(true)
         try {
           const r = await fetch('/api/audios-mary', { method: 'POST', body: fd })
           const d = await r.json()
-          if (d.ok) { setTitulo(''); setCuando(''); await cargar() }
+          if (d.ok) { setCuando(''); await cargar() }
           else setError(d.error ?? 'No pude guardar el audio')
         } catch {
           setError('No pude guardar el audio')
@@ -92,11 +91,11 @@ export default function AudiosMaryPage() {
     }
   }
 
-  async function guardarCampo(id: number, campos: { titulo?: string; cuando_usarlo?: string }) {
+  async function guardarCuando(id: number, cuando_usarlo: string) {
     await fetch('/api/audios-mary', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...campos }),
+      body: JSON.stringify({ id, cuando_usarlo }),
     })
   }
 
@@ -130,10 +129,6 @@ export default function AudiosMaryPage() {
         <div className="flex-1 overflow-y-auto" style={{ padding: '16px 18px', maxWidth: 720, width: '100%', margin: '0 auto' }}>
           <div style={{ border: '1px solid #D3E7DE', borderRadius: 14, padding: 14, background: '#F7FAF9', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#054D44' }}>¿Cómo le llamas?</label>
-              <input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="el del autismo" style={caja} />
-            </div>
-            <div>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#054D44' }}>¿Cuándo hay que mandarlo?</label>
               {/* Caja de dos líneas: en el teléfono una sola línea le corta la frase y no puede releer lo que escribió. */}
               <textarea value={cuando} onChange={e => setCuando(e.target.value)} rows={2}
@@ -156,17 +151,18 @@ export default function AudiosMaryPage() {
             )}
             {audios.map(a => (
               <div key={a.id} style={{ border: '1px solid #D3E7DE', borderRadius: 14, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input defaultValue={a.titulo} onBlur={e => guardarCampo(a.id, { titulo: e.target.value })}
-                    style={{ ...caja, flex: 1, fontWeight: 700, color: '#054D44', background: '#fff' }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  {/* La caja crece con la frase: ahora esto es lo ÚNICO que identifica
+                      el audio, así que cortarla dejaría a Mary sin saber cuál es. */}
+                  <textarea defaultValue={a.cuando_usarlo} placeholder="¿Cuándo hay que mandarlo?"
+                    rows={Math.min(6, Math.max(2, Math.ceil(a.cuando_usarlo.length / 30)))}
+                    onBlur={e => guardarCuando(a.id, e.target.value)}
+                    style={{ ...caja, flex: 1, background: '#fff', resize: 'vertical' }} />
                   <button onClick={() => sacar(a.id)} title="Sacar de la lista"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 10, border: '1px solid #E5A0A0', background: '#FDECEC', color: '#B03A3A', cursor: 'pointer', flexShrink: 0 }}>
                     <Trash2 size={16} />
                   </button>
                 </div>
-                <textarea defaultValue={a.cuando_usarlo} placeholder="¿Cuándo hay que mandarlo?" rows={2}
-                  onBlur={e => guardarCampo(a.id, { cuando_usarlo: e.target.value })}
-                  style={{ ...caja, background: '#fff', resize: 'vertical' }} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <audio controls src={`/api/media/${a.archivo}`} style={{ height: 36, maxWidth: 280, width: '100%' }} />
                   <span style={{ fontSize: 11, color: '#8696A0' }}>{a.segundos} s</span>

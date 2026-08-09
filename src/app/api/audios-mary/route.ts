@@ -22,11 +22,12 @@ export async function POST(req: NextRequest) {
 
   const form = await req.formData();
   const file = form.get("file");
-  const titulo = String(form.get("titulo") ?? "").trim();
   const cuando = String(form.get("cuando_usarlo") ?? "").trim();
   const segundos = Math.max(0, Math.round(Number(form.get("segundos")) || 0));
-  if (!(file instanceof Blob) || !titulo) {
-    return NextResponse.json({ ok: false, error: "Falta el audio o el nombre" }, { status: 400 });
+  // Lo obligatorio es el "cuándo hay que mandarlo": es lo único que se le pide a Mary
+  // desde el 09-08-2026 y lo que usa el bot para reconocer el audio.
+  if (!(file instanceof Blob) || !cuando) {
+    return NextResponse.json({ ok: false, error: "Falta el audio o el cuándo hay que mandarlo" }, { status: 400 });
   }
 
   const mime = (file.type || "").toLowerCase();
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "No se pudo guardar el audio" }, { status: 500 });
   }
 
-  const id = addAudioMary({ archivo: name, titulo, cuando_usarlo: cuando, segundos });
+  const id = addAudioMary({ archivo: name, cuando_usarlo: cuando, segundos });
   return NextResponse.json({ ok: true, id, archivo: name, segundos });
 }
 

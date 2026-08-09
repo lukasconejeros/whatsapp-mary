@@ -1436,12 +1436,20 @@ export interface AudioMary {
   created_at: number;
 }
 
+/**
+ * `titulo` es opcional desde el 09-08-2026: en la pantalla Mary ya sólo escribe CUÁNDO
+ * hay que mandar el audio (las dos cajas la confundían). Si no viene nombre, se guarda
+ * ese mismo texto, así los audios de antes —que sí tienen nombre— siguen intactos y la
+ * columna no queda nunca vacía.
+ */
 export function addAudioMary(a: {
-  archivo: string; titulo: string; cuando_usarlo: string; segundos: number;
+  archivo: string; titulo?: string; cuando_usarlo: string; segundos: number;
 }): number {
+  const cuando = a.cuando_usarlo.trim();
+  const titulo = (a.titulo ?? "").trim() || cuando;
   const r = ctx().db
     .prepare("INSERT INTO audios_mary (archivo, titulo, cuando_usarlo, segundos) VALUES (?,?,?,?)")
-    .run(a.archivo, a.titulo.trim(), a.cuando_usarlo.trim(), Math.max(0, Math.round(a.segundos)));
+    .run(a.archivo, titulo, cuando, Math.max(0, Math.round(a.segundos)));
   return r.lastInsertRowid as number;
 }
 

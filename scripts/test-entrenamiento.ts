@@ -62,13 +62,23 @@ check("cambiar el título no borra el cuándo usarlo",
   listAudiosMary().find(x => x.id === idA)?.cuando_usarlo.includes("autismo") === true);
 check("puede sacarlo de la lista", deleteAudioMary(idA) && !listAudiosMary().some(x => x.id === idA));
 
+// Desde el 09-08-2026 Mary ya NO le pone nombre al audio: solo escribe cuándo hay que
+// mandarlo. Pedido suyo: dos cajas confundían ("solo que diga cuándo lo ocuparía").
+const idSinNombre = addAudioMary({ archivo: "sin_nombre.ogg", cuando_usarlo: "cuando preguntan por el horario", segundos: 9 });
+const sinNombre = listAudiosMary().find(x => x.id === idSinNombre);
+check("se puede guardar sin ponerle nombre", idSinNombre > 0);
+check("y queda identificado por el cuándo usarlo", sinNombre?.titulo === "cuando preguntan por el horario");
+deleteAudioMary(idSinNombre);
+
 console.log("\n— El bot PROPONE el audio, nunca lo manda —");
 const audios: AudioMary[] = [{
   id: 7, archivo: "mary_7.ogg", titulo: "el del autismo",
   cuando_usarlo: "cuando preguntan por niños con autismo", segundos: 20, created_at: 0,
 }];
 const prop = simularHerramienta("proponerAudio", { id: 7 }, audios);
-check("avisa que te lo habría propuesto", prop.aviso.includes("propuesto") && prop.aviso.includes("el del autismo"));
+check("avisa que te lo habría propuesto", prop.aviso.includes("propuesto"));
+check("y lo nombra por el cuándo usarlo, que es lo que ella escribe",
+  prop.aviso.includes("cuando preguntan por niños con autismo"));
 check("NO dice que lo mandó",
   !prop.aviso.toLowerCase().includes("envió") && !prop.aviso.toLowerCase().includes("mandó"));
 check("el modelo recibe que salió bien", prop.resultado.ok === true);
@@ -76,17 +86,23 @@ check("un id que no existe no revienta", simularHerramienta("proponerAudio", { i
 check("sin audios grabados la herramienta ni se ofrece", definicionProponerAudio([]) === null);
 const def = definicionProponerAudio(audios);
 check("la descripción lleva las palabras de Mary", def!.description.includes("cuando preguntan por niños con autismo"));
-check("y el título para que elija", def!.description.includes("el del autismo"));
+
+// Audios de antes del 09-08-2026: los que tienen nombre viejo y nada escrito en
+// "cuándo usarlo" no pueden quedar sin identificar, ni para el bot ni en el informe.
+const viejo: AudioMary[] = [{ id: 8, archivo: "mary_8.ogg", titulo: "el de los valores", cuando_usarlo: "", segundos: 11, created_at: 0 }];
+check("un audio viejo sin cuándo usarlo no queda anónimo",
+  simularHerramienta("proponerAudio", { id: 8 }, viejo).aviso.includes("el de los valores"));
+check("y el bot igual lo puede elegir", definicionProponerAudio(viejo)!.description.includes("el de los valores"));
 
 console.log("\n— Descargar todo: la tarde entera en un archivo —");
-const idAudioInforme = addAudioMary({ archivo: "mary_informe.ogg", titulo: "el de los valores", cuando_usarlo: "cuando preguntan cuánto cuesta", segundos: 12 });
+const idAudioInforme = addAudioMary({ archivo: "mary_informe.ogg", cuando_usarlo: "cuando preguntan cuánto cuesta", segundos: 12 });
 const informe = armarInforme(listEnsayoTodo(), listAudiosMary());
 check("trae lo que escribió Mary haciendo de apoderado", informe.includes("Hola, cuánto cuesta"));
 check("trae las respuestas del bot", informe.includes("¿Para quién sería la clase?"));
 check("separa por práctica", informe.includes("Práctica 1"));
 check("trae más de una práctica", informe.includes(`Práctica ${sesionEnsayoActual()}`));
 check("marca el audio de la corrección", informe.includes("correccion_test.ogg"));
-check("lista los audios con su cuándo usarlo", informe.includes("el de los valores") && informe.includes("cuando preguntan cuánto cuesta"));
+check("lista los audios con su cuándo usarlo", informe.includes("cuando preguntan cuánto cuesta"));
 deleteAudioMary(idAudioInforme);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
