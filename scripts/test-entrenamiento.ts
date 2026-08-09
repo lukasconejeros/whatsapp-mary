@@ -3,6 +3,7 @@ import {
   addEnsayoMensaje, listEnsayoMensajes, listEnsayoTodo,
   archivarEnsayo, sesionEnsayoActual,
   guardarCorreccion, guardarCorreccionAudio,
+  addAudioMary, listAudiosMary, updateAudioMary, deleteAudioMary,
 } from "../src/lib/db.js";
 
 let pass = 0, fail = 0;
@@ -44,6 +45,20 @@ check("borrar la corrección la deja vacía, no rompe",
   guardarCorreccion(idBot, null) && listEnsayoTodo().find(m => m.id === idBot)?.correccion === null);
 check("y el audio de la corrección sigue guardado",
   listEnsayoTodo().find(m => m.id === idBot)?.correccion_audio === "correccion_test.ogg");
+
+console.log("\n— Mis audios: los graba ella y dice cuándo usarlos —");
+const idA = addAudioMary({ archivo: "audio_test.ogg", titulo: "el del autismo", cuando_usarlo: "cuando preguntan por niños con autismo", segundos: 24 });
+check("guarda el audio", idA > 0);
+const a = listAudiosMary().find(x => x.id === idA);
+check("con el nombre que ella le puso", a?.titulo === "el del autismo");
+check("y con SUS palabras de cuándo usarlo", a?.cuando_usarlo.includes("autismo") === true);
+check("guarda la duración", a?.segundos === 24);
+check("puede renombrarlo",
+  updateAudioMary(idA, { titulo: "el de los niños especiales" }) &&
+  listAudiosMary().find(x => x.id === idA)?.titulo === "el de los niños especiales");
+check("cambiar el título no borra el cuándo usarlo",
+  listAudiosMary().find(x => x.id === idA)?.cuando_usarlo.includes("autismo") === true);
+check("puede sacarlo de la lista", deleteAudioMary(idA) && !listAudiosMary().some(x => x.id === idA));
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

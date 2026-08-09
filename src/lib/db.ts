@@ -228,6 +228,19 @@ CREATE TABLE IF NOT EXISTS ensayo_mensajes (
 );
 CREATE INDEX IF NOT EXISTS idx_ensayo_created ON ensayo_mensajes(created_at);
 
+-- Los audios que Mary graba con SU voz para las preguntas que no se contestan bien
+-- por escrito (una foto que no se entiende, los valores, un niño con autismo).
+-- 'cuando_usarlo' está en sus palabras: ese texto es el material con el que después
+-- configuramos al bot. El bot solo los PROPONE; ella aprieta enviar.
+CREATE TABLE IF NOT EXISTS audios_mary (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  archivo TEXT NOT NULL,
+  titulo TEXT NOT NULL,
+  cuando_usarlo TEXT NOT NULL DEFAULT '',
+  segundos INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
 -- Feedbacks/felicitaciones que Mary manda a los apoderados desde el Asistente.
 -- estado: 'borrador' (esperando confirmación) | 'ambiguo' (varios candidatos) |
 --         'sin_destinatario' (no se encontró) | 'enviado' | 'cancelado'.
@@ -1410,6 +1423,48 @@ export function listEnsayoMalos(): EnsayoMensaje[] {
   return ctx().db
     .prepare("SELECT * FROM ensayo_mensajes WHERE malo = 1 ORDER BY id DESC")
     .all() as EnsayoMensaje[];
+}
+
+// ── Los audios de Mary (entrenamiento, 09-08-2026) ─────────────────────────
+
+export interface AudioMary {
+  id: number;
+  archivo: string;
+  titulo: string;
+  cuando_usarlo: string;
+  segundos: number;
+  created_at: number;
+}
+
+export function addAudioMary(a: {
+  archivo: string; titulo: string; cuando_usarlo: string; segundos: number;
+}): number {
+  const r = ctx().db
+    .prepare("INSERT INTO audios_mary (archivo, titulo, cuando_usarlo, segundos) VALUES (?,?,?,?)")
+    .run(a.archivo, a.titulo.trim(), a.cuando_usarlo.trim(), Math.max(0, Math.round(a.segundos)));
+  return r.lastInsertRowid as number;
+}
+
+export function listAudiosMary(): AudioMary[] {
+  return ctx().db.prepare("SELECT * FROM audios_mary ORDER BY id ASC").all() as AudioMary[];
+}
+
+export function updateAudioMary(
+  id: number,
+  campos: { titulo?: string; cuando_usarlo?: string }
+): boolean {
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (typeof campos.titulo === "string") { sets.push("titulo = ?"); vals.push(campos.titulo.trim()); }
+  if (typeof campos.cuando_usarlo === "string") { sets.push("cuando_usarlo = ?"); vals.push(campos.cuando_usarlo.trim()); }
+  if (!sets.length) return false;
+  vals.push(id);
+  return ctx().db.prepare(`UPDATE audios_mary SET ${sets.join(", ")} WHERE id = ?`).run(...vals).changes > 0;
+}
+
+/** Lo saca de la lista. El ARCHIVO no se borra: nada de lo que grabó Mary se pierde. */
+export function deleteAudioMary(id: number): boolean {
+  return ctx().db.prepare("DELETE FROM audios_mary WHERE id = ?").run(id).changes > 0;
 }
 
 // ── Feedbacks: mensajes con fotos que Mary manda a los apoderados ──────────

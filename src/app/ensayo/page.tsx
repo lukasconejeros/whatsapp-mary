@@ -185,6 +185,10 @@ export default function EnsayoPage() {
                 Escribe como si fueras un apoderado que recién llega, y mira cómo contesta.
               </p>
             </div>
+            <a href="/ensayo/audios" title="Los audios que grabas con tu voz"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+              <Mic size={14} /> Mis audios
+            </a>
             <button onClick={empezarDeNuevo} title="Empieza una práctica nueva. Lo anterior queda guardado"
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
               <RotateCcw size={14} /> Empezar de nuevo
