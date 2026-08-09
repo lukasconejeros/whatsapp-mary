@@ -196,3 +196,41 @@ la única salida es el botón.
 
 **Cómo reconocerlo**: panel girando en "Generando código QR…" + `updated_at` de
 `connection_state` que no se mueve al apretar el botón = la ruta está reventando.
+
+---
+
+## #16 — El CSS moderno que escribes NO llega al navegador (Next lo borra en silencio)
+
+**Síntoma** (09-ago-2026): se añade `height: 100dvh` y `overscroll-behavior-y: contain`
+a `globals.css`, el archivo en disco las tiene, el servidor se reinicia… y en el
+navegador `getComputedStyle` sigue diciendo `auto`. Ni error, ni aviso, ni nada.
+
+**Cómo se midió**: en la página, `CSS.supports('height','100dvh')` → **true** (el
+navegador sí las entiende) y, al inyectarlas a mano con `addStyleTag`, funcionan al
+instante. Buscando el texto de todas las hojas de estilo cargadas: `dvh` no aparece por
+ningún lado, mientras que la regla vecina del mismo archivo (`column-reverse`) sí.
+
+**Causa raíz**: Lightning CSS, el compilador de CSS de Next, mira la lista de navegadores
+objetivo (browserslist) y, como aquí no hay ninguna configurada, usa la de por defecto —
+que incluye navegadores anteriores a `dvh` (Safari 15.4) y a `overscroll-behavior`
+(Safari 16). Lo que no puede traducir, **lo borra**, sin decirlo.
+
+**Solución** (la que se usó, sin tocar la configuración de todo el proyecto): el valor
+viaja dentro de una **variable CSS** —que Lightning CSS no inspecciona— y la regla va
+envuelta en `@supports`, que decide el propio navegador:
+
+```css
+:root { --alto-visible: 100vh; }
+@supports (height: 100dvh) { :root { --alto-visible: 100dvh; } }
+.flex.h-screen.overflow-hidden { height: var(--alto-visible); }
+```
+
+**Cómo reconocerlo**: una propiedad CSS moderna que "no hace nada" pero que el navegador
+sí soporta. Antes de dar vueltas: busca su texto en las hojas cargadas de la página. Si
+no está, no es tuyo el error — te lo borró el compilador. Ojo: en desarrollo el CSS llega
+por `<style>`, no por `<link>`, así que hay que mirar los dos (y `adoptedStyleSheets`).
+
+**La otra lección del día**: el botón flotante del pincel tapaba el botón de enviar del
+chat, y quien lo demostró fue Playwright al negarse a pulsarlo
+(`asistente-fab intercepts pointer events`). Un clic automatizado sobre los botones
+importantes caza los estorbos de la interfaz que mirando fotos no se ven.
