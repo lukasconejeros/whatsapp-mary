@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot, Sparkles } from 'lucide-react'
 
 const items = [
   { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
   { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
   { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
+  { href: '/asistente',  Icon: Sparkles,      label: 'Asistente'  },
   { href: '/ensayo',     Icon: Bot,           label: 'Bot'        },
   { href: '/conexion',   Icon: Plug,          label: 'Conexión'   },
 ]
@@ -30,19 +31,11 @@ export default function AppNav() {
     poll(); const t = setInterval(poll, 4000); return () => { mounted = false; clearInterval(t) }
   }, [])
 
-  // En el Asistente y en Chats hay un botón de enviar abajo a la derecha; ahí el
-  // pincel flotante lo tapaba (sobre todo en el teléfono), así que no se muestra.
-  const ocultarFab = path.startsWith('/asistente') || path.startsWith('/inbox')
-
+  // El pincel flotante se sacó (09-08-2026): tapaba el botón de enviar de los chats
+  // —Playwright no podía ni pulsarlo: "asistente-fab intercepts pointer events"—.
+  // El Asistente ahora es un ícono más del menú, así no se pierde el acceso.
   return (
     <>
-    {/* Botón flotante del Asistente IA: pincel brillante */}
-    {!ocultarFab && (
-      <Link href="/asistente" className="asistente-fab" aria-label="Asistente IA" title="Asistente IA">
-        <Brush size={24} strokeWidth={2.2} />
-      </Link>
-    )}
-
     <nav className="app-sidebar flex flex-col h-full shrink-0"
       style={{ width: 212, background: '#FFFFFF', borderRight: '1px solid #D3E7DE' }}>
 
