@@ -69,6 +69,32 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 @keyframes fadeUp { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 .fade-up { animation: fadeUp .2s ease both; }
 
+/* ── El alto de la app en el teléfono ────────────────────────────────────────
+   En el iPhone, 100vh (h-screen de Tailwind) NO es lo que se ve: mide como si la
+   barra de direcciones de Safari no existiera, o sea ~90 px de más. Ese sobrante
+   cuelga por debajo de la pantalla y hace que el dedo arrastre la página ENTERA
+   (cabecera y barra de abajo incluidas) en vez del chat. Medido el 09-08-2026:
+   con la barra de Safari, scrollY llegaba a 90; sin ella, a 0.
+   100dvh es el alto REAL visible, así no sobra nada y el gesto se queda dentro
+   del chat.
+
+   ⚠️ Va por variable y dentro de @supports A PROPÓSITO: el compilador de CSS de
+   Next (Lightning CSS) mira una lista de navegadores antigua y BORRA en seco
+   `height: 100dvh` y `overscroll-behavior-y` si las escribes sueltas — comprobado
+   el 09-08-2026: no llegaban al navegador aunque estuvieran en este archivo. Dentro
+   de una variable el valor viaja intacto, y el @supports deja fuera al navegador
+   viejo, que se queda con el 100vh de siempre. */
+:root { --alto-visible: 100vh; }
+@supports (height: 100dvh) {
+  :root { --alto-visible: 100dvh; }
+}
+.flex.h-screen.overflow-hidden { height: var(--alto-visible); }
+
+/* Y que el rebote al llegar al final de una lista no se contagie a la página. */
+@supports (overscroll-behavior-y: contain) {
+  .flex.h-screen.overflow-hidden .overflow-y-auto { overscroll-behavior-y: contain; }
+}
+
 /* ── Responsive: en teléfono la barra lateral pasa a ser barra inferior ── */
 @media (max-width: 767px) {
   /* El shell de la app apila el contenido arriba y la navegación abajo */

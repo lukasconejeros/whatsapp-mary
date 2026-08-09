@@ -93,7 +93,8 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     return () => clearInterval(t)
   }, [conv.id])
 
-  useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
+  // block: 'nearest' para bajar solo la lista, no la página de alrededor (teléfono).
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [msgs])
 
 
   // Toma la nota que Mary escribió en la caja y la convierte en un mensaje bonito
@@ -234,7 +235,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         </span>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', background:'#FFFFFF' }}>
+      <div style={{ flex:1, overflowY:'auto', overscrollBehaviorY:'contain', padding:'14px 16px', background:'#FFFFFF' }}>
         {loading ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:6,color:'#94A3B8' }}>
             <div style={{ width:13,height:13,border:'2px solid #D3E7DE',borderTopColor:'#00A884',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>

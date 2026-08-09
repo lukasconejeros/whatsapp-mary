@@ -57,7 +57,9 @@ export default function EnsayoPage() {
   }, [])
 
   useEffect(() => { cargar() }, [cargar])
-  useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, pensando])
+  // block: 'nearest' baja solo la lista del chat. Sin eso, scrollIntoView también
+  // mueve la página de alrededor, que es justo lo que se ve raro en el teléfono.
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [msgs, pensando])
 
   async function enviar(t: string) {
     const limpio = t.trim()

@@ -45,7 +45,8 @@ export default function AsistentePage() {
     const d = await fetch('/api/asistente').then(r => r.json())
     if (d.ok) { setMsgs(d.mensajes); setHistorialVisto(true) }
   }, [])
-  useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, pensando, fotos])
+  // block: 'nearest' para bajar solo la lista, no la página de alrededor (teléfono).
+  useEffect(() => { finRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [msgs, pensando, fotos])
 
   // Al salir del Asistente, cortar dictado/grabación para no dejar el micrófono abierto.
   useEffect(() => () => {
