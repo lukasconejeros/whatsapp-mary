@@ -5,6 +5,7 @@ import {
   archivarEnsayo,
   marcarEnsayoMalo,
   guardarCorreccion,
+  listAudiosMary,
   type EnsayoMensaje,
 } from "@/lib/db";
 import { responderEnsayo, type TurnoEnsayo } from "@/lib/ensayo";
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest) {
   addEnsayoMensaje("apoderado", texto);
 
   try {
-    const r = await responderEnsayo(aTurnos(listEnsayoMensajes()));
+    // Con la lista de audios que grabó Mary, el modelo puede PROPONER uno (nunca mandarlo).
+    const r = await responderEnsayo(aTurnos(listEnsayoMensajes()), listAudiosMary());
     // Si el bot se apaga (silenciar) no escribe nada: se guarda igual el turno con
     // sus avisos, porque a Mary le sirve ver que ahí NO habría contestado.
     const id = addEnsayoMensaje("bot", r.texto, r.acciones);

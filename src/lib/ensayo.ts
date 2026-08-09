@@ -10,6 +10,7 @@
 // Sin extensión .js: este módulo lo importan la API de Next y los scripts (db.ts hace igual).
 import { buildSystemPrompt } from "./system-prompt";
 import { toolDefinitions } from "./tools/index";
+import type { AudioMary } from "./db";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_VUELTAS = 6;
@@ -27,9 +28,34 @@ export type RespuestaEnsayo = {
 // ── Lo que habría hecho cada herramienta, sin hacerlo ──────────────────────────
 // Devuelve el aviso para Mary y el resultado que se le entrega al modelo para que
 // siga la conversación como si la herramienta hubiera funcionado.
+/**
+ * La herramienta para proponer un audio de Mary existe SOLO en el ensayo: el bot de
+ * WhatsApp de verdad no la tiene (por eso no se toca el registro de tools). El modelo
+ * únicamente puede elegir un id de la lista que grabó ella: no inventa audios ni
+ * situaciones. Si no ha grabado ninguno, la herramienta ni se ofrece.
+ */
+export function definicionProponerAudio(audios: AudioMary[]) {
+  if (!audios.length) return null;
+  const lista = audios
+    .map((a) => `- id ${a.id}: "${a.titulo}" — ${a.cuando_usarlo || "sin indicación"}`)
+    .join("\n");
+  return {
+    name: "proponerAudio",
+    description:
+      "Propone mandarle a la persona una nota de voz grabada por Mary. NO la envía: " +
+      "Mary la revisa y decide. Úsala solo si la situación calza con una de estas:\n" + lista,
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "number", description: "El id del audio de la lista" } },
+      required: ["id"],
+    },
+  };
+}
+
 export function simularHerramienta(
   nombre: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  audios: AudioMary[] = []
 ): { aviso: string; resultado: Record<string, unknown> } {
   switch (nombre) {
     case "silenciar":
@@ -54,6 +80,20 @@ export function simularHerramienta(
       return {
         aviso: "Aquí habría guardado los datos" + (n ? ` de ${n}` : "") + " en la lista de contactos.",
         resultado: { ok: true, guardado: true },
+      };
+    }
+    case "proponerAudio": {
+      const id = Number(args.id);
+      const audio = audios.find((a) => a.id === id);
+      if (!audio) {
+        return {
+          aviso: "Quiso proponerte un audio que no existe.",
+          resultado: { ok: false, message: "No existe un audio con ese id" },
+        };
+      }
+      return {
+        aviso: `Aquí te habría propuesto este audio tuyo: "${audio.titulo}". Tú decides si se manda.`,
+        resultado: { ok: true, propuesto: audio.titulo },
       };
     }
     default:
@@ -89,15 +129,17 @@ type Contenido =
 
 type MensajeApi = { role: "user" | "assistant"; content: string | Contenido[] };
 
-function herramientasParaAnthropic() {
-  return toolDefinitions.map((t) => ({
+function herramientasParaAnthropic(audios: AudioMary[] = []) {
+  const base = toolDefinitions.map((t) => ({
     name: t.function.name,
     description: t.function.description,
     input_schema: t.function.parameters,
   }));
+  const extra = definicionProponerAudio(audios);
+  return extra ? [...base, extra] : base;
 }
 
-async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: string) {
+async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: string, audios: AudioMary[] = []) {
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
@@ -109,7 +151,7 @@ async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: st
       model: process.env.ENSAYO_MODEL ?? "claude-haiku-4-5-20251001",
       max_tokens: MAX_TOKENS,
       system,
-      tools: herramientasParaAnthropic(),
+      tools: herramientasParaAnthropic(audios),
       messages,
     }),
   });
@@ -121,7 +163,10 @@ async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: st
  * Responde un turno del ensayo. `turnos` es la conversación completa hasta ahora,
  * incluyendo el último mensaje del apoderado.
  */
-export async function responderEnsayo(turnos: TurnoEnsayo[]): Promise<RespuestaEnsayo> {
+export async function responderEnsayo(
+  turnos: TurnoEnsayo[],
+  audios: AudioMary[] = []
+): Promise<RespuestaEnsayo> {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error("Falta ANTHROPIC_API_KEY para el chat de ensayo.");
 
@@ -139,7 +184,7 @@ export async function responderEnsayo(turnos: TurnoEnsayo[]): Promise<RespuestaE
   let texto = "";
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
-    const data = await pedirAnthropic(system, messages, apiKey);
+    const data = await pedirAnthropic(system, messages, apiKey, audios);
 
     const textos = data.content.filter((c): c is Extract<Contenido, { type: "text" }> => c.type === "text");
     const usos = data.content.filter((c): c is Extract<Contenido, { type: "tool_use" }> => c.type === "tool_use");
@@ -155,7 +200,7 @@ export async function responderEnsayo(turnos: TurnoEnsayo[]): Promise<RespuestaE
     messages.push({ role: "assistant", content: data.content });
     const resultados: Contenido[] = [];
     for (const uso of usos) {
-      const { aviso, resultado } = simularHerramienta(uso.name, uso.input ?? {});
+      const { aviso, resultado } = simularHerramienta(uso.name, uso.input ?? {}, audios);
       acciones.push(aviso);
       resultados.push({ type: "tool_result", tool_use_id: uso.id, content: JSON.stringify(resultado) });
     }

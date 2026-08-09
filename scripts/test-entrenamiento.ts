@@ -4,7 +4,9 @@ import {
   archivarEnsayo, sesionEnsayoActual,
   guardarCorreccion, guardarCorreccionAudio,
   addAudioMary, listAudiosMary, updateAudioMary, deleteAudioMary,
+  type AudioMary,
 } from "../src/lib/db.js";
+import { simularHerramienta, definicionProponerAudio } from "../src/lib/ensayo.js";
 
 let pass = 0, fail = 0;
 function check(n: string, c: boolean) { if (c) { console.log(`  ✅ ${n}`); pass++; } else { console.log(`  ❌ ${n}`); fail++; } }
@@ -59,6 +61,22 @@ check("puede renombrarlo",
 check("cambiar el título no borra el cuándo usarlo",
   listAudiosMary().find(x => x.id === idA)?.cuando_usarlo.includes("autismo") === true);
 check("puede sacarlo de la lista", deleteAudioMary(idA) && !listAudiosMary().some(x => x.id === idA));
+
+console.log("\n— El bot PROPONE el audio, nunca lo manda —");
+const audios: AudioMary[] = [{
+  id: 7, archivo: "mary_7.ogg", titulo: "el del autismo",
+  cuando_usarlo: "cuando preguntan por niños con autismo", segundos: 20, created_at: 0,
+}];
+const prop = simularHerramienta("proponerAudio", { id: 7 }, audios);
+check("avisa que te lo habría propuesto", prop.aviso.includes("propuesto") && prop.aviso.includes("el del autismo"));
+check("NO dice que lo mandó",
+  !prop.aviso.toLowerCase().includes("envió") && !prop.aviso.toLowerCase().includes("mandó"));
+check("el modelo recibe que salió bien", prop.resultado.ok === true);
+check("un id que no existe no revienta", simularHerramienta("proponerAudio", { id: 999 }, audios).resultado.ok === false);
+check("sin audios grabados la herramienta ni se ofrece", definicionProponerAudio([]) === null);
+const def = definicionProponerAudio(audios);
+check("la descripción lleva las palabras de Mary", def!.description.includes("cuando preguntan por niños con autismo"));
+check("y el título para que elija", def!.description.includes("el del autismo"));
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);
