@@ -4,6 +4,7 @@ import {
   listEnsayoMensajes,
   archivarEnsayo,
   marcarEnsayoMalo,
+  guardarCorreccion,
   type EnsayoMensaje,
 } from "@/lib/db";
 import { responderEnsayo, type TurnoEnsayo } from "@/lib/ensayo";
@@ -63,20 +64,27 @@ export async function DELETE() {
   return NextResponse.json({ ok: true, archivados, sesion });
 }
 
-/** "Esto yo no lo diría" — Mary marca una respuesta del bot. */
+/**
+ * Dos cosas independientes sobre una respuesta del bot:
+ *  - "Esto yo no lo diría" (el pulgar abajo)  → { id, malo }
+ *  - "Yo diría esto" (su versión, escrita)    → { id, correccion }
+ * Puede usar una, la otra o las dos.
+ */
 export async function PATCH(req: NextRequest) {
-  let id: number;
-  let malo: boolean;
+  let body: { id?: number; malo?: boolean; correccion?: string | null };
   try {
-    const b = (await req.json()) as { id?: number; malo?: boolean };
-    id = Number(b.id);
-    malo = b.malo !== false;
+    body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ ok: false, error: "JSON inválido" }, { status: 400 });
   }
+  const id = Number(body.id);
   if (!Number.isFinite(id)) {
     return NextResponse.json({ ok: false, error: "id inválido" }, { status: 400 });
   }
-  const ok = marcarEnsayoMalo(id, malo);
+  if ("correccion" in body) {
+    const ok = guardarCorreccion(id, typeof body.correccion === "string" ? body.correccion : null);
+    return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
+  }
+  const ok = marcarEnsayoMalo(id, body.malo !== false);
   return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
 }

@@ -344,6 +344,11 @@ function build(): Ctx {
   // borra. Lo que ya existía queda en la sesión 1.
   addColumnaSiFalta(db, "ensayo_mensajes", "sesion_id", "INTEGER NOT NULL DEFAULT 1");
   db.exec("CREATE INDEX IF NOT EXISTS idx_ensayo_sesion ON ensayo_mensajes(sesion_id, id)");
+  // "Yo diría esto": la versión de Mary, escrita y/o hablada, pegada a la respuesta
+  // del bot que corrige. Se guarda; el cerebro NO cambia solo con esto.
+  addColumnaSiFalta(db, "ensayo_mensajes", "correccion", "TEXT");
+  addColumnaSiFalta(db, "ensayo_mensajes", "correccion_audio", "TEXT");
+  addColumnaSiFalta(db, "ensayo_mensajes", "correccion_seg", "INTEGER");
   addColumnaSiFalta(db, "outbox", "kind", "TEXT NOT NULL DEFAULT 'text'");
   addColumnaSiFalta(db, "outbox", "media", "TEXT");
   addColumnaSiFalta(db, "outbox", "attempts", "INTEGER NOT NULL DEFAULT 0");
@@ -1315,6 +1320,9 @@ export interface EnsayoMensaje {
   acciones: string | null;
   malo: number;
   sesion_id: number;
+  correccion: string | null;
+  correccion_audio: string | null;
+  correccion_seg: number | null;
   created_at: number;
 }
 
@@ -1374,6 +1382,26 @@ export function marcarEnsayoMalo(id: number, malo: boolean): boolean {
   const r = ctx().db
     .prepare("UPDATE ensayo_mensajes SET malo = ? WHERE id = ? AND rol = 'bot'")
     .run(malo ? 1 : 0, id);
+  return r.changes > 0;
+}
+
+/**
+ * "Yo diría esto", escrito. `null` borra la corrección. Solo se corrige al bot: lo que
+ * escribió el apoderado es la pregunta, no hay nada que corregir ahí.
+ */
+export function guardarCorreccion(id: number, texto: string | null): boolean {
+  const limpio = texto === null ? null : texto.trim();
+  const r = ctx().db
+    .prepare("UPDATE ensayo_mensajes SET correccion = ? WHERE id = ? AND rol = 'bot'")
+    .run(limpio && limpio.length ? limpio : null, id);
+  return r.changes > 0;
+}
+
+/** "Yo diría esto", hablado. Convive con el texto: grabar no pisa lo que escribió. */
+export function guardarCorreccionAudio(id: number, archivo: string, segundos: number): boolean {
+  const r = ctx().db
+    .prepare("UPDATE ensayo_mensajes SET correccion_audio = ?, correccion_seg = ? WHERE id = ? AND rol = 'bot'")
+    .run(archivo, Math.max(0, Math.round(segundos)), id);
   return r.changes > 0;
 }
 

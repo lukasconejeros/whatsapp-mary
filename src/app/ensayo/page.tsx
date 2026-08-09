@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
-import { Send, RotateCcw, ThumbsDown, Clock, Zap } from 'lucide-react'
+import { Send, RotateCcw, ThumbsDown, Clock, Zap, Mic, Pencil } from 'lucide-react'
 
 type Msg = {
   id: number
@@ -10,6 +10,8 @@ type Msg = {
   texto: string
   acciones?: string[]
   malo?: boolean
+  correccion?: string
+  correccionAudio?: string
 }
 
 const SUGERENCIAS = [
@@ -28,15 +30,27 @@ export default function EnsayoPage() {
   const [error, setError] = useState('')
   const finRef = useRef<HTMLDivElement | null>(null)
 
+  // "Yo diría esto": la versión de Mary, escrita o hablada, sobre una respuesta del bot.
+  const [editando, setEditando] = useState<number | null>(null)
+  const [borrador, setBorrador] = useState('')
+  const [grabandoId, setGrabandoId] = useState<number | null>(null)
+  const [segGrab, setSegGrab] = useState(0)
+  const recRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const inicioRef = useRef(0)
+  const cronoRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const cargar = useCallback(async () => {
     try {
       const r = await fetch('/api/ensayo')
       const d = await r.json()
       if (d.ok) {
-        setMsgs(d.mensajes.map((m: { id: number; rol: 'apoderado' | 'bot'; texto: string; acciones: string | null; malo: number }) => ({
+        setMsgs(d.mensajes.map((m: { id: number; rol: 'apoderado' | 'bot'; texto: string; acciones: string | null; malo: number; correccion: string | null; correccion_audio: string | null }) => ({
           id: m.id, rol: m.rol, texto: m.texto,
           acciones: m.acciones ? JSON.parse(m.acciones) : undefined,
           malo: m.malo === 1,
+          correccion: m.correccion ?? undefined,
+          correccionAudio: m.correccion_audio ?? undefined,
         })))
       }
     } catch { /* si falla, la pantalla queda vacía y se puede escribir igual */ }
@@ -90,6 +104,65 @@ export default function EnsayoPage() {
     setMsgs([])
     setError('')
   }
+
+  async function guardarCorreccionTexto(id: number) {
+    const t = borrador.trim()
+    await fetch('/api/ensayo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, correccion: t }),
+    })
+    setMsgs(m => m.map(x => x.id === id ? { ...x, correccion: t || undefined } : x))
+    setEditando(null)
+    setBorrador('')
+  }
+
+  // Graba con el micrófono del teléfono. Segunda pulsada = parar y guardar.
+  async function grabarCorreccion(id: number) {
+    if (grabandoId !== null) { recRef.current?.stop(); return }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const rec = new MediaRecorder(stream, { mimeType: mime })
+      chunksRef.current = []
+      inicioRef.current = Date.now()
+      rec.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data) }
+      rec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        if (cronoRef.current) { clearInterval(cronoRef.current); cronoRef.current = null }
+        // La duración la cuenta el reloj del cliente: de los mp4 de Safari no se puede sacar.
+        const segundos = Math.max(1, Math.round((Date.now() - inicioRef.current) / 1000))
+        const fd = new FormData()
+        fd.append('file', new Blob(chunksRef.current, { type: mime }), 'correccion')
+        fd.append('id', String(id))
+        fd.append('segundos', String(segundos))
+        try {
+          const r = await fetch('/api/ensayo/correccion-audio', { method: 'POST', body: fd })
+          const d = await r.json()
+          if (d.ok) setMsgs(m => m.map(x => x.id === id ? { ...x, correccionAudio: d.media } : x))
+          else setError('No pude guardar el audio')
+        } catch {
+          setError('No pude guardar el audio')
+        }
+        setGrabandoId(null)
+        setSegGrab(0)
+      }
+      recRef.current = rec
+      rec.start()
+      setGrabandoId(id)
+      setSegGrab(0)
+      cronoRef.current = setInterval(() => setSegGrab(s => s + 1), 1000)
+    } catch {
+      setError('No pude usar el micrófono. Dale permiso al navegador.')
+      setGrabandoId(null)
+    }
+  }
+
+  // Si se cierra la pantalla en mitad de una grabación, se suelta el micrófono.
+  useEffect(() => () => {
+    if (cronoRef.current) clearInterval(cronoRef.current)
+    if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop()
+  }, [])
 
   async function marcarMalo(id: number, actual: boolean) {
     setMsgs(m => m.map(x => x.id === id ? { ...x, malo: !actual } : x))
@@ -165,11 +238,54 @@ export default function EnsayoPage() {
               ))}
 
               {m.rol === 'bot' && m.id > 0 && (
-                <button onClick={() => marcarMalo(m.id, !!m.malo)}
-                  title="Marca las respuestas que no suenan a ti, para irlas corrigiendo"
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 8, border: '1px solid ' + (m.malo ? '#E5A0A0' : '#E5E7EB'), background: m.malo ? '#FDECEC' : '#fff', color: m.malo ? '#B03A3A' : '#9CA3AF', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <ThumbsDown size={11} /> {m.malo ? 'Marcaste que no lo dirías' : 'Esto yo no lo diría'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', maxWidth: 460 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button onClick={() => marcarMalo(m.id, !!m.malo)}
+                      title="Marca las respuestas que no suenan a ti, para irlas corrigiendo"
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 8, border: '1px solid ' + (m.malo ? '#E5A0A0' : '#E5E7EB'), background: m.malo ? '#FDECEC' : '#fff', color: m.malo ? '#B03A3A' : '#9CA3AF', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <ThumbsDown size={11} /> {m.malo ? 'Marcaste que no lo dirías' : 'Esto yo no lo diría'}
+                    </button>
+
+                    {editando !== m.id && (
+                      <button onClick={() => { setEditando(m.id); setBorrador(m.correccion ?? '') }}
+                        title="Escribe o graba lo que le dirías tú a esta persona"
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 8, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <Pencil size={11} /> {m.correccion || m.correccionAudio ? 'Cambiar lo que dirías tú' : 'Yo diría esto'}
+                      </button>
+                    )}
+                  </div>
+
+                  {editando === m.id && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                      <textarea value={borrador} onChange={e => setBorrador(e.target.value)} rows={3}
+                        placeholder="Escribe con tus palabras lo que le dirías tú…"
+                        style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid #D3E7DE', fontSize: 14, fontFamily: 'inherit', outline: 'none', resize: 'vertical' }} />
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button onClick={() => guardarCorreccionTexto(m.id)}
+                          style={{ padding: '7px 12px', borderRadius: 9, border: 'none', background: '#00A884', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Guardar
+                        </button>
+                        <button onClick={() => grabarCorreccion(m.id)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 9, border: '1px solid ' + (grabandoId === m.id ? '#E5A0A0' : '#D3E7DE'), background: grabandoId === m.id ? '#FDECEC' : '#F3F9F6', color: grabandoId === m.id ? '#B03A3A' : '#008069', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          <Mic size={13} /> {grabandoId === m.id ? `Listo, guardar (${segGrab} s)` : 'Decirlo hablando'}
+                        </button>
+                        <button onClick={() => { setEditando(null); setBorrador('') }}
+                          style={{ padding: '7px 12px', borderRadius: 9, border: '1px solid #E5E7EB', background: '#fff', color: '#667781', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {m.correccion && editando !== m.id && (
+                    <div style={{ fontSize: 12, color: '#054D44', background: '#E7F1EC', border: '1px solid #C7E0D5', borderRadius: 9, padding: '6px 10px', whiteSpace: 'pre-wrap' }}>
+                      Tú dirías: {m.correccion}
+                    </div>
+                  )}
+                  {m.correccionAudio && (
+                    <audio controls src={`/api/media/${m.correccionAudio}`} style={{ height: 34, maxWidth: 260, width: '100%' }} />
+                  )}
+                </div>
               )}
             </div>
           ))}
