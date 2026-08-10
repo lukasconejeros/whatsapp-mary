@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot, Sparkles } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot } from 'lucide-react'
 
+// El Asistente salió del menú (Lukas, 09-08-2026: "sácalo nomás, no lo va a ocupar
+// mi mamá"). La pantalla /asistente y su API siguen vivas: volver a ponerlo es
+// añadir una línea aquí.
 const items = [
   { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
   { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
   { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
-  { href: '/asistente',  Icon: Sparkles,      label: 'Asistente'  },
   { href: '/ensayo',     Icon: Bot,           label: 'Bot'        },
   { href: '/conexion',   Icon: Plug,          label: 'Conexión'   },
 ]
