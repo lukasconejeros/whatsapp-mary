@@ -6,6 +6,9 @@ import { DIA_LABEL, PROFES, PROFE_NOMBRES, profeColor, diaFromFecha } from '@/li
 import { Plus, Trash2, Pencil, X, ChevronLeft, ChevronRight, Mic, Keyboard } from 'lucide-react'
 
 type Clase = { id: number; fecha: string | null; dia: string; profe: string; hora: string | null; alumnos: (string | number)[]; nota: string | null }
+// Clase que se repite TODAS las semanas (los alumnos fijos de Mary). Una fila vale
+// para todos los lunes, así que no tiene fecha: tiene día.
+type ClaseFija = { id: number; dia: string; hora: string; horaFin: string | null; profe: string; alumnos: string[]; cuposPrueba: number; activa: boolean }
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
 type Form = { fecha: string; profe: string; hora: string; alumnos: number[]; alumnosExtra: (string | number)[]; nota: string }
 
@@ -42,6 +45,7 @@ export default function CalendarioPage() {
   const [cursor, setCursor] = useState(() => { const t = new Date(); return { y: t.getFullYear(), m: t.getMonth() } })
   const [sel, setSel] = useState<string>(hoy)
   const [clases, setClases] = useState<Clase[]>([])
+  const [fijas, setFijas] = useState<ClaseFija[]>([])
   const [clientes, setClientes] = useState<ClienteLite[]>([])
   const [filtro, setFiltro] = useState<string>('Todas')
   const [loading, setLoading] = useState(true)
@@ -72,12 +76,14 @@ export default function CalendarioPage() {
   const load = useCallback(async (d: string, h: string) => {
     setLoading(true)
     try {
-      const [c, cl] = await Promise.all([
+      const [c, cl, fj] = await Promise.all([
         fetch(`/api/clases?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch('/api/clientes').then(r => r.json()),
+        fetch('/api/clases-fijas').then(r => r.json()),
       ])
       if (c.ok) setClases(c.clases)
       if (cl.ok) setClientes(cl.clientes)
+      if (fj.ok) setFijas(fj.clasesFijas)
     } finally { setLoading(false) }
   }, [])
   useEffect(() => { load(desde, hasta) }, [load, desde, hasta])
@@ -220,6 +226,17 @@ export default function CalendarioPage() {
   const eventosDe = (fecha: string) => clases.filter(c => c.fecha === fecha && pasaFiltro(c))
   const eventosSel = eventosDe(sel)
 
+  // Las clases que se repiten todas las semanas: a una fecha le tocan las de su día.
+  // Solo las activas — el calendario muestra lo que de verdad se hace.
+  const fijasDe = (fecha: string) => {
+    const dia = diaFromFecha(fecha)
+    return fijas
+      .filter(f => f.activa && f.dia === dia && (filtro === 'Todas' || f.profe === filtro))
+      .sort((a, b) => a.hora.localeCompare(b.hora))
+  }
+  const fijasSel = fijasDe(sel)
+  const rango = (f: ClaseFija) => f.horaFin ? `${f.hora} a ${f.horaFin}` : f.hora
+
   // Selector de alumnos del modal: primero los que vienen ese día, con búsqueda.
   const diaForm = diaFromFecha(form.fecha)
   const clientesOrdenados = [...clientes]
@@ -284,6 +301,12 @@ export default function CalendarioPage() {
                     const isHoy = f === hoy
                     const isSel = f === sel
                     const evs = eventosDe(f)
+                    // Primero las clases de todas las semanas y después las sueltas,
+                    // que es el orden en que Mary piensa el día.
+                    const chips = [
+                      ...fijasDe(f).map(x => ({ key: `f${x.id}`, pc: profeColor(x.profe), hora: x.hora, label: x.alumnos.join(', ') || x.profe, fija: true })),
+                      ...evs.map(x => ({ key: `c${x.id}`, pc: profeColor(x.profe), hora: x.hora ?? '', label: x.nota || (x.alumnos.length ? x.alumnos.map(etiquetaAlumno).join(', ') : x.profe), fija: false })),
+                    ]
                     return (
                       <button key={i} onClick={() => setSel(f)} className="cal-cell"
                         style={{ position: 'relative', minHeight: 92, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
@@ -296,24 +319,20 @@ export default function CalendarioPage() {
                           background: isHoy ? '#00A884' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#374151' : '#9AA7AD' }}>{cell.getDate()}</span>
                         {/* Etiquetas completas (PC) */}
                         <div className="cal-ev-full" style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-                          {evs.slice(0, 3).map(c => {
-                            const pc = profeColor(c.profe)
-                            const label = c.nota || (c.alumnos.length ? c.alumnos.map(etiquetaAlumno).join(', ') : c.profe)
-                            return (
-                              <span key={c.id} title={`${c.hora ?? ''} ${c.profe} ${label}`.trim()}
-                                style={{ display: 'block', fontSize: 10, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                  background: pc.bg, color: '#3f2a35', borderLeft: `3px solid ${pc.color}`, borderRadius: 5, padding: '2px 5px' }}>
-                                {c.hora ? <b style={{ color: pc.color }}>{c.hora}</b> : null} {label}
-                              </span>
-                            )
-                          })}
-                          {evs.length > 3 && <span style={{ fontSize: 10, color: '#667781', paddingLeft: 3 }}>+{evs.length - 3} más</span>}
+                          {chips.slice(0, 3).map(ch => (
+                            <span key={ch.key} title={`${ch.hora} ${ch.label}`.trim()}
+                              style={{ display: 'block', fontSize: 10, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                background: ch.pc.bg, color: '#3f2a35', borderLeft: `3px ${ch.fija ? 'double' : 'solid'} ${ch.pc.color}`, borderRadius: 5, padding: '2px 5px' }}>
+                              {ch.hora ? <b style={{ color: ch.pc.color }}>{ch.hora}</b> : null} {ch.label}
+                            </span>
+                          ))}
+                          {chips.length > 3 && <span style={{ fontSize: 10, color: '#667781', paddingLeft: 3 }}>+{chips.length - 3} más</span>}
                         </div>
                         {/* Puntos de color (teléfono): mantiene todas las celdas de la misma altura */}
-                        {evs.length > 0 && (
+                        {chips.length > 0 && (
                           <div className="cal-ev-dots">
-                            {evs.slice(0, 6).map(c => (
-                              <span key={c.id} style={{ width: 6, height: 6, borderRadius: '50%', background: profeColor(c.profe).color, display: 'inline-block' }} />
+                            {chips.slice(0, 6).map(ch => (
+                              <span key={ch.key} style={{ width: 6, height: 6, borderRadius: '50%', background: ch.pc.color, display: 'inline-block' }} />
                             ))}
                           </div>
                         )}
@@ -335,8 +354,34 @@ export default function CalendarioPage() {
                   </button>
                 </div>
                 <div style={{ padding: 12, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+                  {/* Las de todas las semanas van primero y ordenadas por hora: es como
+                      Mary lee su planilla. Se ven distintas de las clases sueltas para que
+                      se note de un vistazo cuáles se repiten solas. */}
+                  {!loading && fijasSel.map(f => {
+                    const pc = profeColor(f.profe)
+                    return (
+                      <div key={`fija-${f.id}`} style={{ background: '#fff', border: `1px dashed ${pc.color}`, borderLeft: `3px double ${pc.color}`, borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
+                        <div className="flex items-center gap-2" style={{ marginBottom: 5, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 15, fontWeight: 800, color: '#1F2937' }}>{rango(f)}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, flex: 1 }}>{f.profe}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#667781', background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 999, padding: '2px 8px' }}>todas las semanas</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {f.alumnos.length === 0 ? <span style={{ fontSize: 11, color: '#9CA3AF' }}>Sin alumnos</span>
+                            : f.alumnos.map((a, k) => (
+                              <span key={k} style={{ fontSize: 11, color: '#374151', background: '#fff', border: `1px solid ${pc.bd}`, borderRadius: 6, padding: '1px 6px' }}>{a}</span>
+                            ))}
+                        </div>
+                        {f.cuposPrueba > 0 && (
+                          <p style={{ fontSize: 11, color: '#008069', fontWeight: 700, marginTop: 6 }}>
+                            {f.cuposPrueba === 1 ? 'Queda 1 cupo' : `Quedan ${f.cuposPrueba} cupos`} para clase de prueba
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
                   {loading ? <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '24px 0' }}>Cargando…</p>
-                    : eventosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin clases este día.<br />Toca «Agregar» para crear una.</p>
+                    : eventosSel.length === 0 && fijasSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin clases este día.<br />Toca «Agregar» para crear una.</p>
                     : eventosSel.map(c => {
                       const pc = profeColor(c.profe)
                       return (

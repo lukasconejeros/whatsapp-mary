@@ -194,6 +194,27 @@ CREATE TABLE IF NOT EXISTS clases (
 );
 CREATE INDEX IF NOT EXISTS idx_clases_dia ON clases(dia);
 
+-- Las clases que se repiten TODAS las semanas: los alumnos fijos de Mary
+-- (Lukas, 10-08-2026: "esos son alumnos, esos se tienen que repetir todas las
+-- semanas"). NO es una fila por día: es UNA fila que vale para todos los lunes,
+-- como la Suscripción mensual de la app de Lukas. Así, cambiarle el horario a un
+-- grupo se hace una vez y no semana por semana.
+-- La academia trabaja lunes, martes y miércoles; 'dia' usa la convención sin
+-- tilde de DIAS_SEMANA ('Lunes', 'Martes', 'Miercoles', …).
+-- 'activa' en 0 = ya no se hace, pero no se borra: se pierde quién venía.
+CREATE TABLE IF NOT EXISTS clases_fijas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dia TEXT NOT NULL,
+  hora TEXT NOT NULL,                          -- '17:30'
+  hora_fin TEXT,                               -- '19:30' (las planillas son bloques)
+  profe TEXT NOT NULL DEFAULT 'Mary',
+  alumnos TEXT,                                -- JSON: ["Mateo","Matilda"]
+  cupos_prueba INTEGER NOT NULL DEFAULT 0,     -- cuántos cupos de clase de prueba quedan EN ESE HORARIO
+  activa INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_clases_fijas_dia ON clases_fijas(dia, hora);
+
 CREATE TABLE IF NOT EXISTS movimientos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fecha TEXT NOT NULL,
@@ -1256,6 +1277,74 @@ export function marcarAviso5h(ids: number[]): void {
 }
 export function deleteClase(id: number): void {
   ctx().db.prepare("DELETE FROM clases WHERE id=?").run(id);
+}
+
+// ── Clases fijas: las que se repiten todas las semanas ────────────────────
+// Una fila vale para TODOS los lunes (o martes, o miércoles). Ver el comentario
+// de la tabla en el SCHEMA.
+
+export interface ClaseFija {
+  id: number; dia: string; hora: string; horaFin: string | null;
+  profe: string; alumnos: string[]; cuposPrueba: number; activa: boolean;
+}
+export interface ClaseFijaInput {
+  dia: string; hora: string; horaFin?: string | null; profe: string;
+  alumnos?: string[]; cuposPrueba?: number; activa?: boolean;
+}
+interface ClaseFijaRow {
+  id: number; dia: string; hora: string; hora_fin: string | null;
+  profe: string; alumnos: string | null; cupos_prueba: number; activa: number;
+}
+function parseClaseFija(r: ClaseFijaRow): ClaseFija {
+  let alumnos: string[] = [];
+  if (r.alumnos) { try { alumnos = JSON.parse(r.alumnos) as string[]; } catch { alumnos = []; } }
+  return {
+    id: r.id, dia: r.dia, hora: r.hora, horaFin: r.hora_fin, profe: r.profe,
+    alumnos, cuposPrueba: r.cupos_prueba, activa: r.activa === 1,
+  };
+}
+
+// Mismo orden que DIAS_SEMANA de lib/calendario (0 = domingo), repetido aquí a
+// propósito: db.ts lo usan el bot y los scripts, y no debe colgar de la UI.
+const DIAS_SEMANA_DB = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
+
+/** Todas las clases fijas, activas y dadas de baja: es la lista de administración. */
+export function listClasesFijas(): ClaseFija[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM clases_fijas ORDER BY hora ASC, id ASC")
+    .all() as ClaseFijaRow[];
+  return rows.map(parseClaseFija);
+}
+
+/**
+ * Las clases fijas que le tocan a una fecha concreta (YYYY-MM-DD), ordenadas por
+ * hora, que es como Mary lee su planilla. Solo las activas: el calendario muestra
+ * lo que de verdad se hace.
+ */
+export function clasesFijasDeFecha(fecha: string): ClaseFija[] {
+  // Mediodía para que el cambio de horario de verano no corra el día.
+  const dia = DIAS_SEMANA_DB[new Date(`${fecha}T12:00:00`).getDay()];
+  const rows = ctx().db
+    .prepare("SELECT * FROM clases_fijas WHERE dia = ? AND activa = 1 ORDER BY hora ASC, id ASC")
+    .all(dia) as ClaseFijaRow[];
+  return rows.map(parseClaseFija);
+}
+
+export function addClaseFija(d: ClaseFijaInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO clases_fijas (dia, hora, hora_fin, profe, alumnos, cupos_prueba, activa) VALUES (?,?,?,?,?,?,?)")
+    .run(d.dia, d.hora, d.horaFin ?? null, d.profe, JSON.stringify(d.alumnos ?? []), d.cuposPrueba ?? 0, d.activa === false ? 0 : 1);
+  return r.lastInsertRowid as number;
+}
+
+export function updateClaseFija(id: number, d: ClaseFijaInput): void {
+  ctx().db
+    .prepare("UPDATE clases_fijas SET dia=?, hora=?, hora_fin=?, profe=?, alumnos=?, cupos_prueba=?, activa=? WHERE id=?")
+    .run(d.dia, d.hora, d.horaFin ?? null, d.profe, JSON.stringify(d.alumnos ?? []), d.cuposPrueba ?? 0, d.activa === false ? 0 : 1, id);
+}
+
+export function deleteClaseFija(id: number): void {
+  ctx().db.prepare("DELETE FROM clases_fijas WHERE id=?").run(id);
 }
 
 export interface ClienteLite { id: number; nombre: string | null; telefono: string; horario: string[] }

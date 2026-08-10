@@ -44,7 +44,9 @@
     "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
     "test:botones": "node scripts/test-botones-tactiles.mjs",
-    "test:calendario": "node scripts/test-calendario-pc.mjs"
+    "test:calendario": "node scripts/test-calendario-pc.mjs",
+    "test:clases-fijas": "tsx scripts/test-clases-fijas.ts",
+    "cargar:alumnos": "node scripts/cargar-alumnos-arteluk.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
