@@ -42,7 +42,8 @@
     "test:ensayo": "tsx scripts/test-ensayo.ts",
     "test:entrenamiento": "tsx scripts/test-entrenamiento.ts",
     "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
-    "humo:recordatorios": "tsx scripts/humo-recordatorios.ts"
+    "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
+    "test:botones": "node scripts/test-botones-tactiles.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
@@ -76,6 +77,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/web-push": "^3.6.4",
+    "playwright-core": "^1.62.1",
     "rimraf": "^6.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"

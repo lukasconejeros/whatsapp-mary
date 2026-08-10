@@ -209,6 +209,45 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .fin-header .fin-import-label { display: none; }
 }
 
+/* ── Que el dedo llegue al botón: 44x44 mínimo en pantallas táctiles ─────────
+   Lukas, 09-08-2026: "voy a la pestaña de bot o calendario y se pega, tengo que
+   apretarlo varias veces". Medido con un iPhone 13: las flechas de mes eran de
+   18x18 (Finanzas) y 27x27 (Calendario), y los filtros y botones de cabecera
+   andaban en 30-34 px de alto. Apple pide 44x44 de área para el dedo: por debajo
+   de eso el toque cae fuera del botón y parece que la app no responde.
+
+   Solo crece el área que recibe el toque. No cambia ningún color, ni tipografía,
+   ni el orden de nada. Va bajo (pointer: coarse) —dedo, no ratón— más el ancho
+   de teléfono que ya usa el resto del archivo, para que en el PC quede igual.
+   Se verifica con `npm run test:botones`. */
+@media (pointer: coarse), (max-width: 767px) {
+  button, [role="button"], select, summary,
+  input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+  }
+
+  button, [role="button"] { min-width: 44px; }
+
+  /* Botón que es solo un ícono: al crecer la caja el ícono se queda centrado
+     en vez de pegarse a la esquina de arriba a la izquierda. */
+  button:has(> svg:only-child), [role="button"]:has(> svg:only-child) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Enlaces que en realidad son botones (llevan su propio recuadro). */
+  .boton-tactil {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Los de Finanzas tenían su propio mínimo de 36 px, que ganaba por ser más
+     específico: se suben al mismo 44. */
+  .fin-row .fin-acciones button { min-width: 44px; min-height: 44px; }
+}
+
 /* ── Inbox estilo WhatsApp: 2 paneles en PC, 1 en teléfono ── */
 .chat-shell { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chat-list-pane { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border-right: 1px solid #D3E7DE; min-height: 0; }

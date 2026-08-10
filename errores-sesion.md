@@ -234,3 +234,48 @@ por `<style>`, no por `<link>`, así que hay que mirar los dos (y `adoptedStyleS
 chat, y quien lo demostró fue Playwright al negarse a pulsarlo
 (`asistente-fab intercepts pointer events`). Un clic automatizado sobre los botones
 importantes caza los estorbos de la interfaz que mirando fotos no se ven.
+
+---
+
+## #17 — "Tengo que apretar el botón varias veces" en el iPhone (área táctil de 18x18)
+
+**Síntoma** (Lukas, 09-08-2026): *"voy a la pestaña de bot o calendario y se pega, tengo
+que apretarlo varias veces o reiniciarla"*. En el iPhone sobre todo, y en las cuatro apps
+del mismo molde (Arteluk, Conejeros, Medifis, Anpalex).
+
+**Lo que NO era** (todo descartado midiendo, no opinando): el servidor (180-500 ms de
+respuesta), el peso de la app (1 MB de JS), fugas de memoria o de timers (heap clavado en
+10 MB tras 50 navegaciones), el volumen de datos (566 conversaciones y 6026 mensajes van
+igual de rápido), el service worker y las conexiones SSE (0 handles colgados tras 40).
+
+**Causa raíz**: los botones eran más chicos que el dedo. Medido con un iPhone 13 emulado
+en las 9 pantallas del panel: **40 controles por debajo de 44x44**, el mínimo que pide
+Apple. Las flechas de mes de Finanzas medían **18x18**, las del Calendario **27x27**, y
+los filtros y botones de cabecera andaban en **30-34 px de alto**. Por debajo de 44 el
+toque cae fuera del botón y parece que la app no responde.
+
+**Solución**: un bloque en `globals.css` bajo `@media (pointer: coarse), (max-width: 767px)`
+que sube a 44x44 el área de `button`, `[role=button]`, `select`, `summary` y los enlaces
+con pinta de botón (clase `.boton-tactil`). Sólo crece el área que recibe el toque: ni un
+color, ni una tipografía, ni una posición cambian, y en el PC no aplica. Ojo con las
+reglas que ya tenían su propio mínimo (`.fin-row .fin-acciones button` estaba en 36 px):
+ganan por especificidad, hay que subirlas a mano.
+
+**Cómo se verifica**: `npm run test:botones` (necesita la app levantada y `PANEL_PASSWORD`).
+Recorre las 9 pantallas con un iPhone 13 emulado y falla si algún control baja de 44x44 o
+si algo lo tapa. Antes del arreglo: 40 fallos. Después: 0, tanto en Chromium como en
+WebKit —el motor de Safari, que es el del iPhone de verdad— y contra el build de
+producción, no sólo en desarrollo.
+
+**Dos trampas al medir esto**:
+1. El panel de herramientas del modo desarrollo (`nextjs-portal`) sale como si tapara los
+   botones del menú. No existe en producción: hay que descartarlo o el test miente.
+2. Un elemento a medio desplazar dentro de una lista con scroll asoma sólo en parte, y su
+   centro geométrico puede caer sobre la barra del menú. Parece "tapado" y no lo está: el
+   toque hay que probarlo en el centro de lo que **de verdad se ve**.
+
+**Lo que queda pendiente**: el *"se pega tanto que hay que reiniciarla"* NO se reprodujo
+ni con red lenta ni con volumen. Faltan por medir dentro de producción las otras dos
+causas encontradas: la ventana muerta entre que la pantalla se ve y responde al dedo
+(117 ms aquí, 494 en Medifis) y el pico de 11 peticiones a la vez contra el límite de 6
+por dominio que tiene Safari en el iPhone.

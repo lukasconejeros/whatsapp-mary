@@ -188,7 +188,7 @@ export default function AsistentePage() {
             <h1 style={{ fontSize: 18, fontWeight: 800, color: '#054D44', margin: 0 }}>Asistente</h1>
             <p style={{ fontSize: 12, color: '#667781', margin: '4px 0 0' }}>Cuéntame gastos e ingresos, pregúntame por la plata y el calendario, o pídeme mandarle un mensaje con fotos a un apoderado.</p>
           </div>
-          <Link href="/feedbacks" title="Ver los mensajes que enviaste"
+          <Link href="/feedbacks" title="Ver los mensajes que enviaste" className="boton-tactil"
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 10, border: '1px solid #D3E7DE', background: '#F3F9F6', color: '#008069', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
             <MailCheck size={14} /> Enviados
           </Link>
