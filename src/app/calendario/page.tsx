@@ -269,12 +269,15 @@ export default function CalendarioPage() {
             {/* Grilla del mes */}
             <section className="cal-grid">
               <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #E7F1EC' }}>
+                {/* minmax(0,1fr) y no 1fr: una columna `1fr` no puede encoger por debajo de su
+                    contenido, así que un título largo ensanchaba su día y aplastaba a los demás
+                    (Lukas, 09-08: "el calendario se ve mal en el computador"). */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid #E7F1EC' }}>
                   {DOW_LABELS.map(d => (
                     <div key={d} style={{ padding: '8px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#667781' }}>{d}</div>
                   ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
                   {cells.map((cell, i) => {
                     const f = ymd(cell)
                     const inMonth = cell.getMonth() === cursor.m
@@ -283,7 +286,7 @@ export default function CalendarioPage() {
                     const evs = eventosDe(f)
                     return (
                       <button key={i} onClick={() => setSel(f)} className="cal-cell"
-                        style={{ position: 'relative', minHeight: 92, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
+                        style={{ position: 'relative', minHeight: 92, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
                           padding: '5px 5px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
                           border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #E7F1EC' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #E7F1EC' : 'none',
                           background: isSel ? '#E7F1EC' : inMonth ? '#fff' : '#F6FBF8',

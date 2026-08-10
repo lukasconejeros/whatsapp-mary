@@ -43,7 +43,8 @@
     "test:entrenamiento": "tsx scripts/test-entrenamiento.ts",
     "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
-    "test:botones": "node scripts/test-botones-tactiles.mjs"
+    "test:botones": "node scripts/test-botones-tactiles.mjs",
+    "test:calendario": "node scripts/test-calendario-pc.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
