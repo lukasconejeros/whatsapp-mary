@@ -357,3 +357,44 @@ líneas separadas, porque en prosa corrida se leen peor. Todo lo demás, corrido
 
 **Cómo se verifica**: `npm run ensayo:cerebro` (contra el modelo real) y `npm run
 test:cerebro` (62 checks). Commit `8131b2e`.
+---
+
+## #20 — El bot pisaba una regla del prompt cuando la conversación venía larga (10-08-2026)
+
+**Qué pasó**: con el cerebro del #19 ya desplegado, le pidieron *"¿y me pasas los datos para
+transferir?"* y contestó *"primero necesito tu nombre y el de tu hija"*. La regla estaba escrita
+y clarísima en el prompt (🚫 no los cambies por nada). El arnés `ensayo:cerebro` seguía en verde.
+
+**Por qué pasaba**: el arnés arranca de cero con un guion de 16 turnos. La pantalla de práctica de
+Mary llevaba **66 mensajes**. Con esa conversación encima, el modelo se queda enganchado en lo
+último que ofreció ("¿te guardo el cupo?") y esa inercia le gana a una regla del system prompt.
+No es que la regla falte: es que no se está mirando en ese momento.
+
+**Lo que lo arregló**: subir la regla al **FILTRO DE ENTRADA**, que el prompt manda evaluar SIEMPRE
+antes de responder, en vez de dejarla en el capítulo de datos.
+
+**La lección, que vale para todos los clones del kit**: un arnés que empieza de cero prueba el
+prompt, no el bot. Los fallos de verdad aparecen con la conversación encima. Por eso ahora existe
+`npm run ensayo:arrastre`, que parte del historial REAL (saneado: el teléfono y el Instagram de la
+psicóloga son de una persona de verdad y no van al repo) y repite los turnos que fallaron.
+Reprodujo el fallo 2 de 2 veces, con excusa distinta cada vez ("primero el nombre", "primero elige
+el horario"): el candado no puede buscar la excusa, tiene que exigir el dato.
+
+**Y lo que NO se tocó**: el otro fallo de esa tanda —contar lo de la psicóloga sin avisarle a
+Mary— no se pudo reproducir (derivó 4 de 4 veces, y 6 de 6 después). Se dejó el candado repetido
+3 veces por corrida en vez de cambiar el prompt a ciegas. Commit `e4971ae`.
+
+---
+
+## #21 — Un import con `.js` dejaba la pantalla en 500, con todos los tests en verde (10-08-2026)
+
+**Qué pasó**: al portar "Entrenar IA" se creó `src/lib/secciones-negocio.ts` con
+`import { getConfig } from "./db.js"`. Los 32 tests pasaban (tsx resuelve `.js` → `.ts`), pero al
+abrir la pantalla, **500**: `Module not found: Can't resolve './db.js'`. El bundler de Next no lo
+resuelve.
+
+**La lección**: en los módulos de `src/lib` que importa la API de Next, el import va **sin
+extensión** — `ensayo.ts` ya lo tenía escrito en un comentario desde hace semanas. Y la de fondo:
+esto no lo caza ninguna batería de tests, solo levantar la app y abrir la pantalla de verdad.
+
+**Cómo se verifica**: `npm run build` y, mejor, `npm run dev` + entrar al panel. Commit del port.

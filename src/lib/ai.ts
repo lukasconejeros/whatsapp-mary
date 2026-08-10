@@ -14,6 +14,9 @@ const MAX_TOKENS = 3072;
 const RAZONAMIENTO_TOKENS = 1024;
 
 let _client: OpenAI | null = null;
+// Se apaga solo si el proveedor rechaza el razonamiento, y queda apagado para no repetir el
+// error en cada mensaje. Vuelve a encenderse al reiniciar el bot.
+let _razonando = true;
 
 function getClient(): OpenAI {
   if (_client) return _client;
@@ -46,15 +49,28 @@ function buildTools(): OpenAI.Chat.ChatCompletionTool[] {
  * sin gastar una llamada. `reasoning` es de OpenRouter (no está en los tipos del SDK de
  * OpenAI) y es lo que enciende el razonamiento de Haiku 4.5.
  */
-export function cuerpoBot(messages: OpenAI.Chat.ChatCompletionMessageParam[]) {
+export function cuerpoBot(messages: OpenAI.Chat.ChatCompletionMessageParam[], razonando = true) {
   return {
     model: MODEL,
     max_tokens: MAX_TOKENS,
     tools: buildTools(),
     tool_choice: "auto" as const,
-    reasoning: { max_tokens: RAZONAMIENTO_TOKENS },
+    ...(razonando ? { reasoning: { max_tokens: RAZONAMIENTO_TOKENS } } : {}),
     messages,
   };
+}
+
+/**
+ * ¿El error es porque OpenRouter no quiso el razonamiento? Este camino no se puede probar
+ * fuera de producción (la clave de OpenRouter vive allá), así que ante un rechazo del
+ * parámetro se reintenta sin él: un bot que piensa menos es un problema, un bot MUDO
+ * delante de una apoderada es perder al cliente. Un 401 o un 429 no entran acá: esos hay
+ * que verlos, no taparlos con un reintento.
+ */
+export function esErrorDeRazonamiento(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  if (/401|403|429|credit|balance/.test(msg)) return false;
+  return /reasoning|thinking/.test(msg);
 }
 
 function normalizeHistory(history: Message[]): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -106,9 +122,22 @@ export async function generateReply(input: {
   const thread = [...systemMessages, ...messages];
 
   while (turns < MAX_TURNS) {
-    const response = await client.chat.completions.create(
-      cuerpoBot(thread as OpenAI.Chat.ChatCompletionMessageParam[]) as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
-    );
+    const pedir = (razonando: boolean) =>
+      client.chat.completions.create(
+        cuerpoBot(thread as OpenAI.Chat.ChatCompletionMessageParam[], razonando) as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
+      );
+
+    let response;
+    try {
+      response = await pedir(_razonando);
+    } catch (e) {
+      if (!_razonando || !esErrorDeRazonamiento(e)) throw e;
+      // Una sola vez por proceso: si el proveedor no quiere el razonamiento, se sigue
+      // contestando sin él en vez de dejar a la persona esperando.
+      console.warn(`[ia] el proveedor rechazó el razonamiento, se sigue sin él: ${String(e).slice(0, 120)}`);
+      _razonando = false;
+      response = await pedir(false);
+    }
 
     const choice = response.choices[0];
 

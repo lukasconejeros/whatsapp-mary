@@ -14,7 +14,7 @@
  *   npx tsx scripts/test-razonamiento.ts
  */
 import { cuerpoEnsayo } from "../src/lib/ensayo.js";
-import { cuerpoBot } from "../src/lib/ai.js";
+import { cuerpoBot, esErrorDeRazonamiento } from "../src/lib/ai.js";
 
 let pass = 0, fail = 0;
 function ok(cond: boolean, msg: string) {
@@ -50,6 +50,18 @@ ok(/haiku-4-5/.test(bot.model), `usa Haiku 4.5 (${bot.model})`);
 ok(!!bot.reasoning, "el razonamiento va encendido");
 ok((bot.reasoning?.max_tokens ?? 0) >= 1024, `el presupuesto llega al mínimo (${bot.reasoning?.max_tokens})`);
 ok(bot.max_tokens > (bot.reasoning?.max_tokens ?? 0), `max_tokens (${bot.max_tokens}) deja sitio a la respuesta`);
+
+// ── Si OpenRouter no quisiera el razonamiento, el bot NO puede quedarse mudo ──
+// El camino del bot no se puede probar desde el computador de Lukas (la clave de OpenRouter
+// solo está en producción). Así que ante un rechazo del parámetro se reintenta sin él: un bot
+// que piensa menos es un problema; un bot mudo delante de una apoderada es perder al cliente.
+console.log("\nRed de seguridad");
+ok(esErrorDeRazonamiento(new Error('400 Unrecognized request argument supplied: reasoning')), "reconoce el rechazo del parámetro");
+ok(esErrorDeRazonamiento(new Error('unsupported_value: thinking is not supported for this model')), "reconoce que el modelo no soporta pensar");
+ok(!esErrorDeRazonamiento(new Error("401 No auth credentials found")), "una clave mala NO se confunde con esto");
+ok(!esErrorDeRazonamiento(new Error("429 rate limited")), "un límite de uso tampoco");
+const sinRazonar = cuerpoBot([{ role: "user", content: "hola" }], false) as { reasoning?: unknown };
+ok(!sinRazonar.reasoning, "el reintento va sin el parámetro que rechazaron");
 
 // ── Los dos tienen que pensar lo mismo ───────────────────────────────────────
 console.log("\nLos dos caminos");
