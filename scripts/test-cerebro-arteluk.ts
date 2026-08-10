@@ -52,12 +52,15 @@ console.log("\n— Los horarios que confirmó Mary el 10-08 —");
 // no puede dar ninguna otra: un horario inventado hace que un apoderado llegue a la puerta
 // cerrada.
 check("hay talleres todos los días", bajo.includes("todos los días"));
-check("lunes 16:00 a 17:00 y 17:30 a 19:30", /lunes: 16:00 a 17:00 y 17:30 a 19:30/i.test(p));
-check("martes 17:30 a 19:30", /martes: 17:30 a 19:30/i.test(p));
-check("miércoles 17:30 a 19:30", /miércoles: 17:30 a 19:30/i.test(p));
-check("jueves 16:00 a 17:00 y 17:30 a 19:30", /jueves: 16:00 a 17:00 y 17:30 a 19:30/i.test(p));
-check("viernes 17:30 a 19:30 (adolescentes)", /viernes: 17:30 a 19:30 \(grupo de adolescentes\)/i.test(p));
-check("sábado 11:00 a 13:00 (adolescentes)", /sábado: 11:00 a 13:00 \(grupo de adolescentes\)/i.test(p));
+check("lunes 16:00 a 17:00 y 17:30 a 19:30", /lunes 16:00 a 17:00 y 17:30 a 19:30/i.test(p));
+check("martes 17:30 a 19:30", /martes 17:30 a 19:30/i.test(p));
+check("miércoles 17:30 a 19:30", /miércoles 17:30 a 19:30/i.test(p));
+check("jueves 16:00 a 17:00 y 17:30 a 19:30", /jueves 16:00 a 17:00 y 17:30 a 19:30/i.test(p));
+check("viernes 17:30 a 19:30 (adolescentes)", /viernes 17:30 a 19:30 \(grupo de adolescentes\)/i.test(p));
+check("sábado 11:00 a 13:00 (adolescentes)", /sábado 11:00 a 13:00 \(grupo de adolescentes\)/i.test(p));
+// El 10-08 el bot le dio a una niña de 8 solo lunes y jueves: se perdieron martes y
+// miércoles, que también son de niños.
+check("a un niño le da los CUATRO días, no dos", bajo.includes("los cuatro días, lunes, martes, miércoles y jueves"));
 check("grupos de máximo 6 alumnos", bajo.includes("máximo 6 alumnos"));
 check("primero la edad, después los horarios", bajo.includes("nunca antes de saber la edad"));
 check("el cupo lo confirma Mary, no el bot", bajo.includes("ni digas que hay cupo"));
@@ -76,6 +79,18 @@ check("se identifica como asistente de IA si le preguntan", bajo.includes("asist
 check("prohíbe jurar que es Mary", bajo.includes("nunca jures"));
 check("un solo mensaje por respuesta", bajo.includes("un solo mensaje"));
 check("sin listas ni viñetas", bajo.includes("viñeta"));
+
+// 10-08 (tarde). Mary volvió a practicar con el bot ya corregido y Lukas cazó dos cosas:
+// escribía párrafos de documento (con : ; y —) y devolvía CALCADOS los textos que ella
+// misma había escrito. Estos 4 checks son el candado de las dos.
+console.log("\n— Escribe como persona, no como documento (10-08 tarde) —");
+check("prohíbe los dos puntos, el punto y coma y la raya", bajo.includes("prohibidos los signos de documento"));
+check("deja la excepción de la hora (17:30)", bajo.includes("llevar dos puntos es una hora"));
+check("techo duro de 3 o 4 líneas, incluso en el método", bajo.includes("tres o cuatro líneas como máximo"));
+check("los textos de Mary son información, NO libreto para calcar", bajo.includes("no un libreto para\ncopiar y pegar") || bajo.includes("no un libreto para copiar y pegar"));
+check("horarios y datos del banco sí van en líneas", bajo.includes("los horarios y los datos para transferir"));
+check("cuenta que trabajan con una psicóloga", bajo.includes("trabajan con una psicóloga"));
+check("el contacto de la psicóloga lo entrega Mary, no el bot", bajo.includes("el contacto de ella lo entrega mary"));
 
 console.log("\n— Los límites: no agenda, no inventa —");
 check("prohíbe agendar", bajo.includes("nunca agendes"));

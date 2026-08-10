@@ -23,9 +23,23 @@ const GUION = [
   "desde qué edad reciben?",                          // decía "desde los 7": es desde los 5
   "ustedes trabajan arteterapia?",                    // decía que NO: sí hacen
   "cuál es su metodología?",                          // contestaba media frase y volvía a la edad
+  // 10-08 tarde: acá el bot le calcó a Mary su propio párrafo, palabra por palabra.
+  "mi hija es muy tímida y le cuesta socializar",
+  "ustedes trabajan con psicólogos?",                 // dato que Mary dio y no se había bajado
   "ya sabes qué, sí quiero llevarla. qué días tienen?",  // horarios sin confirmar: NO los da
+  "me pasas los datos para transferir?",              // el único caso, con los horarios, que va en líneas
   "soy Carolina y mi hija es Emilia",                 // ya tiene los datos: acá debe derivar
   "oye y estoy hablando con una persona o con un bot?",
+];
+
+// Los textos que escribió Mary son la INFORMACIÓN y el tono, no un molde para copiar y
+// pegar. Si alguna de estas frases sale calcada, el bot está repitiendo en vez de hablar.
+const CALCOS = [
+  "vamos generando espacios para que socialicen de manera natural",
+  "fortaleciendo habilidades de autorregulación mientras crea su propia obra",
+  "para que aprendan a comprender y utilizar el color de manera consciente",
+  "conocer distintos estilos y referentes del arte",
+  "la clase se considerará igualmente realizada",
 ];
 
 const JERGA = ["bacán", "bacan", "filete", "la raja", "sipo", "cachai"];
@@ -59,15 +73,23 @@ async function main() {
     if (precios.length > 1) mal(`mandó ${precios.length} precios juntos: ${precios.join(", ")}`);
     if (/^\s*[-•*]\s/m.test(r.texto)) mal("usó viñetas o lista");
 
-    // 10-08: estilo híbrido. Cuando le preguntan por el MÉTODO, Mary escribe párrafos
-    // largos y eso es lo que convence, así que ahí se permite; en todo lo demás sigue
-    // mandando el mensaje corto de WhatsApp.
-    // La lista de horarios ocupa líneas por definición (Mary los escribe uno por línea).
-    const esPreguntaDeMetodo = /metodolog|arteterapia|técnicas|tecnicas|qué días/i.test(texto);
-    // El tope de 400 venía del estilo seco anterior; las respuestas de Mary pasan de 400
-    // ellas solas, así que el normal sube a 500 y el de método a 900.
-    const topeLineas = esPreguntaDeMetodo ? 10 : 5;
-    const topeChars = esPreguntaDeMetodo ? 900 : 500;
+    // 10-08 (tarde) — Lukas, viendo lo que Mary volvió a practicar: "no debería responder
+    // en párrafos con - ni ; ni :, tiene que acortar para sonar como una persona".
+    if (/[—–]/.test(r.texto)) mal("usó raya larga (—), eso no lo escribe nadie por WhatsApp");
+    if (r.texto.includes(";")) mal("usó punto y coma");
+    if (/\s-\s/.test(r.texto)) mal("usó un guion suelto como separador");
+    // Las horas (17:30) son lo único que puede llevar dos puntos.
+    if (r.texto.replace(/\d{1,2}:\d{2}/g, "").includes(":")) mal("usó dos puntos para presentar algo");
+
+    const calco = CALCOS.find((c) => r.texto.toLowerCase().includes(c));
+    if (calco) mal(`calcó el texto de Mary en vez de contarlo ("${calco.slice(0, 45)}…")`);
+
+    // Techo duro de 3-4 líneas SIEMPRE, incluso si preguntan por el método (lo eligió
+    // Lukas el 10-08). Las únicas que van en líneas son los horarios y los datos para
+    // transferir: en prosa corrida se leen peor.
+    const vaEnLineas = /qué días|horarios|transferir|datos bancarios/i.test(texto);
+    const topeLineas = vaEnLineas ? 10 : 4;
+    const topeChars = vaEnLineas ? 550 : 400;
     if (lineas > topeLineas) mal(`respuesta larga (${lineas} líneas)`);
     if (r.texto.length > topeChars) mal(`respuesta muy larga (${r.texto.length} caracteres)`);
 
@@ -87,12 +109,35 @@ async function main() {
     if (texto.includes("arteterapia")) {
       /no (hac|trabaj|ten)/i.test(r.texto) ? mal("dijo que NO hacen arteterapia") : bien("no negó la arteterapia");
     }
+    if (texto.includes("tímida")) {
+      /grupo|conversa|socializ|confianza|de a poco|de a poquito/i.test(r.texto)
+        ? bien("contesta el fondo de la timidez, con sus palabras")
+        : mal("no contestó lo de la timidez");
+    }
+    // Mary contó que trabajan con una psicóloga y dejó su contacto. El bot lo cuenta,
+    // pero el teléfono y el Instagram de una tercera persona los entrega ella.
+    if (texto.includes("psicólogos")) {
+      /psic[oó]log/i.test(r.texto) ? bien("cuenta que sí trabajan con una psicóloga") : mal("esquivó lo de la psicóloga");
+      /9120\s?8051|99120|instagram\.com/i.test(r.texto) && mal("entregó el contacto de la psicóloga (lo da Mary)");
+      r.acciones.some((a) => a.includes("pasado la conversación"))
+        ? bien("pasa con Mary para el contacto")
+        : mal("no derivó a Mary para dar el contacto");
+    }
+    if (texto.includes("transferir")) {
+      r.texto.includes("1098729145") ? bien("da el número de cuenta") : mal("no dio el número de cuenta");
+      r.texto.includes("78.387.831-3") ? bien("da el RUT de la empresa") : mal("no dio el RUT");
+    }
     // Los horarios que confirmó Mary el 10-08. Para una niña de 8 años van los de lunes a
     // jueves; viernes y sábado son el grupo de adolescentes y NO le sirven.
     if (texto.includes("qué días")) {
       /lunes|martes|mi[ée]rcoles|jueves/i.test(r.texto)
         ? bien("le da los horarios de niños")
         : mal("no le dio ningún horario");
+      // 10-08: le dio solo lunes y jueves. Martes y miércoles también son de niños, y el
+      // que se calla puede ser justo el que a esa mamá le calzaba.
+      const faltan = ["lunes", "martes", "miércoles", "jueves"].filter((d) =>
+        !new RegExp(d.replace("é", "[eé]"), "i").test(r.texto));
+      faltan.length ? mal(`se comió días de niños: ${faltan.join(", ")}`) : bien("le da los cuatro días de niños");
       /viernes|s[áa]bado/i.test(r.texto) && mal("le ofreció el grupo de adolescentes a una niña de 8");
       /domingo/i.test(r.texto) && mal("inventó el domingo, que no existe");
       // Los únicos horarios que existen. Cualquier otra hora es inventada.
