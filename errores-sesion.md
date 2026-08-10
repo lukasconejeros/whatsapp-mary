@@ -320,3 +320,40 @@ corta** que sí debe dar. Con ejemplo, obedece.
 (el calendario cargado el 10-08 dice lunes/martes/miércoles; Mary en el entrenamiento dice
 niños lunes/martes/jueves y adolescentes viernes/sábado; el prompt viejo decía martes y
 jueves). Hasta que ella confirme, el bot **no da ningún día ni hora** y deriva.
+
+---
+
+## #19 — El bot le calcaba a Mary sus propios textos, y escribía como documento
+
+**10-08-2026, tarde.** Mary volvió a practicar con el bot ya corregido (el #18) y Lukas
+cazó dos cosas mirando la conversación: el bot contestaba en párrafos con **dos puntos,
+punto y coma y raya larga** (nadie escribe así por WhatsApp), y sobre todo **devolvía
+palabra por palabra los textos largos que ella misma había escrito entrenando**. Textual
+de Lukas: *"los textos largos que te pase solo es una referencia de la información y cómo
+decirlo, no que lo diga exactamente así"*.
+
+**Por qué pasaba**: al bajar el entrenamiento (#18) sus respuestas se pegaron al prompt
+**entre comillas y completas**, y el prompt además permitía "un párrafo completo como los
+de arriba" cuando preguntaban por el método. Un texto entre comillas dentro del prompt el
+modelo lo lee como el molde de la respuesta, no como el dato. La lección: **la información
+del negocio se guarda como idea; el ejemplo entre comillas queda solo para las respuestas
+que SÍ deben salir textuales** (los datos del banco, la frase de las becas).
+
+**El arnés lo demostró antes de tocar nada**: se endureció primero `ensayo:cerebro` (sin
+`:` `;` `—`, techo de 3-4 líneas, y una lista de frases de Mary que no pueden aparecer
+calcadas) y la corrida dio **17 fallos**. Después del arreglo, **0**.
+
+**Los 3 bugs que salieron de regalo, ninguno de estilo:**
+1. A una niña de 8 le daba **solo lunes y jueves**: martes y miércoles también son de
+   niños. El día que se calla puede ser justo el que a esa mamá le acomodaba. (Es otra vez
+   la familia de casos: se nombró un día y se olvidaron los hermanos.)
+2. Le pedían **los datos para transferir** y respondía pidiendo el nombre primero. Mary en
+   su entrenamiento los entrega al tiro.
+3. Mary contó que trabajan con una **psicóloga** y ese dato nunca se bajó al prompt. Ahora
+   el bot lo cuenta y deriva; el contacto de ella lo entrega Mary, no el bot.
+
+**Excepción que decidió Lukas**: los **horarios** y los **datos para transferir** SÍ van en
+líneas separadas, porque en prosa corrida se leen peor. Todo lo demás, corrido.
+
+**Cómo se verifica**: `npm run ensayo:cerebro` (contra el modelo real) y `npm run
+test:cerebro` (62 checks). Commit `8131b2e`.
