@@ -26,9 +26,33 @@ check("acuarela $45.000", p.includes("45.000"));
 check("taller de artes $60.000", p.includes("60.000"));
 check("premium $120.000", p.includes("120.000"));
 check("matrícula $15.000", p.includes("15.000"));
-check("dirección Picarte 407", p.includes("Picarte 407"));
-check("días martes y jueves", bajo.includes("martes") && bajo.includes("jueves"));
+check("dirección Picarte 805 (Mary la corrigió el 10-08)", p.includes("Picarte 805"));
+check("YA NO dice Picarte 407 (dato viejo, equivocado)", !p.includes("Picarte 407"));
 check("nombra a Mary", p.includes("Mary"));
+
+// El 10-08 Mary entrenó al bot en /ensayo y corrigió 22 respuestas. Estos checks son
+// el candado de lo que ella dijo con sus palabras: si alguien vuelve a poner los datos
+// viejos, un apoderado recibe información falsa.
+console.log("\n— Lo que Mary corrigió entrenando (10-08-2026) —");
+check("desde los 5 años, no desde los 7", bajo.includes("desde los 5 años") && bajo.includes('nunca digas que es "desde los 7"'));
+check("SÍ hacen arteterapia (el bot decía que no)", bajo.includes("arteterapia") && bajo.includes("diplomado en arteterapia"));
+check("la clase de prueba sirve para ver nivel y personalidad", bajo.includes("personalidad"));
+check("se puede recuperar una clase dentro del mes", bajo.includes("recuperar una clase"));
+check("cuenta la Metodología Arteluk y la rosa cromática", bajo.includes("rosa cromática"));
+check("monocromáticas para niños impulsivos / TDAH", bajo.includes("monocromáticas"));
+check("sala de espera con café y té", bajo.includes("salita de espera"));
+check("no hay becas", bajo.includes("no contamos con becas"));
+check("pagos mensuales, primeros 10 días, solo transferencia", bajo.includes("primeros 10 días") && bajo.includes("transferencia"));
+check("datos para transferir (Grupo Arteluk SpA)", p.includes("GRUPO ARTELUK SPA") && p.includes("1098729145"));
+check("se presenta como Mary Quinteros", bajo.includes("magíster en psicología"));
+check("prohíbe el voseo argentino ('querés')", bajo.includes("sin voseo"));
+
+console.log("\n— Los horarios están SIN CONFIRMAR: el bot no puede darlos —");
+// 10-08: hay 3 versiones distintas de los días (calendario, entrenamiento de Mary y este
+// prompt) y Lukas se lo está preguntando a ella. Hasta que conteste, el bot deriva.
+check("dice que no tiene días ni horarios", bajo.includes("no des ningún día ni ninguna hora"));
+check("NO promete martes y jueves como días de taller", !bajo.includes("días de taller:"));
+check("manda derivar cuando pregunten por horarios", bajo.includes("horarios") && bajo.includes("derivarhumano"));
 // La web dice "Oferta Mayo" en agosto: el bot no puede arrastrar una promo vencida.
 check("NO ofrece la oferta de mayo", !bajo.includes("oferta mayo") && !bajo.includes("oferta de mayo"));
 check("NO arrastra el precio viejo de $30.000", !p.includes("30.000"));

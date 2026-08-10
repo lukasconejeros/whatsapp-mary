@@ -279,3 +279,44 @@ ni con red lenta ni con volumen. Faltan por medir dentro de producción las otra
 causas encontradas: la ventana muerta entre que la pantalla se ve y responde al dedo
 (117 ms aquí, 494 en Medifis) y el pico de 11 peticiones a la vez contra el límite de 6
 por dominio que tiene Safari en el iPhone.
+
+---
+
+## #18 — El bot le daba a los apoderados una dirección, una edad y un dato que Mary desmiente
+
+**Síntoma** (10-08-2026): Mary entrenó al bot en la pantalla de práctica haciéndose pasar
+por una apoderada (29 preguntas) y corrigió 22 respuestas con "yo diría esto", marcando 7
+como "esto yo no lo diría". Al leerlas aparecieron **datos falsos que el bot llevaba
+semanas contestando en producción**: la dirección era Picarte 407 y es **Picarte 805,
+segundo piso, al lado del Registro Civil**; decía que reciben "desde los 7 años" y es
+**desde los 5**; respondía que **NO hacen arteterapia** cuando Mary tiene diplomado en
+Arteterapia; e inventaba horarios que no existen.
+
+**Causa**: `prompts/negocio.md` se escribió el 06-08 con los datos de la web y de una
+conversación, sin que la dueña los leyera nunca. Nadie los había contrastado con ella.
+
+**La lección que vale para todos los bots del kit**: los datos del negocio los confirma el
+dueño ANTES de que el bot atienda a nadie. La pantalla de entrenamiento sirve justo para
+eso, pero hay que **leer lo que escribió y bajarlo al prompt**: mientras no se baja, el
+entrenamiento no cambia ni una respuesta.
+
+**Cómo se verifica**: `npm run test:cerebro` (47 checks; los nuevos son el candado de cada
+dato que ella corrigió: Picarte 805, desde los 5 años, arteterapia sí, recuperar clase,
+metodología, monocromáticas, sin becas, forma de pago) y `npm run ensayo:cerebro`, que
+corre una conversación completa contra el modelo real y falla si el bot vuelve a dar la
+dirección vieja, "desde los 7" o un día de clase.
+
+**Trampa al escribir los checks**: las aserciones de `test:cerebro` buscan texto literal en
+el prompt, así que **una negrita en medio de la frase** (`desde los **5 años**`) o un salto
+de línea en el punto justo hacen fallar un check que en realidad está bien. Si un check
+falla, mirar primero cómo quedó partida la frase en el markdown.
+
+**Trampa al soltar información**: el modelo, con la edad del niño recién dicha, soltaba por
+su cuenta el párrafo entero de las técnicas (617 caracteres al tercer mensaje). Prohibirlo
+en abstracto no bastó; se arregló **pegando en el prompt el ejemplo exacto de la respuesta
+corta** que sí debe dar. Con ejemplo, obedece.
+
+**Lo que quedó pendiente**: los días y horarios están en **tres versiones que no calzan**
+(el calendario cargado el 10-08 dice lunes/martes/miércoles; Mary en el entrenamiento dice
+niños lunes/martes/jueves y adolescentes viernes/sábado; el prompt viejo decía martes y
+jueves). Hasta que ella confirme, el bot **no da ningún día ni hora** y deriva.

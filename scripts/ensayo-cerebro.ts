@@ -17,7 +17,13 @@ const GUION = [
   "tiene 8 años",
   "ya, y cuánto sale?",
   "mmm ya, lo voy a pensar y te aviso",              // el "lo pienso" que hace perder al alumno
-  "ya sabes qué, sí quiero llevarla. qué días tienen?",
+  // Las 5 de abajo son preguntas REALES de Mary entrenando el 10-08, con las respuestas
+  // que ella misma corrigió. Cada una tenía el dato equivocado en el cerebro viejo.
+  "dónde están ubicados?",                           // decía Picarte 407: es 805
+  "desde qué edad reciben?",                          // decía "desde los 7": es desde los 5
+  "ustedes trabajan arteterapia?",                    // decía que NO: sí hacen
+  "cuál es su metodología?",                          // contestaba media frase y volvía a la edad
+  "ya sabes qué, sí quiero llevarla. qué días tienen?",  // horarios sin confirmar: NO los da
   "soy Carolina y mi hija es Emilia",                 // ya tiene los datos: acá debe derivar
   "oye y estoy hablando con una persona o con un bot?",
 ];
@@ -52,11 +58,40 @@ async function main() {
     }
     if (precios.length > 1) mal(`mandó ${precios.length} precios juntos: ${precios.join(", ")}`);
     if (/^\s*[-•*]\s/m.test(r.texto)) mal("usó viñetas o lista");
-    if (lineas > 4) mal(`respuesta larga (${lineas} líneas)`);
-    if (r.texto.length > 400) mal(`respuesta muy larga (${r.texto.length} caracteres)`);
+
+    // 10-08: estilo híbrido. Cuando le preguntan por el MÉTODO, Mary escribe párrafos
+    // largos y eso es lo que convence, así que ahí se permite; en todo lo demás sigue
+    // mandando el mensaje corto de WhatsApp.
+    const esPreguntaDeMetodo = /metodolog|arteterapia|técnicas|tecnicas/i.test(texto);
+    // El tope de 400 venía del estilo seco anterior; las respuestas de Mary pasan de 400
+    // ellas solas, así que el normal sube a 500 y el de método a 900.
+    const topeLineas = esPreguntaDeMetodo ? 10 : 5;
+    const topeChars = esPreguntaDeMetodo ? 900 : 500;
+    if (lineas > topeLineas) mal(`respuesta larga (${lineas} líneas)`);
+    if (r.texto.length > topeChars) mal(`respuesta muy larga (${r.texto.length} caracteres)`);
 
     const jerga = JERGA.filter((j) => r.texto.toLowerCase().includes(j));
     if (jerga.length) mal(`usó jerga que no es de Mary: ${jerga.join(", ")}`);
+    if (/qu[eé]r[eé]s|ten[eé]s|pod[eé]s/i.test(r.texto)) mal("usó voseo argentino");
+
+    // Los datos que Mary corrigió: si vuelven los viejos, un apoderado recibe algo falso.
+    if (texto.includes("ubicados")) {
+      r.texto.includes("805") ? bien("da la dirección corregida (Picarte 805)") : mal("no dio Picarte 805");
+      if (r.texto.includes("407")) mal("dio la dirección VIEJA (Picarte 407)");
+    }
+    if (texto.includes("qué edad")) {
+      /\b5\b|cinco/i.test(r.texto) ? bien("dice desde los 5 años") : mal("no dijo que reciben desde los 5 años");
+      if (/desde los 7|desde los siete/i.test(r.texto)) mal("volvió a decir 'desde los 7'");
+    }
+    if (texto.includes("arteterapia")) {
+      /no (hac|trabaj|ten)/i.test(r.texto) ? mal("dijo que NO hacen arteterapia") : bien("no negó la arteterapia");
+    }
+    // Los días están sin confirmar (3 versiones distintas el 10-08): no puede dar ninguno.
+    if (texto.includes("qué días")) {
+      /lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|\d{1,2}:\d{2}/i.test(r.texto)
+        ? mal("dio un día o una hora que NO está confirmado")
+        : bien("no inventó días ni horarios");
+    }
 
     // Puede pedir los datos primero (mejor para Mary), pero con nombre y alumna en la
     // mano ya no hay excusa: tiene que pasarle la conversación.
