@@ -47,12 +47,20 @@ check("datos para transferir (Grupo Arteluk SpA)", p.includes("GRUPO ARTELUK SPA
 check("se presenta como Mary Quinteros", bajo.includes("magíster en psicología"));
 check("prohíbe el voseo argentino ('querés')", bajo.includes("sin voseo"));
 
-console.log("\n— Los horarios están SIN CONFIRMAR: el bot no puede darlos —");
-// 10-08: hay 3 versiones distintas de los días (calendario, entrenamiento de Mary y este
-// prompt) y Lukas se lo está preguntando a ella. Hasta que conteste, el bot deriva.
-check("dice que no tiene días ni horarios", bajo.includes("no des ningún día ni ninguna hora"));
-check("NO promete martes y jueves como días de taller", !bajo.includes("días de taller:"));
-check("manda derivar cuando pregunten por horarios", bajo.includes("horarios") && bajo.includes("derivarhumano"));
+console.log("\n— Los horarios que confirmó Mary el 10-08 —");
+// Antes había 3 versiones distintas de los días. Esta es la que confirmó ella, y el bot
+// no puede dar ninguna otra: un horario inventado hace que un apoderado llegue a la puerta
+// cerrada.
+check("hay talleres todos los días", bajo.includes("todos los días"));
+check("lunes 16:00 a 17:00 y 17:30 a 19:30", /lunes: 16:00 a 17:00 y 17:30 a 19:30/i.test(p));
+check("martes 17:30 a 19:30", /martes: 17:30 a 19:30/i.test(p));
+check("miércoles 17:30 a 19:30", /miércoles: 17:30 a 19:30/i.test(p));
+check("jueves 16:00 a 17:00 y 17:30 a 19:30", /jueves: 16:00 a 17:00 y 17:30 a 19:30/i.test(p));
+check("viernes 17:30 a 19:30 (adolescentes)", /viernes: 17:30 a 19:30 \(grupo de adolescentes\)/i.test(p));
+check("sábado 11:00 a 13:00 (adolescentes)", /sábado: 11:00 a 13:00 \(grupo de adolescentes\)/i.test(p));
+check("grupos de máximo 6 alumnos", bajo.includes("máximo 6 alumnos"));
+check("primero la edad, después los horarios", bajo.includes("nunca antes de saber la edad"));
+check("el cupo lo confirma Mary, no el bot", bajo.includes("ni digas que hay cupo"));
 // La web dice "Oferta Mayo" en agosto: el bot no puede arrastrar una promo vencida.
 check("NO ofrece la oferta de mayo", !bajo.includes("oferta mayo") && !bajo.includes("oferta de mayo"));
 check("NO arrastra el precio viejo de $30.000", !p.includes("30.000"));

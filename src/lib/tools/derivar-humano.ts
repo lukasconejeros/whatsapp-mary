@@ -5,7 +5,12 @@ export const derivarHumanoDefinition = {
   function: {
     name: "derivarHumano",
     description:
-      "Cambia la conversación a Modo Humano para que un operador real continúe. Usar cuando el lead pide precios específicos, hace quejas, o está fuera del alcance del agente.",
+      "Le pasa la conversación a Mary para que siga ella. Úsala SIEMPRE en el mismo mensaje en que " +
+      "digas 'le aviso a Mary' o 'Mary te confirma' — prometerlo sin llamarla deja a la persona " +
+      "esperando para siempre. Úsala también en cuanto tengas el nombre del apoderado y el nombre y " +
+      "la edad del alumno, aunque todavía no haya elegido horario; cuando pidan cupo o agendar; " +
+      "cuando pregunten por arteterapia; ante un reclamo o algo de plata ya pagada; y ante cualquier " +
+      "cosa que no esté en tus datos.",
     parameters: {
       type: "object" as const,
       properties: {

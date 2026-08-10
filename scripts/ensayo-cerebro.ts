@@ -62,7 +62,8 @@ async function main() {
     // 10-08: estilo híbrido. Cuando le preguntan por el MÉTODO, Mary escribe párrafos
     // largos y eso es lo que convence, así que ahí se permite; en todo lo demás sigue
     // mandando el mensaje corto de WhatsApp.
-    const esPreguntaDeMetodo = /metodolog|arteterapia|técnicas|tecnicas/i.test(texto);
+    // La lista de horarios ocupa líneas por definición (Mary los escribe uno por línea).
+    const esPreguntaDeMetodo = /metodolog|arteterapia|técnicas|tecnicas|qué días/i.test(texto);
     // El tope de 400 venía del estilo seco anterior; las respuestas de Mary pasan de 400
     // ellas solas, así que el normal sube a 500 y el de método a 900.
     const topeLineas = esPreguntaDeMetodo ? 10 : 5;
@@ -86,11 +87,19 @@ async function main() {
     if (texto.includes("arteterapia")) {
       /no (hac|trabaj|ten)/i.test(r.texto) ? mal("dijo que NO hacen arteterapia") : bien("no negó la arteterapia");
     }
-    // Los días están sin confirmar (3 versiones distintas el 10-08): no puede dar ninguno.
+    // Los horarios que confirmó Mary el 10-08. Para una niña de 8 años van los de lunes a
+    // jueves; viernes y sábado son el grupo de adolescentes y NO le sirven.
     if (texto.includes("qué días")) {
-      /lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|\d{1,2}:\d{2}/i.test(r.texto)
-        ? mal("dio un día o una hora que NO está confirmado")
-        : bien("no inventó días ni horarios");
+      /lunes|martes|mi[ée]rcoles|jueves/i.test(r.texto)
+        ? bien("le da los horarios de niños")
+        : mal("no le dio ningún horario");
+      /viernes|s[áa]bado/i.test(r.texto) && mal("le ofreció el grupo de adolescentes a una niña de 8");
+      /domingo/i.test(r.texto) && mal("inventó el domingo, que no existe");
+      // Los únicos horarios que existen. Cualquier otra hora es inventada.
+      const horas = r.texto.match(/\d{1,2}:\d{2}/g) ?? [];
+      const validas = ["16:00", "17:00", "17:30", "19:30", "11:00", "13:00"];
+      const inventadas = horas.filter((h) => !validas.includes(h));
+      inventadas.length ? mal(`inventó horas que no existen: ${inventadas.join(", ")}`) : bien("no inventó ninguna hora");
     }
 
     // Puede pedir los datos primero (mejor para Mary), pero con nombre y alumna en la
