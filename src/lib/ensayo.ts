@@ -14,7 +14,13 @@ import type { AudioMary, EnsayoMensaje } from "./db";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_VUELTAS = 6;
-const MAX_TOKENS = 1024;
+// Con razonamiento encendido, `max_tokens` tiene que ser MAYOR que el presupuesto de
+// razonamiento: es el total, no lo que sobra para la respuesta. Con los 1024 de antes la
+// API rechazaba la petición entera y Mary veía el bot mudo.
+const MAX_TOKENS = 3072;
+// 1024 es el mínimo que acepta Anthropic. El mismo número lo usa el bot de WhatsApp por
+// OpenRouter (ver `cuerpoBot` en ai.ts): si no piensan igual, Mary ensaya con otro bot.
+export const RAZONAMIENTO_TOKENS = 1024;
 
 export type RolEnsayo = "apoderado" | "bot";
 export type TurnoEnsayo = { rol: RolEnsayo; texto: string };
@@ -167,7 +173,12 @@ export function demoraEnsayoMs(aleatorio = Math.random()): number {
 type Contenido =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_result"; tool_use_id: string; content: string };
+  | { type: "tool_result"; tool_use_id: string; content: string }
+  // Lo que el modelo piensa antes de contestar. NO se le muestra a nadie, pero viaja
+  // firmado y hay que devolverlo tal cual en el historial: si se pierde, la API rechaza
+  // la vuelta siguiente cuando hubo herramientas de por medio.
+  | { type: "thinking"; thinking: string; signature: string }
+  | { type: "redacted_thinking"; data: string };
 
 type MensajeApi = { role: "user" | "assistant"; content: string | Contenido[] };
 
@@ -181,6 +192,23 @@ function herramientasParaAnthropic(audios: AudioMary[] = []) {
   return extra ? [...base, extra] : base;
 }
 
+/**
+ * El cuerpo de la petición, aparte y sin efectos: así los candados de
+ * `test:razonamiento` lo miran sin gastar una llamada a la API.
+ */
+export function cuerpoEnsayo(system: string, messages: MensajeApi[], audios: AudioMary[] = []) {
+  return {
+    model: process.env.ENSAYO_MODEL ?? "claude-haiku-4-5-20251001",
+    max_tokens: MAX_TOKENS,
+    // Razonamiento encendido (Lukas, 10-08-2026). Ojo: con esto Anthropic solo acepta
+    // temperature 1, por eso aquí no se manda ninguna.
+    thinking: { type: "enabled" as const, budget_tokens: RAZONAMIENTO_TOKENS },
+    system,
+    tools: herramientasParaAnthropic(audios),
+    messages,
+  };
+}
+
 async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: string, audios: AudioMary[] = []) {
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
@@ -189,13 +217,7 @@ async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: st
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({
-      model: process.env.ENSAYO_MODEL ?? "claude-haiku-4-5-20251001",
-      max_tokens: MAX_TOKENS,
-      system,
-      tools: herramientasParaAnthropic(audios),
-      messages,
-    }),
+    body: JSON.stringify(cuerpoEnsayo(system, messages, audios)),
   });
   if (!res.ok) throw new Error(`La IA respondió ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return (await res.json()) as { content: Contenido[]; stop_reason?: string };

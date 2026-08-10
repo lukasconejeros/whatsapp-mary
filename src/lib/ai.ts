@@ -6,7 +6,12 @@ import { computeState } from "./state-manager.js";
 
 const MODEL   = process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5";
 const MAX_TURNS  = 12;
-const MAX_TOKENS = 2048;
+// `max_tokens` es el total e incluye lo que el modelo gasta pensando, así que tiene que
+// superar el presupuesto de razonamiento o la petición se cae y el bot queda mudo.
+const MAX_TOKENS = 3072;
+// El mismo presupuesto que la pantalla de práctica de Mary (RAZONAMIENTO_TOKENS en
+// ensayo.ts). Si los dos números se separan, ella ensaya con un bot que no es el que atiende.
+const RAZONAMIENTO_TOKENS = 1024;
 
 let _client: OpenAI | null = null;
 
@@ -34,6 +39,22 @@ function buildTools(): OpenAI.Chat.ChatCompletionTool[] {
       parameters: t.function.parameters,
     },
   }));
+}
+
+/**
+ * El cuerpo de la petición, aparte y sin efectos, para que `test:razonamiento` lo mire
+ * sin gastar una llamada. `reasoning` es de OpenRouter (no está en los tipos del SDK de
+ * OpenAI) y es lo que enciende el razonamiento de Haiku 4.5.
+ */
+export function cuerpoBot(messages: OpenAI.Chat.ChatCompletionMessageParam[]) {
+  return {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    tools: buildTools(),
+    tool_choice: "auto" as const,
+    reasoning: { max_tokens: RAZONAMIENTO_TOKENS },
+    messages,
+  };
 }
 
 function normalizeHistory(history: Message[]): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -85,13 +106,9 @@ export async function generateReply(input: {
   const thread = [...systemMessages, ...messages];
 
   while (turns < MAX_TURNS) {
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      tools: buildTools(),
-      tool_choice: "auto",
-      messages: thread as OpenAI.Chat.ChatCompletionMessageParam[],
-    });
+    const response = await client.chat.completions.create(
+      cuerpoBot(thread as OpenAI.Chat.ChatCompletionMessageParam[]) as unknown as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
+    );
 
     const choice = response.choices[0];
 

@@ -43,6 +43,8 @@
     "test:entrenamiento": "tsx scripts/test-entrenamiento.ts",
     "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
     "ensayo:arrastre": "tsx scripts/ensayo-arrastre.ts",
+    "test:razonamiento": "tsx scripts/test-razonamiento.ts",
+    "humo:razonamiento": "tsx scripts/humo-razonamiento.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
     "test:botones": "node scripts/test-botones-tactiles.mjs",
     "test:calendario": "node scripts/test-calendario-pc.mjs",
