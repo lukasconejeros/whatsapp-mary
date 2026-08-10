@@ -1,89 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  ETIQUETAS,
+  bloquesDelPrompt,
+  getOverrides,
+  setOverrides,
+  sanear,
+  type ClaveSeccion,
+} from "@/lib/secciones-negocio";
 
 export const dynamic = "force-dynamic";
 
 const NEGOCIO_PATH = path.resolve(process.cwd(), "prompts", "negocio.md");
 
-type Bloque =
-  | { tipo: "raw"; texto: string }
-  | { tipo: "seccion"; titulo: string; contenido: string; tecnica: boolean };
+// ANTES esta ruta ESCRIBÍA prompts/negocio.md, que viaja dentro de la imagen del contenedor:
+// cada deploy restauraba el archivo y borraba en silencio lo que Mary hubiera cambiado. Ahora
+// lo que ella edita se guarda en la base (tabla `config`) y pisa su sección al armar el prompt,
+// así que sobrevive a los deploys — y los arreglos del prompt hechos en el repo siguen llegando.
+// El detalle está en src/lib/secciones-negocio.ts.
 
-// Secciones que afectan el comportamiento técnico del bot (editar con cuidado)
-const TECNICAS = ["filtro", "instruccion", "cómo atender", "como atender", "flujo"];
-function esTecnica(titulo: string): boolean {
-  const t = titulo.toLowerCase();
-  return TECNICAS.some((k) => t.includes(k));
-}
-
-function parse(md: string): { frontmatter: string; bloques: Bloque[] } {
-  let frontmatter = "";
-  let body = md;
-
+function leerPrompt(): string {
+  if (!fs.existsSync(NEGOCIO_PATH)) return "";
+  let md = fs.readFileSync(NEGOCIO_PATH, "utf-8");
   if (md.startsWith("---")) {
     const end = md.indexOf("\n---", 3);
-    if (end !== -1) {
-      frontmatter = md.slice(0, end + 4);
-      body = md.slice(end + 4);
-    }
+    if (end !== -1) md = md.slice(end + 4);
   }
-
-  const lines = body.split("\n");
-  const bloques: Bloque[] = [];
-  let rawBuf: string[] = [];
-  let cur: { titulo: string; contenido: string[] } | null = null;
-
-  const flushRaw = () => {
-    const txt = rawBuf.join("\n").trim();
-    if (txt) bloques.push({ tipo: "raw", texto: txt });
-    rawBuf = [];
-  };
-  const flushSec = () => {
-    if (cur) {
-      bloques.push({
-        tipo: "seccion",
-        titulo: cur.titulo,
-        contenido: cur.contenido.join("\n").trim(),
-        tecnica: esTecnica(cur.titulo),
-      });
-      cur = null;
-    }
-  };
-
-  for (const line of lines) {
-    const h2 = line.match(/^##\s+(.+)$/);
-    if (h2) {
-      if (cur) flushSec();
-      else flushRaw();
-      cur = { titulo: h2[1].trim(), contenido: [] };
-    } else if (cur) {
-      cur.contenido.push(line);
-    } else {
-      rawBuf.push(line);
-    }
-  }
-  flushSec();
-  flushRaw();
-
-  return { frontmatter, bloques };
-}
-
-function rebuild(frontmatter: string, bloques: Bloque[]): string {
-  const parts = bloques.map((b) =>
-    b.tipo === "raw" ? b.texto : `## ${b.titulo}\n${b.contenido}`
-  );
-  return `${frontmatter.trim()}\n\n${parts.join("\n\n")}\n`;
+  return md;
 }
 
 export async function GET() {
   try {
-    if (!fs.existsSync(NEGOCIO_PATH)) {
-      return NextResponse.json({ ok: true, frontmatter: "", bloques: [] });
-    }
-    const md = fs.readFileSync(NEGOCIO_PATH, "utf-8");
-    const { frontmatter, bloques } = parse(md);
-    return NextResponse.json({ ok: true, frontmatter, bloques });
+    const bloques = bloquesDelPrompt(leerPrompt(), getOverrides()).map((b) => ({
+      ...b,
+      // El nombre en cristiano para el panel; las reglas del repo se muestran con su título tal cual.
+      etiqueta: b.clave ? ETIQUETAS[b.clave] : b.titulo,
+    }));
+    return NextResponse.json({ ok: true, bloques });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
@@ -91,21 +45,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { frontmatter, bloques } = (await req.json()) as {
-      frontmatter: string;
-      bloques: Bloque[];
-    };
-    if (!Array.isArray(bloques)) {
+    const body = (await req.json()) as { secciones?: Partial<Record<ClaveSeccion, string>> };
+    if (!body?.secciones || typeof body.secciones !== "object") {
       return NextResponse.json({ ok: false, error: "Formato inválido" }, { status: 400 });
     }
-    const md = rebuild(frontmatter ?? "", bloques);
-    // Backup antes de sobrescribir
-    if (fs.existsSync(NEGOCIO_PATH)) {
-      fs.copyFileSync(NEGOCIO_PATH, NEGOCIO_PATH + ".bak");
-    }
-    fs.writeFileSync(NEGOCIO_PATH, md, "utf-8");
-    // El bot recarga solo: system-prompt.ts cachea por mtime del archivo.
-    return NextResponse.json({ ok: true });
+    // `sanear` deja fuera cualquier clave que no sea de Mary y neutraliza los encabezados: por el
+    // formulario no puede entrar una regla nueva al cerebro del bot.
+    const limpio = sanear(body.secciones);
+    setOverrides(limpio);
+    return NextResponse.json({ ok: true, guardadas: Object.keys(limpio) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

@@ -4,12 +4,9 @@ import { useCallback, useEffect, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import { RefreshCw, Check, AlertTriangle, Sparkles, Settings2 } from 'lucide-react'
 
-type Bloque =
-  | { tipo: 'raw'; texto: string }
-  | { tipo: 'seccion'; titulo: string; contenido: string; tecnica: boolean }
+type Bloque = { titulo: string; etiqueta: string; contenido: string; editable: boolean; clave: string | null }
 
 export default function ConfiguracionPage() {
-  const [frontmatter, setFrontmatter] = useState('')
   const [bloques, setBloques] = useState<Bloque[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -20,30 +17,34 @@ export default function ConfiguracionPage() {
     setLoading(true)
     try {
       const d = await fetch('/api/config').then(r => r.json())
-      if (d.ok) { setFrontmatter(d.frontmatter); setBloques(d.bloques) }
+      if (d.ok) setBloques(d.bloques)
     } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { load() }, [load])
 
   function updateSeccion(idx: number, contenido: string) {
-    setBloques(prev => prev.map((b, i) => i === idx && b.tipo === 'seccion' ? { ...b, contenido } : b))
+    setBloques(prev => prev.map((b, i) => i === idx ? { ...b, contenido } : b))
     setSaved(false)
   }
 
   async function save() {
     setSaving(true); setSaved(false)
     try {
+      // Solo viajan los datos del negocio. Las reglas del bot las mantiene el programa: si se
+      // mandaran desde acá, un arreglo del cerebro dejaría de llegar en el próximo deploy.
+      const secciones: Record<string, string> = {}
+      for (const b of bloques) if (b.editable && b.clave) secciones[b.clave] = b.contenido
       const r = await fetch('/api/config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frontmatter, bloques }),
+        body: JSON.stringify({ secciones }),
       })
       if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
     } finally { setSaving(false) }
   }
 
-  const negocio = bloques.map((b, i) => ({ b, i })).filter(x => x.b.tipo === 'seccion' && !(x.b as { tecnica: boolean }).tecnica)
-  const tecnicas = bloques.map((b, i) => ({ b, i })).filter(x => x.b.tipo === 'seccion' && (x.b as { tecnica: boolean }).tecnica)
+  const negocio = bloques.map((b, i) => ({ b, i })).filter(x => x.b.editable)
+  const tecnicas = bloques.map((b, i) => ({ b, i })).filter(x => !x.b.editable)
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center" style={{ background: '#FFFFFF' }}>
@@ -81,8 +82,9 @@ export default function ConfiguracionPage() {
             <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 12, background: '#E7F1EC', border: '1px solid #A7D8CC', marginBottom: 24 }}>
               <Sparkles size={18} style={{ color: '#00A884', flexShrink: 0, marginTop: 1 }} />
               <p style={{ fontSize: 13, color: '#054D44', lineHeight: 1.55 }}>
-                Acá entrenas tu asistente: cambia precios, promociones, horarios y servicios.
-                Los cambios se aplican al bot al instante, sin reiniciar nada.
+                Acá entrenas tu asistente: la dirección, los horarios, los precios, la cuenta del
+                banco y quiénes hacen las clases. Los cambios se aplican al bot al instante, sin
+                reiniciar nada, y ya no se borran cuando se actualiza el sistema.
               </p>
             </div>
 
@@ -91,8 +93,8 @@ export default function ConfiguracionPage() {
               Información del negocio
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
-              {negocio.map(({ b, i }) => b.tipo === 'seccion' && (
-                <SeccionEditor key={i} titulo={b.titulo} contenido={b.contenido} onChange={v => updateSeccion(i, v)} />
+              {negocio.map(({ b, i }) => (
+                <SeccionEditor key={i} titulo={b.etiqueta} contenido={b.contenido} onChange={v => updateSeccion(i, v)} />
               ))}
             </div>
 
@@ -104,7 +106,7 @@ export default function ConfiguracionPage() {
                   style={{ background: 'none', border: 'none', cursor: 'pointer', marginBottom: 12, padding: 0, fontFamily: 'inherit' }}>
                   <Settings2 size={14} style={{ color: '#94A3B8' }} />
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Comportamiento avanzado {showTech ? '▾' : '▸'}
+                    Lo que el bot ya sabe hacer {showTech ? '▾' : '▸'}
                   </span>
                 </button>
 
@@ -113,12 +115,14 @@ export default function ConfiguracionPage() {
                     <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 16 }}>
                       <AlertTriangle size={15} style={{ color: '#B45309', flexShrink: 0, marginTop: 1 }} />
                       <p style={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
-                        Estas secciones controlan cómo se comporta el bot (cuándo responder, cuándo callarse, cómo agendar). Edítalas solo si sabes lo que haces.
+                        Esto es cómo se comporta el bot: cuándo contesta, cuándo se calla y cómo te
+                        pasa una conversación. Lo mantenemos nosotros, por eso se ve pero no se
+                        edita. Si algo de acá hay que cambiar, dínoslo y lo cambiamos.
                       </p>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
-                      {tecnicas.map(({ b, i }) => b.tipo === 'seccion' && (
-                        <SeccionEditor key={i} titulo={b.titulo} contenido={b.contenido} onChange={v => updateSeccion(i, v)} tecnica />
+                      {tecnicas.map(({ b, i }) => (
+                        <SeccionEditor key={i} titulo={b.titulo} contenido={b.contenido} onChange={() => {}} tecnica soloLectura />
                       ))}
                     </div>
                   </>
@@ -132,7 +136,7 @@ export default function ConfiguracionPage() {
   )
 }
 
-function SeccionEditor({ titulo, contenido, onChange, tecnica }: { titulo: string; contenido: string; onChange: (v: string) => void; tecnica?: boolean }) {
+function SeccionEditor({ titulo, contenido, onChange, tecnica, soloLectura }: { titulo: string; contenido: string; onChange: (v: string) => void; tecnica?: boolean; soloLectura?: boolean }) {
   const lines = Math.min(Math.max(contenido.split('\n').length + 1, 3), 16)
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: `1px solid ${tecnica ? '#FDE68A' : '#D3E7DE'}`, overflow: 'hidden', boxShadow: '0 1px 2px rgba(30,58,95,0.04)' }}>
@@ -142,9 +146,11 @@ function SeccionEditor({ titulo, contenido, onChange, tecnica }: { titulo: strin
       <textarea
         value={contenido}
         onChange={e => onChange(e.target.value)}
+        readOnly={soloLectura}
         rows={lines}
         style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', padding: '12px 16px',
-          fontSize: 13, lineHeight: 1.6, color: '#334155', fontFamily: 'inherit', background: '#fff' }}
+          fontSize: 13, lineHeight: 1.6, color: soloLectura ? '#64748B' : '#334155', fontFamily: 'inherit',
+          background: soloLectura ? '#FAFAF9' : '#fff', cursor: soloLectura ? 'default' : 'text' }}
       />
     </div>
   )
