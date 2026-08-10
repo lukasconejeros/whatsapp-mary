@@ -43,6 +43,17 @@ const problemas = []
 
 for (const ruta of RUTAS) {
   await page.goto(BASE + ruta, { waitUntil: 'domcontentloaded' })
+  // Si la sesión no entró, la pantalla que se mide es el login: tres controles y
+  // "todo verde" sin haber mirado nada. Mejor reventar que mentir.
+  if (page.url().includes('/login')) {
+    console.error(`\nNo hay sesión: ${ruta} rebotó al login. El test no mide nada así.`)
+    await browser.close()
+    process.exit(2)
+  }
+  // Y esperar a que la pantalla termine de cargar, o se miden cuatro controles
+  // en vez de todos.
+  await page.waitForFunction(() => !/Cargando/i.test(document.body.innerText), null, { timeout: 60000 })
+    .catch(() => console.log('  (aviso: seguía cargando; se mide igual)'))
   await page.waitForTimeout(1500)
 
   const r = await page.evaluate((MINIMO) => {
@@ -96,7 +107,12 @@ for (const ruta of RUTAS) {
         chicos.push({ el: desc(el), texto, px: `${Math.round(b.width)}x${Math.round(b.height)}` })
       }
 
-      const recibe = document.elementFromPoint(v.left + v.width / 2, v.top + v.height / 2)
+      // Para probar el toque hacemos lo que haría una persona: desplazar el
+      // botón a la vista. Si no, un control a medio subir por la lista parece
+      // "tapado" por la barra de abajo cuando en realidad basta con deslizar.
+      el.scrollIntoView({ block: 'center', inline: 'center' })
+      const t = trozoVisible(el)
+      const recibe = document.elementFromPoint(t.left + t.width / 2, t.top + t.height / 2)
       // nextjs-portal es el panel de herramientas del modo desarrollo: no existe
       // en producción, así que no cuenta como estorbo.
       const esOverlayDeDev = recibe && recibe.tagName.toLowerCase() === 'nextjs-portal'
