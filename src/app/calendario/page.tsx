@@ -13,7 +13,7 @@ type ClaseFija = { id: number; dia: string; hora: string; horaFin: string | null
 // Pago que vuelve TODOS los meses (arriendo, sueldos, suscripción, otros).
 type PagoFijo = { id: number; tipo: string; descripcion: string | null; monto: number; diaMes: number; activo: boolean }
 // Recordatorio puntual de Mary: el aviso va a SU WhatsApp, nunca al apoderado.
-type Recordatorio = { id: number; fecha: string; hora: string | null; texto: string; avisar: boolean; enviadoAt: number | null; hecho: boolean }
+type Recordatorio = { id: number; fecha: string; hora: string | null; texto: string; avisar: boolean; enviadoAt: number | null; hecho: boolean; outboxId?: number | null }
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
 type Form = { fecha: string; profe: string; hora: string; alumnos: number[]; alumnosExtra: (string | number)[]; nota: string }
 
@@ -457,10 +457,14 @@ export default function CalendarioPage() {
                         <button onClick={() => borrarExtra(`/api/recordatorios/${r.id}`, '¿Borrar este recordatorio?')} title="Borrar"
                           style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#1D4ED8' }}><Trash2 size={13} /></button>
                       </div>
-                      {/* Mientras el envío no exista, la pantalla NO dice que el aviso va a
-                          salir: dar por enviado lo que no salió ya costó un incidente. */}
+                      {/* "Enviado" SOLO cuando el WhatsApp salió de verdad (enviadoAt).
+                          Antes de eso se dice que está en camino, nunca que ya salió:
+                          dar por enviado lo que no salió ya costó un incidente. */}
                       <p style={{ fontSize: 10.5, color: '#3B82F6', marginTop: 4 }}>
-                        {r.avisar ? (r.enviadoAt ? 'Aviso enviado' : 'Con aviso · falta encender el envío') : 'Sin aviso'}
+                        {!r.avisar ? 'Sin aviso'
+                          : r.enviadoAt ? 'Te llegó por WhatsApp'
+                          : r.outboxId ? 'Mandándolo por WhatsApp…'
+                          : 'Te llega por WhatsApp'}
                       </p>
                     </div>
                   ))}

@@ -51,6 +51,8 @@
     "test:calendario": "node scripts/test-calendario-pc.mjs",
     "test:clases-fijas": "tsx scripts/test-clases-fijas.ts",
     "test:pagos-recordatorios": "tsx scripts/test-pagos-recordatorios.ts",
+    "test:recordatorios-wa": "tsx scripts/test-recordatorios-wa.ts",
+    "test:recordatorios-envio": "tsx scripts/test-recordatorios-envio.ts",
     "test:calendario-extras": "node scripts/test-calendario-extras.mjs",
     "cargar:alumnos": "node scripts/cargar-alumnos-arteluk.mjs"
   },

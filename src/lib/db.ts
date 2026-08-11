@@ -406,6 +406,9 @@ function build(): Ctx {
   db.exec("CREATE INDEX IF NOT EXISTS idx_clases_fecha ON clases(fecha)");
   // Marca del push "5 h antes" (recordatorios del calendario, 04-08-2026).
   addColumnaSiFalta(db, "clases", "aviso_5h", "INTEGER NOT NULL DEFAULT 0");
+  // Recordatorios de Mary por WhatsApp (10-08-2026): la fila de la cola de envío
+  // que los está llevando. Con esto 'enviado_at' se escribe SOLO cuando salió.
+  addColumnaSiFalta(db, "recordatorios", "outbox_id", "INTEGER");
   // Entrenamiento de Mary (09-08-2026): la práctica se ARCHIVA por sesión, nunca se
   // borra. Lo que ya existía queda en la sesión 1.
   addColumnaSiFalta(db, "ensayo_mensajes", "sesion_id", "INTEGER NOT NULL DEFAULT 1");
@@ -1464,6 +1467,8 @@ export function deletePagoFijo(id: number): void {
 export interface Recordatorio {
   id: number; fecha: string; hora: string | null; texto: string;
   avisar: boolean; enviadoAt: number | null; hecho: boolean;
+  /** Fila del outbox que lo está llevando; null = no está en camino. */
+  outboxId: number | null;
 }
 export interface RecordatorioInput {
   fecha: string; hora?: string | null; texto: string;
@@ -1471,12 +1476,13 @@ export interface RecordatorioInput {
 }
 interface RecordatorioRow {
   id: number; fecha: string; hora: string | null; texto: string;
-  avisar: number; enviado_at: number | null; hecho: number;
+  avisar: number; enviado_at: number | null; hecho: number; outbox_id: number | null;
 }
 function parseRecordatorio(r: RecordatorioRow): Recordatorio {
   return {
     id: r.id, fecha: r.fecha, hora: r.hora, texto: r.texto,
     avisar: r.avisar === 1, enviadoAt: r.enviado_at, hecho: r.hecho === 1,
+    outboxId: r.outbox_id ?? null,
   };
 }
 
@@ -1510,6 +1516,22 @@ export function updateRecordatorio(id: number, d: RecordatorioInput): void {
 /** Se llama SOLO cuando el WhatsApp a Mary salió de verdad. */
 export function marcarRecordatorioEnviado(id: number, cuando = Math.floor(Date.now() / 1000)): void {
   ctx().db.prepare("UPDATE recordatorios SET enviado_at=? WHERE id=?").run(cuando, id);
+}
+
+/**
+ * Anota en qué fila de la cola de envío va (o la suelta con null, si ese envío
+ * fracasó, para que la próxima pasada lo vuelva a intentar).
+ */
+export function marcarRecordatorioEncolado(id: number, outboxId: number | null): void {
+  ctx().db.prepare("UPDATE recordatorios SET outbox_id=? WHERE id=?").run(outboxId, id);
+}
+
+/** Estado de un envío: 0 pendiente · 1 enviado · 2 descartado. null = ya no está. */
+export function getOutboxSent(id: number): number | null {
+  const r = ctx().db.prepare("SELECT sent FROM outbox WHERE id = ?").get(id) as
+    | { sent: number }
+    | undefined;
+  return r ? r.sent : null;
 }
 
 export function deleteRecordatorio(id: number): void {

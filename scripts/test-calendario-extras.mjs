@@ -84,9 +84,15 @@ await page.getByPlaceholder('Ej: comprar acuarelas').fill('PRUEBA comprar acuare
 await page.getByRole('button', { name: 'Guardar' }).click()
 await page.waitForTimeout(900)
 ok((await page.getByText('PRUEBA comprar acuarelas').count()) > 0, 'el recordatorio aparece en el día')
+// El envío por WhatsApp ya existe (10-08-2026), pero recién creado NO ha salido:
+// la tarjeta dice que le LLEGA (futuro), nunca que le llegó.
 ok(
-  (await page.getByText('falta encender el envío').count()) > 0,
-  'NO dice que el aviso salió: el envío todavía no existe y no se da por hecho'
+  (await page.getByText('Te llega por WhatsApp').count()) > 0,
+  'dice que el recordatorio le llega por WhatsApp'
+)
+ok(
+  (await page.getByText('Te llegó por WhatsApp').count()) === 0,
+  'NO lo da por enviado antes de que WhatsApp lo mande'
 )
 
 // ── ALUMNO que se repite todas las semanas ──────────────────────────────────

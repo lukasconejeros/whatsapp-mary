@@ -9,6 +9,7 @@ import pino from "pino";
 import { listClasesRange, marcarAviso5h, getConfig, setConfig, type Clase } from "./db.js";
 import { enviarPush, pushConfigurado } from "./push.js";
 import { recordatoriosPendientes, diasEntre, type FilaCalendario } from "./recordatorios.js";
+import { tickRecordatoriosWa } from "./recordatorios-wa-loop.js";
 import { todaySantiago, nowSantiago } from "./fechas.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
@@ -85,10 +86,17 @@ export function startRecordatoriosLoop(): void {
       await tickRecordatorios();
     } catch (err) {
       logger.error({ err }, "Recordatorios: error en el tick; reintenta");
-    } finally {
-      corriendo = false;
-      timer = setTimeout(run, INTERVALO_MS);
     }
+    try {
+      // Los recordatorios que Mary escribe en el formulario: esos van por
+      // WhatsApp a su propio número, no por push. Van en su propio try para
+      // que un fallo aquí no se lleve por delante los avisos de las clases.
+      tickRecordatoriosWa();
+    } catch (err) {
+      logger.error({ err }, "Recordatorios por WhatsApp: error en el tick; reintenta");
+    }
+    corriendo = false;
+    timer = setTimeout(run, INTERVALO_MS);
   };
   timer = setTimeout(run, 20_000); // arranca 20 s tras levantar el bot
   logger.info("Loop de recordatorios del calendario iniciado");
