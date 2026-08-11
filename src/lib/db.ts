@@ -128,6 +128,19 @@ CREATE TABLE IF NOT EXISTS seguimientos (
 CREATE INDEX IF NOT EXISTS idx_seguimientos_estado ON seguimientos(estado, created_at);
 CREATE INDEX IF NOT EXISTS idx_seguimientos_conv ON seguimientos(conversation_id);
 
+-- Chats que se quedaron SIN RESPUESTA, con el motivo (portado de Medifis #50). Antes
+-- todas las rutas dejaban la misma huella —ninguna— y el porqué se perdía con el
+-- siguiente deploy. Es una anotación interna: al contacto no se le manda nada.
+CREATE TABLE IF NOT EXISTS mudos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  motivo TEXT NOT NULL,
+  categoria TEXT,               -- de qué tipo de contacto era (potencial = lead pagado)
+  detalle TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_mudos_conv ON mudos(conversation_id, created_at);
+
 -- Config simple clave→valor (ej. la plantilla EDITABLE del mensaje de seguimiento).
 CREATE TABLE IF NOT EXISTS config (
   clave TEXT PRIMARY KEY,
@@ -836,6 +849,10 @@ export function deleteConversation(conversationId: number): void {
     // leads tiene FK a conversations (RESTRICT): hay que borrarlo antes o el DELETE
     // de la conversación falla con SQLITE_CONSTRAINT y el borrado nunca se completa.
     c.db.prepare("DELETE FROM leads WHERE conversation_id = ?").run(conversationId);
+    // Igual que leads: 'mudos' y 'seguimientos' apuntan a la conversación, y si quedan
+    // filas el DELETE se cae con SQLITE_CONSTRAINT y no se borra nada.
+    c.db.prepare("DELETE FROM mudos WHERE conversation_id = ?").run(conversationId);
+    c.db.prepare("DELETE FROM seguimientos WHERE conversation_id = ?").run(conversationId);
     c.deleteConv.run(conversationId);
   });
   del();
@@ -914,6 +931,38 @@ export function setCategoria(
   ctx().db
     .prepare("UPDATE conversations SET categoria = ?, categoria_manual = ? WHERE id = ?")
     .run(categoria, manual ? 1 : 0, conversationId);
+}
+
+// ── Chats sin respuesta ───────────────────────────────────────────────────────
+
+export interface Mudo {
+  id: number;
+  conversation_id: number;
+  motivo: string;
+  categoria: string | null;
+  detalle: string | null;
+  created_at: number;
+}
+
+/** Anota que a este chat no se le contestó, y por qué. Nunca rompe el flujo del bot. */
+export function registrarMudo(
+  conversationId: number,
+  motivo: string,
+  detalle?: string
+): void {
+  try {
+    const categoria = getConversationById(conversationId)?.categoria ?? null;
+    ctx().db
+      .prepare("INSERT INTO mudos (conversation_id, motivo, categoria, detalle) VALUES (?, ?, ?, ?)")
+      .run(conversationId, motivo, categoria, detalle ?? null);
+  } catch { /* una anotación nunca puede tumbar al bot */ }
+}
+
+/** Los chats sin respuesta más recientes (para revisar por qué se quedó callado). */
+export function listMudos(limit = 50): Mudo[] {
+  return ctx().db
+    .prepare("SELECT * FROM mudos ORDER BY created_at DESC LIMIT ?")
+    .all(limit) as Mudo[];
 }
 
 export function setCtwaReferral(conversationId: number, referral: unknown): void {

@@ -10,6 +10,7 @@ import {
   setCtwaReferral,
   setMode,
   setModeAutomatico,
+  registrarMudo,
   setConversationPhoto,
   enqueueOutbox,
   markMessageProcessed,
@@ -21,7 +22,7 @@ import { fueEnvioOutbox } from "./eco.js";
 import { describirImagen, transcribirAudio, leerComprobante } from "../media.js";
 import { interpretarComprobante, vinoDeMeta, type BorradorComprobante } from "../comprobante.js";
 import { todaySantiago } from "../fechas.js";
-import { generateReply } from "../ai.js";
+import { generateReplyDetallado } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
@@ -402,8 +403,19 @@ export async function handleIncomingMessages(
           const fresh2 = getConversationById(convId);
           if (!fresh2 || fresh2.mode !== "AI") return;
           const history = getRecentHistory(convId, 20);
-          const reply = await generateReply({ history, conversationId: convId, phone });
-          if (!reply) return;
+          const { texto: reply, motivo } = await generateReplyDetallado({ history, conversationId: convId, phone });
+          if (!reply) {
+            // Nadie se enteraba de esto: quedaba en el registro del contenedor y el
+            // siguiente deploy se lo llevaba (Medifis #50). Ahora queda en la base.
+            registrarMudo(convId, motivo ?? "sin_texto_del_modelo");
+            const cat = getConversationById(convId)?.categoria;
+            if (cat === "potencial") {
+              logger.error({ convId, motivo }, "🔴 un lead de ANUNCIO se quedó sin respuesta");
+            } else {
+              logger.info({ convId, motivo }, "sin respuesta para este chat");
+            }
+            return;
+          }
           // La respuesta sale por el OUTBOX (reintentos + socket vigente tras
           // reconexión), no por sock.sendMessage directo. Se registra junto al encolado.
           insertMessage(convId, "assistant", reply);

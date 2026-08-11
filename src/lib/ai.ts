@@ -154,11 +154,38 @@ function normalizeHistory(history: Message[]): OpenAI.Chat.ChatCompletionMessage
   return normalized;
 }
 
+// Por qué un chat se quedó sin respuesta. Hasta ahora todas las rutas dejaban la misma
+// huella (nada) y el motivo se perdía con el siguiente deploy: Medifis #50.
+export type MotivoMudo =
+  | "sin_texto_del_modelo"   // el modelo devolvió vacío incluso tras el empujón
+  | "silencio_deliberado"    // llamó a silenciar(): no es cliente del taller
+  | "sin_mensaje_del_usuario"; // no había nada que contestar (mensaje propio o vacío)
+
+export interface RespuestaBot {
+  texto: string;
+  motivo: MotivoMudo | null;
+}
+
+// El empujón del reintento (Medifis #51). Reintentar tal cual NO sirve: el bot corre a
+// temperatura baja y sale el mismo vacío. Lo que cambia el resultado es decirle que ese
+// silencio no corresponde.
+const EMPUJON_REINTENTO =
+  "Tu respuesta anterior salió vacía y la persona se quedó sin nada. " +
+  "Responde ahora con un mensaje normal para ella. Si dudabas si contestar o no, contesta.";
+
 export async function generateReply(input: {
   history: Message[];
   conversationId: number;
   phone?: string;
 }): Promise<string> {
+  return (await generateReplyDetallado(input)).texto;
+}
+
+export async function generateReplyDetallado(input: {
+  history: Message[];
+  conversationId: number;
+  phone?: string;
+}): Promise<RespuestaBot> {
   const client   = getClient();
   const sysprompt = buildSystemPrompt();
   const messages  = normalizeHistory(input.history);
@@ -170,12 +197,46 @@ export async function generateReply(input: {
     : "";
   const estadoContext = `[ESTADO_TURNO: ${turnoState.estado}${metaStr}]`;
 
-  if (messages.length === 0 || messages[messages.length - 1].role !== "user") return "";
+  if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
+    return { texto: "", motivo: "sin_mensaje_del_usuario" };
+  }
 
   const systemMessages = mensajesDeSistema(sysprompt, estadoContext, _cacheando);
 
+  const ctxModelo = { ...input, sysprompt, estadoContext };
+  const primero = await conversarConElModelo(client, [...systemMessages, ...messages], ctxModelo);
+  if (primero.texto.trim()) return { texto: primero.texto, motivo: null };
+  if (primero.silencio) return { texto: "", motivo: "silencio_deliberado" };
+
+  // Salió vacío sin querer callar: se reintenta UNA vez con el empujón (Medifis #51).
+  // Solo si el primer intento no ejecutó ninguna herramienta: si ya derivó o marcó
+  // interés, repetir la vuelta las ejecutaría dos veces.
+  if (primero.usoHerramientas) return { texto: "", motivo: "sin_texto_del_modelo" };
+
+  console.warn("[ia] respuesta vacía — se reintenta una vez con el empujón");
+  const segundo = await conversarConElModelo(
+    client,
+    [...systemMessages, ...messages, { role: "system", content: EMPUJON_REINTENTO }],
+    ctxModelo
+  );
+  if (segundo.texto.trim()) return { texto: segundo.texto, motivo: null };
+  if (segundo.silencio) return { texto: "", motivo: "silencio_deliberado" };
+  return { texto: "", motivo: "sin_texto_del_modelo" };
+}
+
+// Una vuelta completa con el modelo: pide, ejecuta las herramientas que pida y vuelve a
+// pedir hasta que conteste. Devuelve el texto (vacío si no escribió nada), si el silencio
+// fue deliberado —llamó a silenciar()— y si llegó a ejecutar alguna herramienta.
+async function conversarConElModelo(
+  client: OpenAI,
+  threadInicial: OpenAI.Chat.ChatCompletionMessageParam[],
+  input: { conversationId: number; phone?: string; sysprompt: string; estadoContext: string }
+): Promise<{ texto: string; silencio: boolean; usoHerramientas: boolean }> {
+  const { sysprompt, estadoContext } = input;
   let turns = 0;
-  const thread = [...systemMessages, ...messages];
+  let silencio = false;
+  let usoHerramientas = false;
+  const thread = [...threadInicial];
 
   while (turns < MAX_TURNS) {
     const pedir = (razonando: boolean) =>
@@ -220,8 +281,8 @@ export async function generateReply(input: {
 
     const choice = response.choices[0];
 
-    if (choice.finish_reason === "stop" || choice.finish_reason === "end_turn") {
-      return choice.message.content ?? "";
+    if (choice.finish_reason === "stop") {
+      return { texto: choice.message.content ?? "", silencio, usoHerramientas };
     }
 
     if (choice.finish_reason === "tool_calls" && choice.message.tool_calls?.length) {
@@ -230,6 +291,7 @@ export async function generateReply(input: {
       const toolResults: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
 
       for (const toolCall of choice.message.tool_calls) {
+        if (toolCall.type !== "function") continue;
         let args: Record<string, unknown> = {};
         try { args = JSON.parse(toolCall.function.arguments); } catch { /* empty args */ }
 
@@ -238,6 +300,12 @@ export async function generateReply(input: {
           args,
           { conversationId: input.conversationId, phone: input.phone }
         );
+        usoHerramientas = true;
+        // Callarse solo cuenta si la tool lo aceptó: a un lead de anuncio se le niega
+        // (ver tools/silenciar.ts), y ahí el silencio NO es deliberado, es un fallo.
+        if (toolCall.function.name === "silenciar" && (result as { ok?: boolean })?.ok !== false) {
+          silencio = true;
+        }
 
         toolResults.push({
           role: "tool",
@@ -252,9 +320,12 @@ export async function generateReply(input: {
     }
 
     // Respuesta de texto sin tool_calls
-    if (choice.message.content) return choice.message.content;
+    if (choice.message.content) return { texto: choice.message.content, silencio, usoHerramientas };
     break;
   }
 
-  return "Déjame un momento, vuelvo contigo enseguida.";
+  // Se acabaron los turnos sin una respuesta: si el silencio era a propósito se
+  // respeta, y si no, no se deja a nadie esperando.
+  if (silencio) return { texto: "", silencio, usoHerramientas };
+  return { texto: "Déjame un momento, vuelvo contigo enseguida.", silencio, usoHerramientas };
 }
