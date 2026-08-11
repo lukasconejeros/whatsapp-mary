@@ -440,3 +440,44 @@ personales en silencio, ~USD 0,01 la corrida.
 **De paso**: `deleteConversation()` se caía con `FOREIGN KEY constraint failed` en cuanto la
 conversación tenía filas hijas nuevas (lo cazó el test), y el `typecheck` del repo estaba **rojo desde
 antes** en `ai.ts` (`finish_reason === "end_turn"` imposible y `tool_calls` sin discriminar el tipo).
+
+---
+
+## #23 — La app se quedaba cargando y los botones "no se apretaban" (11-08-2026)
+
+**Síntoma** (Lukas, textual): *"estoy en conversaciones, se queda cargando y aprieto Finanzas o
+Calendario y no se aprieta; mi mamá se mete y no carga; pasa en el teléfono y en el computador"*.
+
+**Cómo se midió** (nada de impresiones): Playwright contra producción con pantalla de iPhone
+390×844, registrando TODAS las llamadas `/api` con su peso. Antes del arreglo:
+
+| Qué | Medida |
+|---|---|
+| Fotos de perfil en los primeros 12 s | **104 peticiones · 5,9 MB** · media 4,8 s · la peor **10,2 s** |
+| `/api/conversations` | 207 KB **sin comprimir**, ×2 en 12 s |
+| Total bajado en 12 s | **6,3 MB en 109 peticiones** |
+| Toque en Calendario | **6,1 s** |
+
+**Las tres causas** (ninguna era "el servidor está lento"):
+
+1. **El inbox pedía las 341 fotos de golpe**, también las de las filas que no se ven. El navegador
+   solo abre **6 conexiones por dominio**, así que el toque del usuario quedaba EN COLA detrás de
+   ~100 fotos → la pantalla no cambiaba y parecía que el botón no respondía.
+2. **Las fotos no se cacheaban NUNCA**: la regla `headers()` de `next.config.ts` ponía
+   `no-store` a todo lo que no fuera `/_next/static`, y **pisaba** el `Cache-Control` que la
+   propia ruta `/api/media` mandaba. Cada apertura de la app volvía a bajar los 5,9 MB enteros.
+3. **`/api/conversations` viajaba sin comprimir**: Next comprime el HTML de las páginas pero no
+   las respuestas de las rutas `/api`. 207 KB cada 10 s ≈ 1 MB por minuto en datos móviles.
+
+**De paso**: `/api/media` leía el archivo con `readFileSync`, bloqueando el único hilo de Node en
+cada foto; con decenas seguidas el servidor no atendía nada más mientras leía del disco.
+
+**Trampa que se evitó**: la nota de la sesión anterior culpaba a `Dashboard.tsx:44` y su
+`setInterval` de 2 s. Ese componente **es código muerto** — `/` redirige a `/inbox` y nadie importa
+`ConnectionGate`/`Dashboard`. Arreglarlo no habría cambiado nada. Por eso se volvió a medir antes de
+tocar en vez de fiarse de lo anotado.
+
+**Cómo se verifica**: correr el script de medida contra producción y comparar con la tabla de
+arriba (fotos pedidas en los primeros 5 s, KB totales y tiempo del toque en Calendario). En local:
+`/api/conversations` debe responder `content-encoding: gzip`, un `avatar_*.jpg` con
+`max-age=86400`, un audio con `max-age=31536000, immutable` y `/inbox` seguir en `no-store`.
