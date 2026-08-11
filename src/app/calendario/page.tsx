@@ -277,11 +277,15 @@ export default function CalendarioPage() {
   const chipAlumno = (fecha: string, nombre: string, borde: string) => {
     const est = estadoAsis(fecha, nombre)
     return (
+      // El botón mide 44 px de alto (lo mínimo para tocarlo bien en el teléfono),
+      // pero el chip de dentro sigue siendo chico: se ve igual que antes.
       <button key={`${fecha}-${nombre}`} onClick={() => ciclarAsis(fecha, nombre)}
         title={est === 'vino' ? 'Vino — toca para cambiar' : est === 'falto' ? 'Faltó — toca para cambiar' : 'Sin marcar — toca para marcar'}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 26, fontSize: 11, color: '#374151', background: '#fff', border: `1px solid ${borde}`, borderRadius: 6, padding: '2px 7px', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: est ? COLOR_ASIS[est] : '#D1D5DB' }} />
-        {nombre}
+        style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, minWidth: 44, padding: '0 2px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#374151', background: '#fff', border: `1px solid ${borde}`, borderRadius: 6, padding: '3px 7px' }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: est ? COLOR_ASIS[est] : '#D1D5DB' }} />
+          {nombre}
+        </span>
       </button>
     )
   }

@@ -481,3 +481,35 @@ tocar en vez de fiarse de lo anotado.
 arriba (fotos pedidas en los primeros 5 s, KB totales y tiempo del toque en Calendario). En local:
 `/api/conversations` debe responder `content-encoding: gzip`, un `avatar_*.jpg` con
 `max-age=86400`, un audio con `max-age=31536000, immutable` y `/inbox` seguir en `no-store`.
+
+## #24 — Apagar dos avisos y encender otros dos: la familia completa antes de tocar (11-08-2026)
+
+**El encargo.** Lukas, por audio: que a las 10:00 le llegue a Mary todo lo del dia y que a
+las 21:00 un "microbot" en su propio numero le pregunte si vinieron todos, para pintar el
+calendario con puntos verdes y rojos. Textual: *"ya no vamos a hacer lo de las cinco horas"*
+y *"no es tanto conversacional, sino tarea especifica"*.
+
+**El acierto (regla de CLAUDE.md aplicada ANTES de escribir codigo).** El pedido nombraba UN
+aviso ("el de las cinco horas") pero la app tenia TRES: el resumen de la vispera a las 20:00
+por notificacion, el de 5 h antes por notificacion, y los recordatorios que Mary escribe a
+mano por WhatsApp. Se le enseño la lista de los tres y se le pregunto que pasaba con cada
+uno antes de tocar nada; eligio apagar los dos de notificacion y dejar intactos los suyos.
+Sin esa lista se habria apagado solo uno y le habrian quedado cuatro avisos al dia.
+
+**Lo que casi se cuela.** Dos tests nuevos daban por hecho una base vacia: la fecha de prueba
+2099-01-05 cae en un dia de semana que SI tiene clases fijas reales (Alison, Amelia...), asi
+que los conteos absolutos fallaban. Se cambiaron por diferencias contra el "antes" y por
+invariantes (que la lista vaya ordenada), no por totales.
+
+**Un bug propio cazado por un test viejo.** Los chips de alumno con su puntito median 62x26 y
+`test:botones` los caza: por debajo de 44x44 no se tocan bien en el iPhone. Se dejo el boton
+en 44 px de alto con el chip pequeño dentro, asi el area tactil crece sin engordar el diseño.
+
+**Y una deuda de la misma mañana.** `test:calendario-extras` llevaba roto desde `debad93`
+(esta mañana): buscaba un boton "Agregar" que se habia partido en "Dictar" y "Formulario".
+Estaba rojo antes de tocar nada; se arreglo de paso.
+
+**Decision de diseño que vale recordar**: el parser de la respuesta NO usa IA. La lista de
+nombres del dia se conoce, asi que interpretar "no fue Mateo" es buscarlos en la frase: sale
+gratis, responde al instante y **no puede inventar un alumno**. Ante la duda no adivina,
+vuelve a preguntar UNA vez y despues lo deja estar.
