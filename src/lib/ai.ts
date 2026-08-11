@@ -9,9 +9,19 @@ const MAX_TURNS  = 12;
 // `max_tokens` es el total e incluye lo que el modelo gasta pensando, así que tiene que
 // superar el presupuesto de razonamiento o la petición se cae y el bot queda mudo.
 const MAX_TOKENS = 3072;
-// El mismo presupuesto que la pantalla de práctica de Mary (RAZONAMIENTO_TOKENS en
-// ensayo.ts). Si los dos números se separan, ella ensaya con un bot que no es el que atiende.
-const RAZONAMIENTO_TOKENS = 1024;
+/**
+ * El razonamiento va APAGADO (Lukas, 10-08-2026: "si el sin razonamiento alcanza, igual está
+ * bien, la idea es que gaste pocos tokens"). Se midió antes de apagarlo, no de oído: con y sin
+ * pensar, los dos arneses reales (`ensayo:cerebro` y `ensayo:arrastre`, 5 corridas) dieron los
+ * MISMOS aciertos, y sin pensar contesta en la mitad de tiempo (~5,7 s → ~2,5 s por respuesta)
+ * con 3,3 veces menos tokens de salida. Aquí no hay agenda que calzar ni reservas que calcular:
+ * el bot informa, y para eso Haiku no necesita pensar antes.
+ * Para volver a encenderlo: `RAZONAMIENTO_ENSAYO=1024` (vale para el bot y para la práctica).
+ */
+export function presupuestoRazonamientoBot(): number {
+  const v = parseInt(process.env.RAZONAMIENTO_ENSAYO ?? "", 10);
+  return Number.isFinite(v) && v >= 0 ? v : 0;
+}
 
 let _client: OpenAI | null = null;
 // Se apaga solo si el proveedor rechaza el razonamiento, y queda apagado para no repetir el
@@ -50,12 +60,13 @@ function buildTools(): OpenAI.Chat.ChatCompletionTool[] {
  * OpenAI) y es lo que enciende el razonamiento de Haiku 4.5.
  */
 export function cuerpoBot(messages: OpenAI.Chat.ChatCompletionMessageParam[], razonando = true) {
+  const presupuesto = presupuestoRazonamientoBot();
   return {
     model: MODEL,
     max_tokens: MAX_TOKENS,
     tools: buildTools(),
     tool_choice: "auto" as const,
-    ...(razonando ? { reasoning: { max_tokens: RAZONAMIENTO_TOKENS } } : {}),
+    ...(razonando && presupuesto > 0 ? { reasoning: { max_tokens: presupuesto } } : {}),
     messages,
   };
 }

@@ -22,7 +22,7 @@
 import "./env-loader.js";
 import fs from "node:fs";
 import path from "node:path";
-import { responderEnsayo, type TurnoEnsayo } from "../src/lib/ensayo.js";
+import { responderEnsayo, resumenUso, type TurnoEnsayo } from "../src/lib/ensayo.js";
 
 const FIXTURE = path.resolve(process.cwd(), "scripts", "fixtures", "practica-mary-10ago.json");
 
@@ -50,6 +50,7 @@ async function turno(hasta: number, texto: string) {
 
 async function main() {
   console.log("\n🎭 Ensayo con arrastre — los dos turnos que fallaron en producción el 10-08\n");
+  const arranque = Date.now();
 
   // ── A. Los datos para transferir, justo después de ofrecerle el cupo ──────────
   // El historial termina en la respuesta del bot con los horarios y un "¿te guardo el cupo?".
@@ -79,6 +80,7 @@ async function main() {
     console.log("");
   }
 
+  console.log(resumenUso(Date.now() - arranque));
   console.log(fallos === 0
     ? "🎉 Con la conversación encima, el bot sigue cumpliendo\n"
     : `⚠️  ${fallos} fallos con arrastre (el arnés normal no los ve)\n`);

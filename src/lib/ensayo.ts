@@ -18,9 +18,30 @@ const MAX_VUELTAS = 6;
 // razonamiento: es el total, no lo que sobra para la respuesta. Con los 1024 de antes la
 // API rechazaba la petición entera y Mary veía el bot mudo.
 const MAX_TOKENS = 3072;
-// 1024 es el mínimo que acepta Anthropic. El mismo número lo usa el bot de WhatsApp por
-// OpenRouter (ver `cuerpoBot` en ai.ts): si no piensan igual, Mary ensaya con otro bot.
+// 1024 es el mínimo que acepta Anthropic si algún día se vuelve a encender.
 export const RAZONAMIENTO_TOKENS = 1024;
+/**
+ * Razonamiento APAGADO por defecto, y medido antes de apagarlo (Lukas, 10-08-2026: "si el sin
+ * razonamiento alcanza, igual está bien, la idea es que gaste pocos tokens"). Mismos aciertos
+ * en los dos arneses reales, la mitad de tiempo y 3,3 veces menos tokens de salida.
+ * `RAZONAMIENTO_ENSAYO=1024` lo enciende otra vez, aquí y en el bot (ai.ts lee la misma
+ * variable: si se separan, Mary ensaya con un bot que no es el que atiende).
+ */
+export function presupuestoRazonamiento(): number {
+  const v = parseInt(process.env.RAZONAMIENTO_ENSAYO ?? "", 10);
+  return Number.isFinite(v) && v >= 0 ? v : 0;
+}
+
+/** Lo que llevan gastado las llamadas de este proceso, para comparar coste con y sin pensar. */
+export const usoEnsayo = { llamadas: 0, entrada: 0, salida: 0 };
+
+/** Una línea con lo que costó la corrida. Precios de Haiku 4.5: USD 1 y 5 por millón. */
+export function resumenUso(ms: number): string {
+  const { llamadas, entrada, salida } = usoEnsayo;
+  const usd = entrada / 1e6 + (salida / 1e6) * 5;
+  const p = presupuestoRazonamiento();
+  return `⏱️  ${(ms / 1000).toFixed(1)} s · ${llamadas} llamadas · ${entrada} tokens de entrada y ${salida} de salida · ~USD ${usd.toFixed(4)} · razonamiento ${p > 0 ? `${p} tokens` : "APAGADO"}`;
+}
 
 export type RolEnsayo = "apoderado" | "bot";
 export type TurnoEnsayo = { rol: RolEnsayo; texto: string };
@@ -197,12 +218,13 @@ function herramientasParaAnthropic(audios: AudioMary[] = []) {
  * `test:razonamiento` lo miran sin gastar una llamada a la API.
  */
 export function cuerpoEnsayo(system: string, messages: MensajeApi[], audios: AudioMary[] = []) {
+  const razonamiento = presupuestoRazonamiento();
   return {
     model: process.env.ENSAYO_MODEL ?? "claude-haiku-4-5-20251001",
     max_tokens: MAX_TOKENS,
     // Razonamiento encendido (Lukas, 10-08-2026). Ojo: con esto Anthropic solo acepta
     // temperature 1, por eso aquí no se manda ninguna.
-    thinking: { type: "enabled" as const, budget_tokens: RAZONAMIENTO_TOKENS },
+    ...(razonamiento > 0 ? { thinking: { type: "enabled" as const, budget_tokens: razonamiento } } : {}),
     system,
     tools: herramientasParaAnthropic(audios),
     messages,
@@ -220,7 +242,15 @@ async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: st
     body: JSON.stringify(cuerpoEnsayo(system, messages, audios)),
   });
   if (!res.ok) throw new Error(`La IA respondió ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return (await res.json()) as { content: Contenido[]; stop_reason?: string };
+  const data = (await res.json()) as {
+    content: Contenido[];
+    stop_reason?: string;
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
+  usoEnsayo.llamadas++;
+  usoEnsayo.entrada += data.usage?.input_tokens ?? 0;
+  usoEnsayo.salida += data.usage?.output_tokens ?? 0;
+  return data;
 }
 
 /**

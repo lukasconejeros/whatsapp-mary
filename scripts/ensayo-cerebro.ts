@@ -9,7 +9,7 @@
  *   npx tsx scripts/ensayo-cerebro.ts
  */
 import "./env-loader.js";
-import { responderEnsayo, demoraEnsayoMs, type TurnoEnsayo } from "../src/lib/ensayo.js";
+import { responderEnsayo, demoraEnsayoMs, resumenUso, type TurnoEnsayo } from "../src/lib/ensayo.js";
 
 const GUION = [
   "Hola, quiero información",                        // el mensaje que hoy mata la conversación
@@ -52,6 +52,7 @@ function bien(msg: string) { console.log(`   ✅ ${msg}`); }
 
 async function main() {
   console.log(`\n🎭 Ensayo del cerebro de Arteluk (demora del ensayo: ${Math.round(demoraEnsayoMs() / 1000)} s por respuesta)\n`);
+  const arranque = Date.now();
   const turnos: TurnoEnsayo[] = [];
 
   for (const texto of GUION) {
@@ -162,6 +163,7 @@ async function main() {
     console.log("");
   }
 
+  console.log(resumenUso(Date.now() - arranque));
   console.log(fallos === 0
     ? "🎉 La conversación respetó la regla de oro\n"
     : `⚠️  ${fallos} fallos de estilo o de regla de oro\n`);
