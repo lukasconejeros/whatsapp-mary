@@ -398,3 +398,45 @@ extensión** — `ensayo.ts` ya lo tenía escrito en un comentario desde hace se
 esto no lo caza ninguna batería de tests, solo levantar la app y abrir la pantalla de verdad.
 
 **Cómo se verifica**: `npm run build` y, mejor, `npm run dev` + entrar al panel. Commit del port.
+
+---
+
+## #22 — El bot no le contestaba solo a NADIE, ni al lead de un anuncio pagado (10-08-2026)
+
+**Qué pasó**: revisando las bitácoras de Medifis (51 casos) y Anpalex (43) para portar lo aprendido,
+apareció algo peor que cualquiera de esos casos. Todas las conversaciones nacen con `mode` en
+**HUMAN** (`db.ts`, `DEFAULT 'HUMAN'`) y **ninguna parte del código las encendía**: `setMode` solo se
+llamaba desde el panel y desde `silenciar()`. O sea que un lead que llegaba por un anuncio de Meta se
+quedaba esperando hasta que Mary abriera el chat y apretara el interruptor a mano.
+
+**Y encima, a quién contestar lo decidía el modelo** leyendo el mensaje (el FILTRO DE ENTRADA del
+prompt), teniendo la señal dura de Meta (`ctwa_referral`) guardada en la base desde el primer mensaje
+y sin usarla para nada. Es el error #51 de Medifis: allí el modelo metía la plantilla *"Quiero
+resolver una duda (anuncio)"* en el saco de los mensajes que no se contestan —corta y sin pregunta— y
+se perdían 6 a 8 de cada 14 leads pagados. Aquí la regla escrita es todavía más dura ("ante la duda
+real, silencia").
+
+**Lo que se hizo** (decisiones de Lukas, una por una):
+- `src/lib/quien-contesta.ts`: **anuncio → contesta siempre · número desconocido → contesta, y el
+  filtro del prompt decide · apoderado ya inscrito → callado, lo ve Mary**.
+- Columna **`mode_manual`**: si lo decidió una persona, manda. Mary toca el interruptor, o le escribe
+  al contacto (desde su teléfono, desde el chat del panel o mandando un audio o una foto) y el bot se
+  apaga en esa conversación. El automático ya no vuelve a encenderlo (Medifis #21, Anpalex #20/#25/#26).
+- **Fuera el silencio nocturno** de 22:00 a 08:00 (Anpalex #41): el lead que ve el anuncio a las 23:00
+  escribe a las 23:00.
+- `silenciar()` **se niega** si la conversación llegó por un anuncio, y el motivo de cada chat mudo
+  queda en la tabla `mudos` en vez de perderse con el siguiente deploy (Medifis #50).
+
+**Lo que NO se pudo reproducir, y hay que decirlo**: con el arnés contra el modelo real
+(`npx tsx scripts/verificar-leads-anuncio.ts 3`) el prompt **viejo** contestó igualmente **15 de 15**
+primeros mensajes de anuncio. La regla nueva del prompt es prevención traída de Medifis, no el arreglo
+de algo que aquí estuviera midiendo roto. Lo que sí estaba roto de verdad era el modo HUMAN y el
+silencio nocturno.
+
+**Cómo se verifica**: `npm run test:quien-contesta` (17), `npm run test:mudos` (11) y, contra el
+modelo real, `npx tsx scripts/verificar-leads-anuncio.ts` — 15/15 leads contestados y las 2 frases
+personales en silencio, ~USD 0,01 la corrida.
+
+**De paso**: `deleteConversation()` se caía con `FOREIGN KEY constraint failed` en cuanto la
+conversación tenía filas hijas nuevas (lo cazó el test), y el `typecheck` del repo estaba **rojo desde
+antes** en `ai.ts` (`finish_reason === "end_turn"` imposible y `tool_calls` sin discriminar el tipo).
