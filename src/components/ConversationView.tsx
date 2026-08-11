@@ -219,7 +219,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #E7F1EC', background:'#fff', flexShrink:0 }}>
-        <Avatar src={conv.contact.avatar} size={38} />
+        <Avatar src={conv.contact.avatar} size={38} prioritaria />
         <div style={{ flex:1, minWidth:0 }}>
           <p style={{ fontSize:15,fontWeight:600,color:'#0F172A',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{conv.contact.name}</p>
           <div style={{ display:'flex',alignItems:'center',gap:6,marginTop:2 }}>
