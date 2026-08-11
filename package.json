@@ -60,7 +60,8 @@
     "test:recordatorios-wa": "tsx scripts/test-recordatorios-wa.ts",
     "test:recordatorios-envio": "tsx scripts/test-recordatorios-envio.ts",
     "test:calendario-extras": "node scripts/test-calendario-extras.mjs",
-    "cargar:alumnos": "node scripts/cargar-alumnos-arteluk.mjs"
+    "cargar:alumnos": "node scripts/cargar-alumnos-arteluk.mjs",
+    "test:asistencia": "tsx scripts/test-asistencia-db.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

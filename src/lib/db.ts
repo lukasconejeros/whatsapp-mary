@@ -262,6 +262,47 @@ CREATE TABLE IF NOT EXISTS recordatorios (
 );
 CREATE INDEX IF NOT EXISTS idx_recordatorios_fecha ON recordatorios(fecha);
 
+-- Los dos avisos fijos que le llegan a Mary por WhatsApp (Lukas, 11-08-2026):
+-- 'resumen' a las 10:00 con todo lo del día y 'pase-lista' a las 21:00 con la
+-- pregunta de quién vino. Una fila por día y tipo, que es el candado para no
+-- repetir el mensaje en cada pasada de 5 minutos.
+-- 'enviado_at' NO se escribe al encolar: solo cuando el outbox confirma que
+-- WhatsApp lo mandó. El "enviado" falso ya costó un incidente.
+CREATE TABLE IF NOT EXISTS avisos_diarios (
+  fecha TEXT NOT NULL,                         -- 'YYYY-MM-DD'
+  tipo TEXT NOT NULL,                          -- 'resumen' | 'pase-lista'
+  outbox_id INTEGER,                           -- en la cola, todavía sin confirmar
+  enviado_at INTEGER,                          -- confirmado por el outbox
+  PRIMARY KEY (fecha, tipo)
+);
+
+-- Lo específico del pase de lista: la lista CERRADA de nombres que se le
+-- preguntaron (contra ella se interpreta la respuesta, así no se inventa un
+-- alumno) y lo que contestó. 'aclaraciones' cuenta las veces que se le pidió
+-- que repita: máximo una, después se deja el día sin marcar.
+CREATE TABLE IF NOT EXISTS pase_lista (
+  fecha TEXT PRIMARY KEY,
+  alumnos TEXT NOT NULL,                       -- JSON: ["Mateo","Matilda"]
+  respondido_at INTEGER,
+  respuesta TEXT,                              -- lo que escribió o dijo, tal cual
+  aclaraciones INTEGER NOT NULL DEFAULT 0
+);
+
+-- Quién vino y quién faltó. Va por NOMBRE y no por clase a propósito: un día de
+-- Mary son clases fijas (alumnos en texto) más eventos puntuales (ids de
+-- 'clientes'), y lo único que ambos mundos comparten —y lo único que ella dice
+-- por WhatsApp— es el nombre visible.
+CREATE TABLE IF NOT EXISTS asistencia (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha TEXT NOT NULL,
+  alumno TEXT NOT NULL,
+  estado TEXT NOT NULL CHECK(estado IN ('vino','falto')),
+  fuente TEXT NOT NULL DEFAULT 'whatsapp',     -- 'whatsapp' | 'panel' (corregido a mano)
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  UNIQUE (fecha, alumno)
+);
+CREATE INDEX IF NOT EXISTS idx_asistencia_fecha ON asistencia(fecha);
+
 CREATE TABLE IF NOT EXISTS movimientos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fecha TEXT NOT NULL,
@@ -1614,6 +1655,132 @@ export function listClientes(): ClienteLite[] {
     if (r.horario) { try { horario = JSON.parse(r.horario) as string[]; } catch { horario = []; } }
     return { id: r.id, nombre: r.nombre, telefono: r.telefono, horario };
   });
+}
+
+// ── Avisos diarios, pase de lista y asistencia ────────────────────────────
+// Los dos avisos que le llegan a Mary a su propio WhatsApp (10:00 y 21:00) y lo
+// que se registra con su respuesta. Ver el comentario de las tablas en SCHEMA.
+
+export type TipoAviso = "resumen" | "pase-lista";
+export interface AvisoDiario {
+  fecha: string; tipo: TipoAviso; outboxId: number | null; enviadoAt: number | null;
+}
+interface AvisoDiarioRow {
+  fecha: string; tipo: string; outbox_id: number | null; enviado_at: number | null;
+}
+
+export function getAvisoDiario(fecha: string, tipo: TipoAviso): AvisoDiario | null {
+  const r = ctx().db
+    .prepare("SELECT * FROM avisos_diarios WHERE fecha = ? AND tipo = ?")
+    .get(fecha, tipo) as AvisoDiarioRow | undefined;
+  if (!r) return null;
+  return { fecha: r.fecha, tipo: r.tipo as TipoAviso, outboxId: r.outbox_id, enviadoAt: r.enviado_at };
+}
+
+/** Deja anotado que el mensaje está en la cola. `null` lo suelta para reintentar. */
+export function marcarAvisoEncolado(fecha: string, tipo: TipoAviso, outboxId: number | null): void {
+  ctx().db
+    .prepare(
+      `INSERT INTO avisos_diarios (fecha, tipo, outbox_id) VALUES (?,?,?)
+       ON CONFLICT(fecha, tipo) DO UPDATE SET outbox_id = excluded.outbox_id`
+    )
+    .run(fecha, tipo, outboxId);
+}
+
+/** Solo cuando el outbox confirmó que WhatsApp lo despachó. */
+export function marcarAvisoEnviado(fecha: string, tipo: TipoAviso): void {
+  ctx().db
+    .prepare(
+      `INSERT INTO avisos_diarios (fecha, tipo, enviado_at) VALUES (?,?,unixepoch())
+       ON CONFLICT(fecha, tipo) DO UPDATE SET enviado_at = unixepoch()`
+    )
+    .run(fecha, tipo);
+}
+
+export function borrarAvisoDiario(fecha: string, tipo: TipoAviso): void {
+  ctx().db.prepare("DELETE FROM avisos_diarios WHERE fecha = ? AND tipo = ?").run(fecha, tipo);
+}
+
+export interface PaseLista {
+  fecha: string; alumnos: string[]; respondidoAt: number | null;
+  respuesta: string | null; aclaraciones: number;
+}
+interface PaseListaRow {
+  fecha: string; alumnos: string | null; respondido_at: number | null;
+  respuesta: string | null; aclaraciones: number;
+}
+
+export function getPaseLista(fecha: string): PaseLista | null {
+  const r = ctx().db.prepare("SELECT * FROM pase_lista WHERE fecha = ?").get(fecha) as
+    | PaseListaRow | undefined;
+  if (!r) return null;
+  let alumnos: string[] = [];
+  if (r.alumnos) { try { alumnos = JSON.parse(r.alumnos) as string[]; } catch { alumnos = []; } }
+  return {
+    fecha: r.fecha, alumnos, respondidoAt: r.respondido_at,
+    respuesta: r.respuesta, aclaraciones: r.aclaraciones,
+  };
+}
+
+/**
+ * Abre el pase de lista del día con los nombres que se le preguntaron.
+ * Si ya existe NO se pisa la respuesta: reabrirlo borraría lo que ella contestó.
+ */
+export function abrirPaseLista(fecha: string, alumnos: string[]): void {
+  ctx().db
+    .prepare(
+      `INSERT INTO pase_lista (fecha, alumnos) VALUES (?,?)
+       ON CONFLICT(fecha) DO NOTHING`
+    )
+    .run(fecha, JSON.stringify(alumnos));
+}
+
+export function cerrarPaseLista(fecha: string, respuesta: string): void {
+  ctx().db
+    .prepare("UPDATE pase_lista SET respondido_at = unixepoch(), respuesta = ? WHERE fecha = ?")
+    .run(respuesta, fecha);
+}
+
+/** Suma una petición de aclaración y devuelve cuántas van. */
+export function sumarAclaracion(fecha: string): number {
+  ctx().db.prepare("UPDATE pase_lista SET aclaraciones = aclaraciones + 1 WHERE fecha = ?").run(fecha);
+  return getPaseLista(fecha)?.aclaraciones ?? 0;
+}
+
+export function borrarPaseLista(fecha: string): void {
+  ctx().db.prepare("DELETE FROM pase_lista WHERE fecha = ?").run(fecha);
+}
+
+export type EstadoAsistencia = "vino" | "falto";
+export type FuenteAsistencia = "whatsapp" | "panel";
+export interface Asistencia {
+  id: number; fecha: string; alumno: string;
+  estado: EstadoAsistencia; fuente: FuenteAsistencia; created_at: number;
+}
+
+/** Marca (o corrige) a un alumno en un día. Nunca duplica: manda el último. */
+export function marcarAsistencia(
+  fecha: string, alumno: string, estado: EstadoAsistencia, fuente: FuenteAsistencia = "whatsapp"
+): void {
+  const nombre = alumno.trim();
+  if (!nombre) return;
+  ctx().db
+    .prepare(
+      `INSERT INTO asistencia (fecha, alumno, estado, fuente) VALUES (?,?,?,?)
+       ON CONFLICT(fecha, alumno) DO UPDATE SET estado = excluded.estado, fuente = excluded.fuente`
+    )
+    .run(fecha, nombre, estado, fuente);
+}
+
+export function asistenciaRango(desde: string, hasta: string): Asistencia[] {
+  return ctx().db
+    .prepare("SELECT * FROM asistencia WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, alumno ASC")
+    .all(desde, hasta) as Asistencia[];
+}
+
+/** Desmarca: el alumno vuelve a "sin marcar" (el puntito gris del calendario). */
+export function borrarAsistencia(fecha: string, alumno: string): void {
+  ctx().db.prepare("DELETE FROM asistencia WHERE fecha = ? AND alumno = ?").run(fecha, alumno.trim());
 }
 
 // ── Movimientos (asistente de finanzas por Telegram) ──────────────────────
