@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +23,27 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "nombre invalido" }, { status: 400 });
   }
   const file = path.join(MEDIA_DIR, safe);
-  if (!fs.existsSync(file)) {
+  // Lectura ASÍNCRONA a propósito: la versión con readFileSync bloqueaba el único hilo de
+  // Node en cada foto, y al abrir el inbox llegan decenas seguidas → el servidor no atendía
+  // nada más (ni el cambio de pantalla) mientras leía del disco.
+  let data: Buffer;
+  try {
+    data = await fs.readFile(file);
+  } catch {
     return NextResponse.json({ ok: false, error: "no encontrado" }, { status: 404 });
   }
   const ext = safe.split(".").pop()?.toLowerCase() ?? "";
-  const data = fs.readFileSync(file);
+  // Fotos de perfil: el nombre es fijo por conversación (avatar_<id>.jpg), así que se
+  // cachean un día — si algún día se actualiza la foto del contacto, se ve al día siguiente
+  // en vez de quedarse pegada para siempre. Los audios/fotos de mensajes llevan marca de
+  // tiempo en el nombre: nunca cambian, se cachean un año.
+  const esAvatar = safe.startsWith("avatar_");
   return new NextResponse(new Uint8Array(data), {
     headers: {
       "Content-Type": TIPOS[ext] ?? "application/octet-stream",
-      "Cache-Control": "private, max-age=31536000",
+      "Cache-Control": esAvatar
+        ? "private, max-age=86400, stale-while-revalidate=604800"
+        : "private, max-age=31536000, immutable",
     },
   });
 }
