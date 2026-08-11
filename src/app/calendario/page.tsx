@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
+import FormularioExtras, { type TipoExtra } from '@/components/FormularioExtras'
 import { DIA_LABEL, PROFES, PROFE_NOMBRES, profeColor, diaFromFecha } from '@/lib/calendario'
 import { Plus, Trash2, Pencil, X, ChevronLeft, ChevronRight, Mic, Keyboard } from 'lucide-react'
 
@@ -9,6 +10,10 @@ type Clase = { id: number; fecha: string | null; dia: string; profe: string; hor
 // Clase que se repite TODAS las semanas (los alumnos fijos de Mary). Una fila vale
 // para todos los lunes, así que no tiene fecha: tiene día.
 type ClaseFija = { id: number; dia: string; hora: string; horaFin: string | null; profe: string; alumnos: string[]; cuposPrueba: number; activa: boolean }
+// Pago que vuelve TODOS los meses (arriendo, sueldos, suscripción, otros).
+type PagoFijo = { id: number; tipo: string; descripcion: string | null; monto: number; diaMes: number; activo: boolean }
+// Recordatorio puntual de Mary: el aviso va a SU WhatsApp, nunca al apoderado.
+type Recordatorio = { id: number; fecha: string; hora: string | null; texto: string; avisar: boolean; enviadoAt: number | null; hecho: boolean }
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
 type Form = { fecha: string; profe: string; hora: string; alumnos: number[]; alumnosExtra: (string | number)[]; nota: string }
 
@@ -26,6 +31,13 @@ function getSpeechRecognition(): (new () => SpeechRec) | null {
 }
 
 const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const TITULO_TIPO: Record<string, string> = {
+  clase: 'clase', alumno: 'alumno', pago: 'pago', recordatorio: 'recordatorio',
+}
+const ETIQUETA_PAGO: Record<string, string> = {
+  arriendo: 'Arriendo', sueldos: 'Sueldos', suscripcion: 'Suscripción', otros: 'Otros',
+}
+const pesos = (n: number) => `$${n.toLocaleString('es-CL')}`
 
 // Fecha local → 'YYYY-MM-DD' (sin pasar por UTC, evita corrimientos de día).
 function ymd(d: Date): string {
@@ -46,10 +58,15 @@ export default function CalendarioPage() {
   const [sel, setSel] = useState<string>(hoy)
   const [clases, setClases] = useState<Clase[]>([])
   const [fijas, setFijas] = useState<ClaseFija[]>([])
+  const [pagos, setPagos] = useState<PagoFijo[]>([])
+  const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([])
   const [clientes, setClientes] = useState<ClienteLite[]>([])
   const [filtro, setFiltro] = useState<string>('Todas')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  // Qué se está agregando al calendario. La clase suelta es la de siempre; alumno, pago y
+  // recordatorio los pidió Lukas el 10-08-2026 y viven en FormularioExtras.
+  const [tipoForm, setTipoForm] = useState<'clase' | TipoExtra>('clase')
   const [guardando, setGuardando] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState<Form>({ fecha: hoy, profe: 'Mary', hora: '16:00', alumnos: [], alumnosExtra: [], nota: '' })
@@ -76,14 +93,18 @@ export default function CalendarioPage() {
   const load = useCallback(async (d: string, h: string) => {
     setLoading(true)
     try {
-      const [c, cl, fj] = await Promise.all([
+      const [c, cl, fj, pg, rc] = await Promise.all([
         fetch(`/api/clases?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch('/api/clientes').then(r => r.json()),
         fetch('/api/clases-fijas').then(r => r.json()),
+        fetch('/api/pagos-fijos').then(r => r.json()),
+        fetch(`/api/recordatorios?desde=${d}&hasta=${h}`).then(r => r.json()),
       ])
       if (c.ok) setClases(c.clases)
       if (cl.ok) setClientes(cl.clientes)
       if (fj.ok) setFijas(fj.clasesFijas)
+      if (pg.ok) setPagos(pg.pagosFijos)
+      if (rc.ok) setRecordatorios(rc.recordatorios)
     } finally { setLoading(false) }
   }, [])
   useEffect(() => { load(desde, hasta) }, [load, desde, hasta])
@@ -102,12 +123,12 @@ export default function CalendarioPage() {
   }
 
   function openNew(fecha: string) {
-    setEditId(null); setSearch('')
+    setEditId(null); setSearch(''); setTipoForm('clase')
     setForm({ fecha, profe: 'Mary', hora: '16:00', alumnos: [], alumnosExtra: [], nota: '' })
     setShowForm(true)
   }
   function openEdit(c: Clase) {
-    setEditId(c.id); setSearch('')
+    setEditId(c.id); setSearch(''); setTipoForm('clase')
     const nums = c.alumnos.filter((a): a is number => typeof a === 'number')
     const extra = c.alumnos.filter((a) => typeof a !== 'number')
     setForm({ fecha: c.fecha ?? sel, profe: c.profe, hora: c.hora ?? '', alumnos: nums, alumnosExtra: extra, nota: c.nota ?? '' })
@@ -236,6 +257,36 @@ export default function CalendarioPage() {
   }
   const fijasSel = fijasDe(sel)
   const rango = (f: ClaseFija) => f.horaFin ? `${f.hora} a ${f.horaFin}` : f.hora
+
+  // Los pagos que caen en una fecha. Misma regla que la base (pagosFijosDeFecha): el del 31
+  // NO se salta febrero, cae el último día del mes.
+  const pagosDe = (fecha: string) => {
+    const d = new Date(`${fecha}T12:00:00`)
+    const dia = d.getDate()
+    const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    return pagos.filter(p => p.activo && (p.diaMes > ultimo ? dia === ultimo : p.diaMes === dia))
+  }
+  const recordatoriosDe = (fecha: string) => recordatorios.filter(r => r.fecha === fecha)
+  const pagosSel = pagosDe(sel)
+  const recordatoriosSel = recordatoriosDe(sel)
+
+  async function borrarExtra(url: string, pregunta: string) {
+    if (!confirm(pregunta)) return
+    try {
+      if ((await fetch(url, { method: 'DELETE' }).then(x => x.json())).ok) load(desde, hasta)
+      else alert('No se pudo borrar. Reintenta.')
+    } catch { alert('No se pudo borrar. Revisa tu internet.') }
+  }
+
+  async function toggleHecho(r: Recordatorio) {
+    try {
+      await fetch(`/api/recordatorios/${r.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha: r.fecha, hora: r.hora, texto: r.texto, avisar: r.avisar, hecho: !r.hecho }),
+      })
+      load(desde, hasta)
+    } catch { alert('No se pudo guardar. Revisa tu internet.') }
+  }
 
   // Selector de alumnos del modal: primero los que vienen ese día, con búsqueda.
   const diaForm = diaFromFecha(form.fecha)
@@ -380,8 +431,41 @@ export default function CalendarioPage() {
                       </div>
                     )
                   })}
+                  {/* Pagos que vuelven cada mes y recordatorios: van con otro color para que
+                      no se confundan con una clase de un vistazo. */}
+                  {!loading && pagosSel.map(p => (
+                    <div key={`pago-${p.id}`} style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '3px solid #F59E0B', borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
+                      <div className="flex items-center gap-2">
+                        <span style={{ fontSize: 14, fontWeight: 800, color: '#92400E' }}>{pesos(p.monto)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', flex: 1 }}>{ETIQUETA_PAGO[p.tipo] ?? p.tipo}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 999, padding: '2px 8px' }}>todos los meses</span>
+                        <button onClick={() => borrarExtra(`/api/pagos-fijos/${p.id}`, '¿Borrar este pago? Deja de aparecer todos los meses.')} title="Borrar"
+                          style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#B45309' }}><Trash2 size={13} /></button>
+                      </div>
+                      {p.descripcion && <p style={{ fontSize: 12, color: '#78350F', marginTop: 4 }}>{p.descripcion}</p>}
+                    </div>
+                  ))}
+                  {!loading && recordatoriosSel.map(r => (
+                    <div key={`rec-${r.id}`} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderLeft: '3px solid #3B82F6', borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
+                      <div className="flex items-center gap-2">
+                        <span style={{ fontSize: 14, fontWeight: 800, color: '#1E3A8A' }}>{r.hora ?? '—'}</span>
+                        <span style={{ fontSize: 12, color: '#1E40AF', flex: 1, textDecoration: r.hecho ? 'line-through' : 'none' }}>{r.texto}</span>
+                        <button onClick={() => toggleHecho(r)} title={r.hecho ? 'Marcar como pendiente' : 'Marcar como hecho'}
+                          style={{ minWidth: 44, minHeight: 32, border: 'none', background: 'transparent', cursor: 'pointer', color: '#1D4ED8', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+                          {r.hecho ? 'Hecho' : 'Marcar'}
+                        </button>
+                        <button onClick={() => borrarExtra(`/api/recordatorios/${r.id}`, '¿Borrar este recordatorio?')} title="Borrar"
+                          style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#1D4ED8' }}><Trash2 size={13} /></button>
+                      </div>
+                      {/* Mientras el envío no exista, la pantalla NO dice que el aviso va a
+                          salir: dar por enviado lo que no salió ya costó un incidente. */}
+                      <p style={{ fontSize: 10.5, color: '#3B82F6', marginTop: 4 }}>
+                        {r.avisar ? (r.enviadoAt ? 'Aviso enviado' : 'Con aviso · falta encender el envío') : 'Sin aviso'}
+                      </p>
+                    </div>
+                  ))}
                   {loading ? <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '24px 0' }}>Cargando…</p>
-                    : eventosSel.length === 0 && fijasSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin clases este día.<br />Toca «Agregar» para crear una.</p>
+                    : eventosSel.length === 0 && fijasSel.length === 0 && pagosSel.length === 0 && recordatoriosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin nada este día.<br />Toca «Agregar» para crear algo.</p>
                     : eventosSel.map(c => {
                       const pc = profeColor(c.profe)
                       return (
@@ -442,13 +526,41 @@ export default function CalendarioPage() {
       {/* Modal agregar / editar */}
       {showForm && (
         <div onClick={closeForm} style={{ position: 'fixed', inset: 0, background: 'rgba(6,77,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <form onClick={e => e.stopPropagation()} onSubmit={submitForm}
+          <div onClick={e => e.stopPropagation()}
             style={{ background: '#fff', borderRadius: 16, padding: 20, width: 420, maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(6,77,68,0.25)' }}>
             <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#054D44' }}>{editId ? 'Editar' : 'Agregar'} clase · {fechaLarga(form.fecha)}</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#054D44' }}>{editId ? 'Editar' : 'Agregar'} {TITULO_TIPO[tipoForm]} · {fechaLarga(form.fecha)}</p>
               <button type="button" onClick={closeForm} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8696A0', display: 'flex' }}><X size={16} /></button>
             </div>
 
+            {/* Lo primero que elige Mary es QUÉ está agregando. Editando una clase no se
+                muestra: ahí el tipo ya está decidido y cambiarlo confundiría. */}
+            {!editId && (
+              <div className="flex gap-1" style={{ marginBottom: 14, background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 10, padding: 3 }}>
+                {(['clase', 'alumno', 'pago', 'recordatorio'] as const).map(t => (
+                  <button type="button" key={t} onClick={() => setTipoForm(t)}
+                    style={{
+                      flex: 1, minHeight: 44, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                      fontSize: 12.5, fontWeight: 700, textTransform: 'capitalize',
+                      background: tipoForm === t ? '#00A884' : 'transparent',
+                      color: tipoForm === t ? '#fff' : '#667781',
+                    }}>
+                    {t === 'recordatorio' ? 'Recordar' : t}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {tipoForm !== 'clase' ? (
+              <FormularioExtras
+                tipo={tipoForm}
+                fecha={form.fecha}
+                fijas={fijas}
+                onClose={closeForm}
+                onGuardado={() => load(desde, hasta)}
+              />
+            ) : (
+            <form onSubmit={submitForm}>
             <div className="flex gap-2" style={{ marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 12, color: '#667781' }}>Profe</label>
@@ -500,8 +612,10 @@ export default function CalendarioPage() {
               {clientesOrdenados.length === 0 && <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '14px 0' }}>Sin clientes</p>}
             </div>
 
-            <button type="submit" disabled={guardando} style={{ width: '100%', marginTop: 16, padding: '10px', borderRadius: 9, border: 'none', background: '#00A884', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
-          </form>
+            <button type="submit" disabled={guardando} style={{ width: '100%', marginTop: 16, minHeight: 46, padding: '10px', borderRadius: 9, border: 'none', background: '#00A884', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+            </form>
+            )}
+          </div>
         </div>
       )}
     </div>

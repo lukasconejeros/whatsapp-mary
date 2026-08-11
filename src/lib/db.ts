@@ -215,6 +215,38 @@ CREATE TABLE IF NOT EXISTS clases_fijas (
 );
 CREATE INDEX IF NOT EXISTS idx_clases_fijas_dia ON clases_fijas(dia, hora);
 
+-- Los PAGOS que vuelven CADA MES (arriendo, sueldos, suscripción y "otros", que
+-- lleva descripción obligatoria). Lukas dijo "todas las semanas" pero al
+-- preguntarle eligió mensual, que es como se pagan de verdad (10-08-2026).
+-- Una fila vale para todos los meses, igual que clases_fijas con las semanas.
+-- 'dia_mes' 31 NO se salta febrero: cae el último día del mes (ver pagosFijosDeFecha).
+CREATE TABLE IF NOT EXISTS pagos_fijos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL,                          -- 'arriendo' | 'sueldos' | 'suscripcion' | 'otros'
+  descripcion TEXT,                            -- obligatoria cuando el tipo es 'otros'
+  monto INTEGER NOT NULL DEFAULT 0,
+  dia_mes INTEGER NOT NULL,                    -- 1..31
+  activo INTEGER NOT NULL DEFAULT 1,           -- 0 = ya no se paga, pero no se pierde
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_pagos_fijos_dia ON pagos_fijos(dia_mes);
+
+-- Los RECORDATORIOS de Mary. Van por WhatsApp A SU TELÉFONO (decisión de Lukas,
+-- 10-08-2026), nunca al apoderado: por eso aquí no hay ningún destinatario que
+-- pueda ser un cliente. 'enviado_at' se escribe SOLO cuando el mensaje salió de
+-- verdad — el "enviado" falso ya costó un incidente en la app de Lukas.
+CREATE TABLE IF NOT EXISTS recordatorios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha TEXT NOT NULL,                         -- 'YYYY-MM-DD', puntual (no se repite)
+  hora TEXT,                                   -- '09:00'
+  texto TEXT NOT NULL,
+  avisar INTEGER NOT NULL DEFAULT 1,           -- mandarle el WhatsApp a Mary
+  enviado_at INTEGER,                          -- cuándo salió de verdad
+  hecho INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_recordatorios_fecha ON recordatorios(fecha);
+
 CREATE TABLE IF NOT EXISTS movimientos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fecha TEXT NOT NULL,
@@ -1345,6 +1377,143 @@ export function updateClaseFija(id: number, d: ClaseFijaInput): void {
 
 export function deleteClaseFija(id: number): void {
   ctx().db.prepare("DELETE FROM clases_fijas WHERE id=?").run(id);
+}
+
+// ── Pagos que vuelven cada mes ────────────────────────────────────────────────
+
+export type TipoPagoFijo = "arriendo" | "sueldos" | "suscripcion" | "otros";
+export interface PagoFijo {
+  id: number; tipo: TipoPagoFijo; descripcion: string | null;
+  monto: number; diaMes: number; activo: boolean;
+}
+export interface PagoFijoInput {
+  tipo: TipoPagoFijo | string; descripcion?: string | null;
+  monto: number; diaMes: number; activo?: boolean;
+}
+interface PagoFijoRow {
+  id: number; tipo: string; descripcion: string | null;
+  monto: number; dia_mes: number; activo: number;
+}
+function parsePagoFijo(r: PagoFijoRow): PagoFijo {
+  return {
+    id: r.id, tipo: r.tipo as TipoPagoFijo, descripcion: r.descripcion,
+    monto: r.monto, diaMes: r.dia_mes, activo: r.activo === 1,
+  };
+}
+
+/**
+ * "Otros" sin descripción es justo lo que Lukas pidió que se preguntara ("cuando ponga
+ * otros que aparezca una descripción"), así que no se deja guardar: un gasto llamado
+ * "otros" y nada más no le dice nada a nadie tres meses después.
+ */
+function validaPagoFijo(d: PagoFijoInput): void {
+  if (d.tipo === "otros" && !String(d.descripcion ?? "").trim()) {
+    throw new Error("Un pago de tipo 'otros' necesita descripción.");
+  }
+  if (!Number.isInteger(d.diaMes) || d.diaMes < 1 || d.diaMes > 31) {
+    throw new Error("El día del mes tiene que ir entre 1 y 31.");
+  }
+}
+
+/** Todos, activos y dados de baja: es la lista de administración. */
+export function listPagosFijos(): PagoFijo[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM pagos_fijos ORDER BY dia_mes ASC, id ASC")
+    .all() as PagoFijoRow[];
+  return rows.map(parsePagoFijo);
+}
+
+/**
+ * Los pagos que caen en una fecha concreta. El del 31 NO se salta los meses cortos:
+ * en febrero cae el 28 (o el 29) y en abril el 30, como la Suscripción mensual de la
+ * app de Lukas. Solo los activos: el calendario muestra lo que de verdad se paga.
+ */
+export function pagosFijosDeFecha(fecha: string): PagoFijo[] {
+  const d = new Date(`${fecha}T12:00:00`);
+  const dia = d.getDate();
+  const ultimoDelMes = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const rows = ctx().db
+    .prepare("SELECT * FROM pagos_fijos WHERE activo = 1 ORDER BY dia_mes ASC, id ASC")
+    .all() as PagoFijoRow[];
+  return rows
+    .map(parsePagoFijo)
+    .filter((p) => (p.diaMes > ultimoDelMes ? dia === ultimoDelMes : p.diaMes === dia));
+}
+
+export function addPagoFijo(d: PagoFijoInput): number {
+  validaPagoFijo(d);
+  const r = ctx().db
+    .prepare("INSERT INTO pagos_fijos (tipo, descripcion, monto, dia_mes, activo) VALUES (?,?,?,?,?)")
+    .run(d.tipo, d.descripcion ?? null, d.monto, d.diaMes, d.activo === false ? 0 : 1);
+  return r.lastInsertRowid as number;
+}
+
+export function updatePagoFijo(id: number, d: PagoFijoInput): void {
+  validaPagoFijo(d);
+  ctx().db
+    .prepare("UPDATE pagos_fijos SET tipo=?, descripcion=?, monto=?, dia_mes=?, activo=? WHERE id=?")
+    .run(d.tipo, d.descripcion ?? null, d.monto, d.diaMes, d.activo === false ? 0 : 1, id);
+}
+
+export function deletePagoFijo(id: number): void {
+  ctx().db.prepare("DELETE FROM pagos_fijos WHERE id=?").run(id);
+}
+
+// ── Recordatorios (van por WhatsApp a Mary, nunca al apoderado) ───────────────
+
+export interface Recordatorio {
+  id: number; fecha: string; hora: string | null; texto: string;
+  avisar: boolean; enviadoAt: number | null; hecho: boolean;
+}
+export interface RecordatorioInput {
+  fecha: string; hora?: string | null; texto: string;
+  avisar?: boolean; hecho?: boolean;
+}
+interface RecordatorioRow {
+  id: number; fecha: string; hora: string | null; texto: string;
+  avisar: number; enviado_at: number | null; hecho: number;
+}
+function parseRecordatorio(r: RecordatorioRow): Recordatorio {
+  return {
+    id: r.id, fecha: r.fecha, hora: r.hora, texto: r.texto,
+    avisar: r.avisar === 1, enviadoAt: r.enviado_at, hecho: r.hecho === 1,
+  };
+}
+
+/** Los de un rango de fechas, que es como los pide el calendario del mes. */
+export function listRecordatorios(desde: string, hasta: string): Recordatorio[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM recordatorios WHERE fecha BETWEEN ? AND ? ORDER BY fecha ASC, hora ASC, id ASC")
+    .all(desde, hasta) as RecordatorioRow[];
+  return rows.map(parseRecordatorio);
+}
+
+export function recordatoriosDeFecha(fecha: string): Recordatorio[] {
+  return listRecordatorios(fecha, fecha);
+}
+
+export function addRecordatorio(d: RecordatorioInput): number {
+  if (!String(d.texto ?? "").trim()) throw new Error("El recordatorio necesita una descripción.");
+  const r = ctx().db
+    .prepare("INSERT INTO recordatorios (fecha, hora, texto, avisar, hecho) VALUES (?,?,?,?,?)")
+    .run(d.fecha, d.hora ?? null, d.texto.trim(), d.avisar === false ? 0 : 1, d.hecho ? 1 : 0);
+  return r.lastInsertRowid as number;
+}
+
+export function updateRecordatorio(id: number, d: RecordatorioInput): void {
+  if (!String(d.texto ?? "").trim()) throw new Error("El recordatorio necesita una descripción.");
+  ctx().db
+    .prepare("UPDATE recordatorios SET fecha=?, hora=?, texto=?, avisar=?, hecho=? WHERE id=?")
+    .run(d.fecha, d.hora ?? null, d.texto.trim(), d.avisar === false ? 0 : 1, d.hecho ? 1 : 0, id);
+}
+
+/** Se llama SOLO cuando el WhatsApp a Mary salió de verdad. */
+export function marcarRecordatorioEnviado(id: number, cuando = Math.floor(Date.now() / 1000)): void {
+  ctx().db.prepare("UPDATE recordatorios SET enviado_at=? WHERE id=?").run(cuando, id);
+}
+
+export function deleteRecordatorio(id: number): void {
+  ctx().db.prepare("DELETE FROM recordatorios WHERE id=?").run(id);
 }
 
 export interface ClienteLite { id: number; nombre: string | null; telefono: string; horario: string[] }
