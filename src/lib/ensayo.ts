@@ -225,7 +225,10 @@ export function cuerpoEnsayo(system: string, messages: MensajeApi[], audios: Aud
     // Razonamiento encendido (Lukas, 10-08-2026). Ojo: con esto Anthropic solo acepta
     // temperature 1, por eso aquí no se manda ninguna.
     ...(razonamiento > 0 ? { thinking: { type: "enabled" as const, budget_tokens: razonamiento } } : {}),
-    system,
+    // El prompt va en bloque y marcado como cacheable: son ~6.750 tokens que se
+    // repiten en cada mensaje de la práctica y así se cobran al 10% desde la
+    // segunda llamada (medido el 10-08-2026; Haiku 4.5 exige 4.096 como mínimo).
+    system: [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }],
     tools: herramientasParaAnthropic(audios),
     messages,
   };

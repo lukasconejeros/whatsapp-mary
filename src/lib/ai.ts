@@ -27,6 +27,12 @@ let _client: OpenAI | null = null;
 // Se apaga solo si el proveedor rechaza el razonamiento, y queda apagado para no repetir el
 // error en cada mensaje. Vuelve a encenderse al reiniciar el bot.
 let _razonando = true;
+// Igual que arriba, pero para la caché del prompt: si el proveedor la rechaza, se
+// apaga hasta el próximo reinicio en vez de dejar al bot sin contestar.
+// Marcha atrás sin tocar código: CACHE_PROMPT=0 en el entorno la deja apagada. Existe
+// porque guardar en caché cuesta un 25% más: si en producción los mensajes llegan tan
+// espaciados que expira antes de reusarse, saldría más caro y hay que poder apagarla.
+let _cacheando = process.env.CACHE_PROMPT !== "0";
 
 function getClient(): OpenAI {
   if (_client) return _client;
@@ -69,6 +75,47 @@ export function cuerpoBot(messages: OpenAI.Chat.ChatCompletionMessageParam[], ra
     ...(razonando && presupuesto > 0 ? { reasoning: { max_tokens: presupuesto } } : {}),
     messages,
   };
+}
+
+/**
+ * El prompt del sistema partido en dos: lo ESTABLE (que se manda idéntico en cada
+ * mensaje y por eso se puede cachear) y el ESTADO DEL TURNO, que cambia cada vez.
+ *
+ * El orden no es un detalle: la caché es un "prefijo idéntico", así que cualquier
+ * cosa que cambie tiene que ir DESPUÉS de lo cacheado. Si el estado se pegara al
+ * prompt como antes, la caché no acertaría nunca y encima se pagaría el recargo de
+ * escribirla en cada llamada.
+ *
+ * Medido el 10-08-2026: el prompt son 6.754 tokens y Haiku 4.5 exige 4.096 para
+ * poder cachear, así que entra. Leer lo cacheado cuesta el 10%.
+ */
+export function mensajesDeSistema(
+  sysprompt: string,
+  estadoContext: string,
+  cacheando = true
+): OpenAI.Chat.ChatCompletionMessageParam[] {
+  if (!cacheando) {
+    return [{ role: "system", content: sysprompt + "\n\n" + estadoContext }];
+  }
+  // `cache_control` es de Anthropic (vía OpenRouter) y no está en los tipos del SDK
+  // de OpenAI, igual que `reasoning` en cuerpoBot.
+  const bloques = [
+    { type: "text", text: sysprompt, cache_control: { type: "ephemeral" } },
+    { type: "text", text: estadoContext },
+  ];
+  return [{ role: "system", content: bloques } as unknown as OpenAI.Chat.ChatCompletionMessageParam];
+}
+
+/**
+ * ¿El error viene de que el proveedor no quiso la caché? Mismo criterio que con el
+ * razonamiento: ante un rechazo del parámetro se reintenta SIN caché, porque un bot
+ * que gasta de más es un problema y un bot MUDO delante de una apoderada es perder
+ * al cliente. Un 401, un 429 o quedarse sin saldo NO entran acá: esos hay que verlos.
+ */
+export function esErrorDeCache(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  if (/401|402|403|429|credit|balance/.test(msg)) return false;
+  return /cache_control|content block|content_block/.test(msg);
 }
 
 /**
@@ -125,9 +172,7 @@ export async function generateReply(input: {
 
   if (messages.length === 0 || messages[messages.length - 1].role !== "user") return "";
 
-  const systemMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: sysprompt + "\n\n" + estadoContext },
-  ];
+  const systemMessages = mensajesDeSistema(sysprompt, estadoContext, _cacheando);
 
   let turns = 0;
   const thread = [...systemMessages, ...messages];
@@ -142,12 +187,35 @@ export async function generateReply(input: {
     try {
       response = await pedir(_razonando);
     } catch (e) {
-      if (!_razonando || !esErrorDeRazonamiento(e)) throw e;
-      // Una sola vez por proceso: si el proveedor no quiere el razonamiento, se sigue
-      // contestando sin él en vez de dejar a la persona esperando.
-      console.warn(`[ia] el proveedor rechazó el razonamiento, se sigue sin él: ${String(e).slice(0, 120)}`);
-      _razonando = false;
-      response = await pedir(false);
+      // Primero la caché: si el proveedor no quiere `cache_control`, se sigue sin
+      // ella (se gasta más, pero el bot contesta). Queda apagada hasta reiniciar.
+      if (_cacheando && esErrorDeCache(e)) {
+        console.warn(`[ia] el proveedor rechazó la caché del prompt, se sigue sin ella: ${String(e).slice(0, 120)}`);
+        _cacheando = false;
+        thread[0] = mensajesDeSistema(sysprompt, estadoContext, false)[0];
+        response = await pedir(_razonando);
+      } else if (!_razonando || !esErrorDeRazonamiento(e)) {
+        throw e;
+      } else {
+        // Una sola vez por proceso: si el proveedor no quiere el razonamiento, se sigue
+        // contestando sin él en vez de dejar a la persona esperando.
+        console.warn(`[ia] el proveedor rechazó el razonamiento, se sigue sin él: ${String(e).slice(0, 120)}`);
+        _razonando = false;
+        response = await pedir(false);
+      }
+    }
+
+    // Queda anotado cuánto se leyó de caché y cuánto se guardó. Es lo único que
+    // dirá, con la base de producción delante, si la caché está ahorrando de verdad
+    // o si las apoderadas escriben tan espaciado que expira antes de reusarse.
+    const uso = response.usage as unknown as {
+      prompt_tokens?: number;
+      prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
+    } | undefined;
+    if (uso) {
+      console.info(
+        `[ia] entrada ${uso.prompt_tokens ?? 0} · leído de caché ${uso.prompt_tokens_details?.cached_tokens ?? 0} · guardado ${uso.prompt_tokens_details?.cache_write_tokens ?? 0}`
+      );
     }
 
     const choice = response.choices[0];
