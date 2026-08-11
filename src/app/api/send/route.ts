@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { insertMessage, enqueueOutbox, getConversationById, getConnectionState } from "@/lib/db";
+import { insertMessage, enqueueOutbox, getConversationById, getConnectionState, setMode } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
 
   insertMessage(conversationId, "human", message.trim());
   enqueueOutbox(conversationId, conv.phone, message.trim());
+  // Mary escribió: el bot se apaga en esta conversación para que no queden los dos
+  // contestando a la vez (Anpalex #25/#26). Igual que cuando escribe desde su teléfono.
+  if (conv.mode === "AI") setMode(conversationId, "HUMAN");
 
   return NextResponse.json({ ok: true });
 }

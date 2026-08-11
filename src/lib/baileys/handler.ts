@@ -8,6 +8,8 @@ import {
   getRecentHistory,
   setCategoria,
   setCtwaReferral,
+  setMode,
+  setModeAutomatico,
   setConversationPhoto,
   enqueueOutbox,
   markMessageProcessed,
@@ -21,6 +23,7 @@ import { interpretarComprobante, vinoDeMeta, type BorradorComprobante } from "..
 import { todaySantiago } from "../fechas.js";
 import { generateReply } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
+import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
 import pino from "pino";
 import fs from "fs";
@@ -163,23 +166,6 @@ function humanDelay(): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// Silencio nocturno según hora de Chile (UTC-3/-4 DST)
-function isQuietHour(): boolean {
-  const start = numEnv("QUIET_HOUR_START", 22);
-  const end = numEnv("QUIET_HOUR_END", 8);
-  const hChile = parseInt(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Santiago",
-      hour: "numeric",
-      hour12: false,
-    }).format(new Date()),
-    10
-  );
-  return start > end
-    ? hChile >= start || hChile < end   // cruza medianoche
-    : hChile >= start && hChile < end;
-}
-
 export async function handleIncomingMessages(
   sock: WASocket,
   event: BaileysEventMap["messages.upsert"]
@@ -218,6 +204,14 @@ export async function handleIncomingMessages(
         const jidGuardar = jidSal.endsWith("@lid") ? `${phoneSal}@s.whatsapp.net` : jidSal;
         const convSal = getOrCreateConversation(phoneSal, undefined, jidGuardar);
         insertMessage(convSal.id, "human", textoSal, mediaSal);
+        // Mary tomó la conversación: el bot se calla en ESE chat (encargo de Lukas,
+        // 10-08-2026). Es el choque bot-secretaria de Anpalex #25/#26: los dos escribiendo
+        // al mismo contacto sin verse. Queda como decisión manual, así que el modo
+        // automático ya no vuelve a encenderlo.
+        if (getConversationById(convSal.id)?.mode === "AI") {
+          setMode(convSal.id, "HUMAN");
+          logger.info({ phone: phoneSal }, "✋ contestó Mary — bot apagado en esa conversación");
+        }
         logger.info({ phone: phoneSal }, "💬 saliente desde otro dispositivo — guardado");
       } catch (e) {
         logger.warn({ err: String(e).slice(0, 80) }, "no se pudo guardar saliente de otro dispositivo");
@@ -330,6 +324,19 @@ export async function handleIncomingMessages(
       setCategoria(convo.id, categoria, false);
     }
 
+    // ¿Le toca al bot esta conversación? Se decide por de dónde viene quien escribe, no
+    // por lo que el modelo opine del mensaje (ver src/lib/quien-contesta.ts). Sin esto
+    // TODAS las conversaciones se quedaban en HUMAN y el bot no contestaba solo ni al
+    // lead de un anuncio pagado.
+    const antesDeDecidir = getConversationById(convo.id);
+    if (antesDeDecidir && puedeDecidirElSistema(antesDeDecidir)) {
+      const modo = modoAutomatico(antesDeDecidir.categoria);
+      if (antesDeDecidir.mode !== modo) {
+        setModeAutomatico(convo.id, modo);
+        logger.info({ phone, categoria: antesDeDecidir.categoria, modo }, "🤖 modo automático aplicado");
+      }
+    }
+
     // Comprobante de transferencia: se PROPONE en la bandeja de Finanzas y ahí lo aprueba
     // Mary. Nunca entra solo a Ingresos (decisión de Lukas, 05-08-2026). Va después de
     // clasificar para saber si el que pagó venía de un anuncio de Meta.
@@ -372,13 +379,9 @@ export async function handleIncomingMessages(
       continue;
     }
 
-    // Silencio nocturno: el mensaje queda guardado (Mary lo ve y responde); la
-    // auto-respuesta AI no se dispara de noche. (La app trabaja en modo HUMAN, así
-    // que este camino AI casi no se usa.)
-    if (isQuietHour()) {
-      logger.info({ phone }, "Silencio nocturno — sin auto-respuesta");
-      continue;
-    }
+    // Sin silencio nocturno (encargo de Lukas, 10-08-2026, portado de Anpalex #41): el
+    // lead que ve un anuncio a las 23:00 escribe a las 23:00, y hasta hoy se quedaba sin
+    // respuesta hasta el otro día. El bot contesta a cualquier hora.
 
     // Debounce por conversationId (no por phone): evita DOBLE respuesta cuando el
     // mismo contacto llega bajo @lid y bajo número real (misma conversación).

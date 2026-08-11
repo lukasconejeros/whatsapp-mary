@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { getConversationById, insertMessage, enqueueOutbox, getConnectionState } from "@/lib/db";
+import { getConversationById, insertMessage, enqueueOutbox, getConnectionState, setMode } from "@/lib/db";
 import { limitar } from "@/lib/ratelimit";
 import { prepararNotaVoz } from "@/lib/audio";
 
@@ -73,6 +73,9 @@ export async function POST(req: NextRequest) {
     console.log(`send-media audio: mime=${mime} ffmpegOk=${ffmpegOk} seconds=${seconds} hint=${hintSeg} out=${outName}`);
   }
   enqueueOutbox(conv.id, conv.phone, contentMeta, { kind, media: outMedia });
+  // Mandar un audio o una foto también es contestar: el bot se apaga en esta
+  // conversación, igual que en /api/send.
+  if (conv.mode === "AI") setMode(conv.id, "HUMAN");
 
   return NextResponse.json({ ok: true, media: name, kind, enviado: outMedia, seg: contentMeta });
 }

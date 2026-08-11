@@ -23,6 +23,7 @@ export interface Conversation {
   estado: ConversationEstado;
   categoria: Categoria;
   categoria_manual: number; // 0 | 1 — si la usuaria la movió a mano
+  mode_manual?: number; // 0 | 1 — el interruptor del bot lo decidió una persona (Mary): manda sobre el automático
   ctwa_referral: string | null; // JSON de la señal de anuncio, o null
   last_message_at: number | null;
   created_at: number;
@@ -74,6 +75,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   estado TEXT NOT NULL DEFAULT 'activo',
   categoria TEXT NOT NULL DEFAULT 'mary',
   categoria_manual INTEGER NOT NULL DEFAULT 0,
+  mode_manual INTEGER NOT NULL DEFAULT 0,
   ctwa_referral TEXT,
   last_message_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -397,6 +399,9 @@ function build(): Ctx {
   addColumnaSiFalta(db, "conversations", "estado", "TEXT NOT NULL DEFAULT 'activo'");
   addColumnaSiFalta(db, "conversations", "categoria", "TEXT NOT NULL DEFAULT 'mary'");
   addColumnaSiFalta(db, "conversations", "categoria_manual", "INTEGER NOT NULL DEFAULT 0");
+  // Quién decidió el interruptor del bot (10-08-2026): 1 = lo tocó Mary (panel) o le
+  // escribió ella al contacto. El modo automático por categoría NUNCA pisa un 1.
+  addColumnaSiFalta(db, "conversations", "mode_manual", "INTEGER NOT NULL DEFAULT 0");
   addColumnaSiFalta(db, "conversations", "ctwa_referral", "TEXT");
   addColumnaSiFalta(db, "conversations", "photo", "TEXT");
   addColumnaSiFalta(db, "conversations", "cerrado", "INTEGER NOT NULL DEFAULT 0");
@@ -692,8 +697,20 @@ export function listConversations(): ConversationListItem[] {
   return ctx().listConvs.all() as ConversationListItem[];
 }
 
+// Interruptor del bot movido por una PERSONA (el panel, o Mary escribiéndole al
+// contacto). Queda marcado como manual: el modo automático por categoría ya no lo toca.
 export function setMode(conversationId: number, mode: ConversationMode): void {
-  ctx().setModeStmt.run(mode, conversationId);
+  ctx().db
+    .prepare("UPDATE conversations SET mode = ?, mode_manual = 1 WHERE id = ?")
+    .run(mode, conversationId);
+}
+
+// Interruptor movido por el SISTEMA al clasificar de dónde viene quien escribe
+// (ver src/lib/quien-contesta.ts). Nunca pisa una decisión manual ni se marca como tal.
+export function setModeAutomatico(conversationId: number, mode: ConversationMode): void {
+  ctx().db
+    .prepare("UPDATE conversations SET mode = ? WHERE id = ? AND mode_manual = 0")
+    .run(mode, conversationId);
 }
 
 // Dedup de mensajes de WhatsApp por su id. Devuelve true si es NUEVO (y lo registra);
