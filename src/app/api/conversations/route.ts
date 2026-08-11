@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
 import { listConversations } from "@/lib/db";
+import { jsonComprimido } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const raw = listConversations();
 
   const conversations = raw.map(c => ({
@@ -31,7 +31,7 @@ export async function GET() {
     ctwaReferral: c.ctwa_referral ? safeJson(c.ctwa_referral) : null,
   }));
 
-  return NextResponse.json({ ok: true, conversations });
+  return jsonComprimido(req, { ok: true, conversations });
 }
 
 function safeJson(s: string): Record<string, unknown> | null {
