@@ -399,9 +399,16 @@ export default function CalendarioPage() {
               <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
                 <div className="flex items-center gap-2" style={{ padding: '12px 14px', borderBottom: '1px solid #E7F1EC' }}>
                   <p style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#054D44' }}>{fechaLarga(sel)}</p>
-                  <button onClick={abrirVoz} title="Agendar por voz"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
-                    <Mic size={14} /> Agregar
+                  {/* Dos caminos SEPARADOS y a la vista (Lukas, 11-08-2026): antes el único
+                      botón abría el dictado y el formulario quedaba escondido detrás de
+                      «Prefiero a mano», así que parecía que no existía. */}
+                  <button onClick={abrirVoz} title="Dictar por voz"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: '1px solid #00A884', background: '#fff', color: '#008069', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+                    <Mic size={14} /> Dictar
+                  </button>
+                  <button onClick={() => openNew(sel)} title="Llenar el formulario a mano"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+                    <Keyboard size={14} /> Formulario
                   </button>
                 </div>
                 <div style={{ padding: 12, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
