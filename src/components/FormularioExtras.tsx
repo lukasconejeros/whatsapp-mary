@@ -221,8 +221,8 @@ export default function FormularioExtras({
               style={{ width: 20, height: 20, accentColor: '#00A884' }} />
             <span style={{ fontSize: 13, color: '#374151' }}>Quiero que me avisen</span>
           </label>
-          <p style={ayuda}>El aviso es para TI, Mary. Nunca se le escribe a un apoderado. Ojo: el envío
-            todavía no está encendido, por ahora el recordatorio queda anotado en el calendario.</p>
+          <p style={ayuda}>El aviso es para TI, Mary: te llega por WhatsApp a tu propio número, a la hora
+            que pongas (sin hora, a las 09:00). Nunca se le escribe a un apoderado.</p>
         </>
       )}
 
