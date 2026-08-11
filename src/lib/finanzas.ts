@@ -1,5 +1,8 @@
 // Ítems idénticos a los desplegables del Airtable de Arteluk.
 export const INGRESO_TIPOS = [
+  // El más barato: $45.000 al mes (Lukas, 11-08-2026). Es el taller de acuarela
+  // que anuncia el bot en prompts/negocio.md; él lo llama "super basico".
+  "Taller - plan super basico",
   "Taller - plan basico",
   "Taller - plan premium",
   "Taller- por un dia",

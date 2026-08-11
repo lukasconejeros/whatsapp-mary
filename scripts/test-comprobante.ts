@@ -5,6 +5,7 @@ import "./env-loader.js";
 import {
   normalizarMonto, esMontoEsperado, interpretarComprobante, MONTOS_ESPERADOS, vinoDeMeta,
 } from "../src/lib/comprobante.js";
+import { INGRESO_TIPOS } from "../src/lib/finanzas.js";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, extra = "") {
@@ -39,6 +40,15 @@ check("la clase de prueba de 19.990", esMontoEsperado(19990));
 check("mensualidades 60/75/120 mil", esMontoEsperado(60000) && esMontoEsperado(75000) && esMontoEsperado(120000));
 check("un monto cualquiera NO es esperado", !esMontoEsperado(37500));
 check("la lista está publicada", MONTOS_ESPERADOS.includes(19990) && MONTOS_ESPERADOS.length >= 5);
+// Lukas, 11-08-2026: llegó una transferencia de 45.000 y salió como monto raro.
+check("el plan super basico de 45.000", esMontoEsperado(45000));
+
+// ── El desplegable de categorías que ve Mary al aprobar el comprobante ─────
+console.log("\n— categorías de ingreso —");
+check("existe el plan super basico", INGRESO_TIPOS.includes("Taller - plan super basico"));
+check("siguen los planes de antes", ["Taller - plan basico", "Taller - plan premium", "Taller- por un dia",
+  "Taller-vacaciones básico", "Taller-vacaciones premium", "kit de arte", "Arriendo espacio", "Sueldo"]
+  .every(t => (INGRESO_TIPOS as readonly string[]).includes(t)));
 
 // ── interpretarComprobante: el corazón del asunto ─────────────────────────
 console.log("\n— interpretarComprobante —");

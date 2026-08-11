@@ -6,8 +6,12 @@
 // cosa", así que aquí la regla de oro es: ante la duda, no proponer nada (devolver null).
 // Un falso positivo le ensucia las cifras del negocio; un falso negativo solo le da trabajo.
 
-/** Montos que Lukas nombró como propios de Arteluk (clase de prueba y mensualidades). */
-export const MONTOS_ESPERADOS = [19990, 20000, 60000, 75000, 120000];
+/**
+ * Montos que Lukas nombró como propios de Arteluk (clase de prueba y mensualidades).
+ * 45.000 es el plan super basico, agregado el 11-08-2026 porque llegó una transferencia
+ * de ese monto y el borrador salió marcado como cifra rara.
+ */
+export const MONTOS_ESPERADOS = [19990, 20000, 45000, 60000, 75000, 120000];
 
 /** Techo de cordura: una academia de arte no recibe transferencias sobre esto. */
 const MONTO_MAX = 5_000_000;
