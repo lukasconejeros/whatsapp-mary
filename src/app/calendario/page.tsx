@@ -15,6 +15,9 @@ type PagoFijo = { id: number; tipo: string; descripcion: string | null; monto: n
 // Recordatorio puntual de Mary: el aviso va a SU WhatsApp, nunca al apoderado.
 type Recordatorio = { id: number; fecha: string; hora: string | null; texto: string; avisar: boolean; enviadoAt: number | null; hecho: boolean; outboxId?: number | null }
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
+// Quién vino y quién faltó. Lo llena el pase de lista de las 21:00 por WhatsApp,
+// y ella lo corrige tocando el puntito (ahí queda con fuente 'panel').
+type AsistenciaRow = { id: number; fecha: string; alumno: string; estado: 'vino' | 'falto'; fuente: string }
 type Form = { fecha: string; profe: string; hora: string; alumnos: number[]; alumnosExtra: (string | number)[]; nota: string }
 
 // Reconocimiento de voz nativo (webkitSpeechRecognition), mismo patrón que el Asistente.
@@ -61,6 +64,7 @@ export default function CalendarioPage() {
   const [pagos, setPagos] = useState<PagoFijo[]>([])
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([])
   const [clientes, setClientes] = useState<ClienteLite[]>([])
+  const [asistencia, setAsistencia] = useState<AsistenciaRow[]>([])
   const [filtro, setFiltro] = useState<string>('Todas')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -93,13 +97,15 @@ export default function CalendarioPage() {
   const load = useCallback(async (d: string, h: string) => {
     setLoading(true)
     try {
-      const [c, cl, fj, pg, rc] = await Promise.all([
+      const [c, cl, fj, pg, rc, as] = await Promise.all([
         fetch(`/api/clases?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch('/api/clientes').then(r => r.json()),
         fetch('/api/clases-fijas').then(r => r.json()),
         fetch('/api/pagos-fijos').then(r => r.json()),
         fetch(`/api/recordatorios?desde=${d}&hasta=${h}`).then(r => r.json()),
+        fetch(`/api/asistencia?desde=${d}&hasta=${h}`).then(r => r.json()),
       ])
+      if (as.ok) setAsistencia(as.asistencia)
       if (c.ok) setClases(c.clases)
       if (cl.ok) setClientes(cl.clientes)
       if (fj.ok) setFijas(fj.clasesFijas)
@@ -240,6 +246,54 @@ export default function CalendarioPage() {
       else alert('No se pudo borrar. Reintenta.')
     } catch { alert('No se pudo borrar. Revisa tu internet.') }
   }
+
+  // ── Asistencia: el puntito de cada alumno ────────────────────────────────
+  // Verde vino, rojo faltó, gris sin marcar. Lo normal es que lo llene solo el
+  // pase de lista de las 21:00; esto es para corregirlo con el dedo.
+  const COLOR_ASIS: Record<string, string> = { vino: '#00A884', falto: '#EF4444' }
+  const estadoAsis = (fecha: string, alumno: string) =>
+    asistencia.find(a => a.fecha === fecha && a.alumno === alumno)?.estado ?? null
+
+  const ciclarAsis = async (fecha: string, alumno: string) => {
+    const actual = estadoAsis(fecha, alumno)
+    const siguiente = actual === null ? 'vino' : actual === 'vino' ? 'falto' : null
+    // Se pinta al tiro y después se guarda: el toque tiene que sentirse inmediato.
+    setAsistencia(prev => {
+      const otros = prev.filter(a => !(a.fecha === fecha && a.alumno === alumno))
+      return siguiente ? [...otros, { id: -1, fecha, alumno, estado: siguiente, fuente: 'panel' }] : otros
+    })
+    try {
+      const r = await fetch('/api/asistencia', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, alumno, estado: siguiente }),
+      })
+      if (!r.ok) throw new Error('no se guardó')
+    } catch {
+      alert('No se pudo guardar. Revisa tu internet.')
+      load(desde, hasta)
+    }
+  }
+
+  const chipAlumno = (fecha: string, nombre: string, borde: string) => {
+    const est = estadoAsis(fecha, nombre)
+    return (
+      <button key={`${fecha}-${nombre}`} onClick={() => ciclarAsis(fecha, nombre)}
+        title={est === 'vino' ? 'Vino — toca para cambiar' : est === 'falto' ? 'Faltó — toca para cambiar' : 'Sin marcar — toca para marcar'}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 26, fontSize: 11, color: '#374151', background: '#fff', border: `1px solid ${borde}`, borderRadius: 6, padding: '2px 7px', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: est ? COLOR_ASIS[est] : '#D1D5DB' }} />
+        {nombre}
+      </button>
+    )
+  }
+
+  // Los que faltaron en el mes que está mirando, el que falta más primero.
+  const faltasMes = (() => {
+    const m = new Map<string, string[]>()
+    for (const a of asistencia) if (a.estado === 'falto') m.set(a.alumno, [...(m.get(a.alumno) ?? []), a.fecha])
+    return [...m.entries()]
+      .map(([alumno, dias]) => ({ alumno, dias: [...dias].sort() }))
+      .sort((x, y) => y.dias.length - x.dias.length || x.alumno.localeCompare(y.alumno))
+  })()
 
   const nombreCliente = (id: number) => clientes.find(c => c.id === id)?.nombre || `#${id}`
   const etiquetaAlumno = (a: string | number) => typeof a === 'number' ? nombreCliente(a) : a
@@ -426,9 +480,7 @@ export default function CalendarioPage() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {f.alumnos.length === 0 ? <span style={{ fontSize: 11, color: '#9CA3AF' }}>Sin alumnos</span>
-                            : f.alumnos.map((a, k) => (
-                              <span key={k} style={{ fontSize: 11, color: '#374151', background: '#fff', border: `1px solid ${pc.bd}`, borderRadius: 6, padding: '1px 6px' }}>{a}</span>
-                            ))}
+                            : f.alumnos.map(a => chipAlumno(sel, a, pc.bd))}
                         </div>
                         {f.cuposPrueba > 0 && (
                           <p style={{ fontSize: 11, color: '#008069', fontWeight: 700, marginTop: 6 }}>
@@ -490,13 +542,25 @@ export default function CalendarioPage() {
                           {c.nota && <p style={{ fontSize: 12, color: '#5A1A38', fontWeight: 600, marginBottom: 5 }}>{c.nota}</p>}
                           <div className="flex flex-wrap gap-1">
                             {c.alumnos.length === 0 ? <span style={{ fontSize: 11, color: '#9CA3AF' }}>Sin alumnos</span>
-                              : c.alumnos.map((a, k) => (
-                                <span key={k} style={{ fontSize: 11, color: '#374151', background: '#fff', border: '1px solid ' + pc.bd, borderRadius: 6, padding: '1px 6px' }}>{etiquetaAlumno(a)}</span>
-                              ))}
+                              : c.alumnos.map(a => chipAlumno(c.fecha ?? sel, etiquetaAlumno(a), pc.bd))}
                           </div>
                         </div>
                       )
                     })}
+                  {/* Los que faltaron en el mes que está mirando. Sale del pase de
+                      lista de las 21:00 y de lo que ella corrija con el dedo. */}
+                  {!loading && faltasMes.length > 0 && (
+                    <div style={{ marginTop: 10, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '9px 11px' }}>
+                      <p style={{ fontSize: 11, fontWeight: 800, color: '#991B1B', marginBottom: 6 }}>Faltaron este mes</p>
+                      {faltasMes.map(f => (
+                        <div key={f.alumno} className="flex items-center gap-2" style={{ marginBottom: 3 }}>
+                          <span style={{ fontSize: 12, color: '#7F1D1D', fontWeight: 700, flex: 1 }}>{f.alumno}</span>
+                          <span style={{ fontSize: 10.5, color: '#B91C1C' }}>{f.dias.map(d => Number(d.slice(8, 10))).join(', ')}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: '#EF4444', borderRadius: 999, padding: '1px 7px' }}>{f.dias.length}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </aside>

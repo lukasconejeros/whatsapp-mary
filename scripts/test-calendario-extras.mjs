@@ -47,8 +47,9 @@ await page.goto(BASE + '/calendario', { waitUntil: 'networkidle' })
 ok(!errores500.length, 'la pantalla del calendario carga sin errores 500')
 
 // ── El selector de tipos ─────────────────────────────────────────────────────
-await page.getByRole('button', { name: 'Agregar' }).first().click()
-await page.getByRole('button', { name: 'Prefiero a mano' }).click()
+// Desde el 11-08-2026 son DOS botones separados: «Dictar» y «Formulario»
+// (antes el formulario estaba escondido detras de «Prefiero a mano»).
+await page.getByRole('button', { name: 'Formulario' }).first().click()
 for (const t of ['clase', 'alumno', 'pago', 'Recordar']) {
   ok(await page.getByRole('button', { name: t, exact: true }).isVisible(), `está la pestaña «${t}»`)
 }
@@ -77,8 +78,9 @@ ok((await page.getByText('todos los meses').count()) > 0, 'se ve que vuelve todo
 
 // ── RECORDATORIO ────────────────────────────────────────────────────────────
 console.log('\nRecordatorio')
-await page.getByRole('button', { name: 'Agregar' }).first().click()
-await page.getByRole('button', { name: 'Prefiero a mano' }).click()
+// Desde el 11-08-2026 son DOS botones separados: «Dictar» y «Formulario»
+// (antes el formulario estaba escondido detras de «Prefiero a mano»).
+await page.getByRole('button', { name: 'Formulario' }).first().click()
 await page.getByRole('button', { name: 'Recordar', exact: true }).click()
 await page.getByPlaceholder('Ej: comprar acuarelas').fill('PRUEBA comprar acuarelas')
 await page.getByRole('button', { name: 'Guardar' }).click()
@@ -97,8 +99,9 @@ ok(
 
 // ── ALUMNO que se repite todas las semanas ──────────────────────────────────
 console.log('\nAlumno que se repite')
-await page.getByRole('button', { name: 'Agregar' }).first().click()
-await page.getByRole('button', { name: 'Prefiero a mano' }).click()
+// Desde el 11-08-2026 son DOS botones separados: «Dictar» y «Formulario»
+// (antes el formulario estaba escondido detras de «Prefiero a mano»).
+await page.getByRole('button', { name: 'Formulario' }).first().click()
 await page.getByRole('button', { name: 'alumno', exact: true }).click()
 await page.getByPlaceholder('Ej: Amelia').fill('PRUEBA Amelia')
 await page.selectOption('select', 'nuevo')
@@ -135,3 +138,4 @@ console.log(`\n🧹 borrado lo de prueba: ${creados.pagos.length} pagos, ${cread
 await browser.close()
 console.log(fail === 0 ? `\n🎉  ${pass} passed, 0 failed\n` : `\n💥  ${pass} passed, ${fail} failed\n`)
 process.exit(fail === 0 ? 0 : 1)
+
