@@ -64,7 +64,8 @@
     "test:asistencia": "tsx scripts/test-asistencia-db.ts",
     "test:pase-lista": "tsx scripts/test-pase-lista.ts",
     "test:dia-mary": "tsx scripts/test-dia-de-mary.ts",
-    "test:avisos-mary": "tsx scripts/test-avisos-mary.ts"
+    "test:avisos-mary": "tsx scripts/test-avisos-mary.ts",
+    "test:avisos-envio": "tsx scripts/test-avisos-envio.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

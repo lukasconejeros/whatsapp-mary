@@ -14,6 +14,19 @@
 // el resumen, por fecha, fuera de aquí. Sin eso, un loop que corre cada 5
 // minutos mandaría el mismo push durante toda la ventana.
 
+/**
+ * APAGADOS el 11-08-2026 por encargo de Lukas: los sustituyen los dos avisos
+ * por WhatsApp de `avisos-mary.ts` (el resumen del día a las 10:00 y el pase de
+ * lista a las 21:00). Con los cuatro encendidos a la vez le llenábamos el
+ * teléfono, así que el resumen de la víspera y el de "5 h antes" se callan.
+ *
+ * El código y sus pruebas se dejan enteros a propósito: si los quiere de vuelta,
+ * es cambiar este false y nada más. El apagado real está en el loop
+ * (`tickRecordatorios`), no aquí, para que las pruebas de esta lógica sigan
+ * valiendo y documentando cómo se comportaban.
+ */
+export const AVISOS_PUSH_ACTIVOS = false;
+
 export type ClaseAviso = "resumen" | "5h";
 
 /** Antelación del aviso previo a cada horario, en minutos. */

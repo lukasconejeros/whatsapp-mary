@@ -8,8 +8,9 @@
 import pino from "pino";
 import { listClasesRange, marcarAviso5h, getConfig, setConfig, type Clase } from "./db.js";
 import { enviarPush, pushConfigurado } from "./push.js";
-import { recordatoriosPendientes, diasEntre, type FilaCalendario } from "./recordatorios.js";
+import { recordatoriosPendientes, diasEntre, AVISOS_PUSH_ACTIVOS, type FilaCalendario } from "./recordatorios.js";
 import { tickRecordatoriosWa } from "./recordatorios-wa-loop.js";
+import { tickAvisosMary } from "./avisos-mary-loop.js";
 import { todaySantiago, nowSantiago } from "./fechas.js";
 
 const logger = pino({ level: (process.env.LOG_LEVEL ?? "info") as pino.Level });
@@ -57,6 +58,9 @@ function aFila(c: Clase): FilaCalendario {
 
 /** Una pasada. Exportada para probarla de punta a punta sin esperar 5 min. */
 export async function tickRecordatorios(): Promise<void> {
+  // Apagados el 11-08-2026: los reemplazan los dos avisos por WhatsApp
+  // (10:00 y 21:00) que manda tickAvisosMary. Ver AVISOS_PUSH_ACTIVOS.
+  if (!AVISOS_PUSH_ACTIVOS) return;
   if (!pushConfigurado()) return; // sin claves VAPID no hay a quién avisar
   const hoy = todaySantiago();
   const ahora = nowSantiago().slice(11); // "HH:MM"
@@ -94,6 +98,13 @@ export function startRecordatoriosLoop(): void {
       tickRecordatoriosWa();
     } catch (err) {
       logger.error({ err }, "Recordatorios por WhatsApp: error en el tick; reintenta");
+    }
+    try {
+      // Los dos avisos fijos de Mary: el resumen del día (10:00) y el pase de
+      // lista (21:00). Su propio try por lo mismo de arriba.
+      tickAvisosMary();
+    } catch (err) {
+      logger.error({ err }, "Avisos de Mary: error en el tick; reintenta");
     }
     corriendo = false;
     timer = setTimeout(run, INTERVALO_MS);
