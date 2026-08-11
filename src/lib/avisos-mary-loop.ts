@@ -13,11 +13,17 @@
 import pino from "pino";
 import {
   getAvisoDiario, marcarAvisoEncolado, marcarAvisoEnviado,
-  abrirPaseLista, getOutboxSent, enqueueOutbox, getOrCreateConversation,
+  abrirPaseLista, getPaseLista, cerrarPaseLista, sumarAclaracion, marcarAsistencia,
+  getOutboxSent, enqueueOutbox, getOrCreateConversation,
   type TipoAviso,
 } from "./db.js";
 import { armarDia } from "./dia-de-mary.js";
-import { tocaAviso, textoResumen, textoPaseLista } from "./avisos-mary.js";
+import {
+  tocaAviso, textoResumen, textoPaseLista,
+  textoConfirmacion, textoNoEntendi, textoMeRindo,
+} from "./avisos-mary.js";
+import { interpretarPaseLista } from "./pase-lista.js";
+import { minutosDe } from "./recordatorios.js";
 import { telefonoDelBot } from "./recordatorios-wa-loop.js";
 import { todaySantiago, nowSantiago } from "./fechas.js";
 
@@ -34,6 +40,15 @@ export interface ResultadoAvisos {
   /** Los que WhatsApp ya despachó y quedaron marcados como enviados. */
   confirmados: number;
 }
+
+/**
+ * Hasta qué hora del día siguiente se sigue aceptando la respuesta al pase de
+ * lista de anoche. Después, lo que ella escriba ya es otra conversación.
+ */
+export const VENCE_AL_DIA_SIGUIENTE_H = 12;
+
+/** Cuántas veces se le pide que aclare antes de dejarlo estar. */
+export const MAX_ACLARACIONES = 1;
 
 function ayerDe(fecha: string): string {
   const d = new Date(`${fecha}T12:00:00Z`);
@@ -110,4 +125,65 @@ export function tickAvisosMary(opts: {
   }
 
   return { encolados, confirmados };
+}
+
+/** Le manda un mensaje al chat de Mary consigo misma. */
+function responder(phone: string | null, texto: string): void {
+  if (!phone) return; // WhatsApp caído: lo marcado queda igual, solo no le contesta
+  const conv = getOrCreateConversation(phone, NOMBRE_CHAT);
+  enqueueOutbox(conv.id, phone, texto, { kind: "text" });
+}
+
+/**
+ * ¿Este mensaje que Mary se escribió a sí misma era la respuesta al pase de
+ * lista? Devuelve `true` si lo atendió (y entonces el handler NO sigue con el
+ * camino normal) y `false` si no había nada abierto: ahí su mensaje se guarda
+ * como siempre y no cambia nada de lo de antes.
+ *
+ * Vale el pase de lista de hoy y, hasta el mediodía, el de anoche: es normal que
+ * conteste al otro día por la mañana.
+ */
+export function procesarRespuestaPaseLista(texto: string, opts: {
+  hoy?: string;
+  ahora?: string;
+  phone?: string | null;
+} = {}): boolean {
+  const hoy = opts.hoy ?? todaySantiago();
+  const ahora = opts.ahora ?? nowSantiago().slice(11);
+  const phone = "phone" in opts ? opts.phone ?? null : telefonoDelBot();
+
+  const fechas = [hoy];
+  if ((minutosDe(ahora) ?? 0) < VENCE_AL_DIA_SIGUIENTE_H * 60) fechas.push(ayerDe(hoy));
+
+  const abierto = fechas
+    .map((f) => getPaseLista(f))
+    .find((p) => p !== null && p.respondidoAt === null);
+  if (!abierto) return false;
+
+  const lectura = interpretarPaseLista(texto, abierto.alumnos);
+
+  if (lectura.tipo === "no-entendi") {
+    // Se pide que aclare UNA vez. A la segunda se deja estar: insistirle a alguien
+    // que está ocupado es peor que quedarse sin el dato, y siempre puede marcarlo
+    // en el calendario.
+    if (abierto.aclaraciones >= MAX_ACLARACIONES) {
+      cerrarPaseLista(abierto.fecha, texto);
+      responder(phone, textoMeRindo());
+      logger.info({ fecha: abierto.fecha }, "Pase de lista: no se entendió dos veces, se deja sin marcar");
+      return true;
+    }
+    sumarAclaracion(abierto.fecha);
+    responder(phone, textoNoEntendi());
+    return true;
+  }
+
+  for (const alumno of lectura.vino) marcarAsistencia(abierto.fecha, alumno, "vino");
+  for (const alumno of lectura.falto) marcarAsistencia(abierto.fecha, alumno, "falto");
+  cerrarPaseLista(abierto.fecha, texto);
+  responder(phone, textoConfirmacion(lectura.vino, lectura.falto));
+  logger.info(
+    { fecha: abierto.fecha, vino: lectura.vino.length, falto: lectura.falto.length },
+    "Pase de lista respondido"
+  );
+  return true;
 }

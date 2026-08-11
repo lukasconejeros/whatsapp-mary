@@ -26,6 +26,8 @@ import { generateReplyDetallado } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
+import { procesarRespuestaPaseLista } from "../avisos-mary-loop.js";
+import { telefonoDelBot } from "../recordatorios-wa-loop.js";
 import pino from "pino";
 import fs from "fs";
 import path from "path";
@@ -201,6 +203,15 @@ export async function handleIncomingMessages(
       let mediaSal: string | null = null;
       if (!textoSal) { const m = await procesarMedia(sock, msg, innerSal); if (m) { textoSal = m.text; mediaSal = m.media; } }
       if (!textoSal) continue;
+      // EL CHAT DE MARY CONSIGO MISMA: si hay un pase de lista esperando
+      // respuesta, esto no es un mensaje a un cliente, es ella diciendo quién
+      // vino (encargo de Lukas, 11-08-2026). Si no hay ninguno abierto,
+      // procesarRespuestaPaseLista devuelve false y todo sigue como siempre.
+      const soloDigitos = (s: string) => s.replace(/\D+/g, "");
+      if (soloDigitos(phoneSal) === soloDigitos(telefonoDelBot() ?? "") && procesarRespuestaPaseLista(textoSal)) {
+        logger.info("📋 respuesta al pase de lista atendida");
+        continue;
+      }
       try {
         const jidGuardar = jidSal.endsWith("@lid") ? `${phoneSal}@s.whatsapp.net` : jidSal;
         const convSal = getOrCreateConversation(phoneSal, undefined, jidGuardar);
