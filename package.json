@@ -62,7 +62,8 @@
     "test:calendario-extras": "node scripts/test-calendario-extras.mjs",
     "cargar:alumnos": "node scripts/cargar-alumnos-arteluk.mjs",
     "test:asistencia": "tsx scripts/test-asistencia-db.ts",
-    "test:pase-lista": "tsx scripts/test-pase-lista.ts"
+    "test:pase-lista": "tsx scripts/test-pase-lista.ts",
+    "test:dia-mary": "tsx scripts/test-dia-de-mary.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
