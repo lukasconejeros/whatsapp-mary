@@ -69,6 +69,8 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const startedAtRef = useRef(0)
   const fotoInputRef = useRef<HTMLInputElement | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const scrollBox = useRef<HTMLDivElement>(null)
+  const ultimoIdRef = useRef<number | null>(null)
 
   // Al desmontar (cambiar de chat/volver), soltar micrófono, grabación y cronómetro
   // para que el micro no quede ENCENDIDO si Mary cambia de chat mientras graba.
@@ -94,7 +96,23 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   }, [conv.id])
 
   // block: 'nearest' para bajar solo la lista, no la página de alrededor (teléfono).
-  useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [msgs])
+  function bajarAlFinal() { ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }
+
+  // Baja SOLO si hay mensaje nuevo Y ella estaba mirando el final (o es la primera
+  // carga del chat). El refresco de los 7 s deja la lista igual casi siempre, pero
+  // antes bajaba al fondo en cada pasada y no dejaba subir a leer lo viejo
+  // (Lukas, 11-08-2026). Si está arriba leyendo, no se la mueve ni con mensaje nuevo:
+  // igual que WhatsApp.
+  useEffect(() => {
+    const ultimo = msgs.length ? msgs[msgs.length - 1].id : null
+    if (ultimo === ultimoIdRef.current) return
+    const primeraCarga = ultimoIdRef.current === null
+    ultimoIdRef.current = ultimo
+    if (ultimo === null) return
+    const box = scrollBox.current
+    const mirandoElFinal = !box || box.scrollHeight - box.scrollTop - box.clientHeight < 150
+    if (primeraCarga || mirandoElFinal) bajarAlFinal()
+  }, [msgs])
 
 
   // Toma la nota que Mary escribió en la caja y la convierte en un mensaje bonito
@@ -123,6 +141,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     setSending(true); const text = reply.trim(); setReply('')
     const tmp: Message = { id: Date.now(), content: text, messageType: 1, senderName: 'Tú', senderType: 'human', createdAt: Date.now()/1000, isPrivate: false }
     setMsgs(p=>[...p,tmp])
+    setTimeout(bajarAlFinal, 60) // lo que ella misma manda siempre se muestra, esté donde esté
     try {
       const r = await fetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversationId:conv.id,message:text})})
       if(!r.ok){setMsgs(p=>p.filter(m=>m.id!==tmp.id));setReply(text);setSendError('No se pudo enviar, reintenta.')}
@@ -166,6 +185,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             setSendError('')
             const tmp: Message = { id: Date.now(), content: '🎤 Audio', media: d.media, messageType: 1, senderName: 'Tú', senderType: 'human', createdAt: Date.now() / 1000, isPrivate: false }
             setMsgs(p => [...p, tmp])
+            setTimeout(bajarAlFinal, 60)
           } else {
             setSendError('No se pudo enviar el audio, reintenta.')
           }
@@ -199,6 +219,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         setSendError('')
         const tmp: Message = { id: Date.now(), content: '📷 Foto', media: d.media, messageType: 1, senderName: 'Tú', senderType: 'human', createdAt: Date.now() / 1000, isPrivate: false }
         setMsgs(p => [...p, tmp])
+        setTimeout(bajarAlFinal, 60)
       } else {
         setSendError('No se pudo enviar la foto, reintenta.')
       }
@@ -235,7 +256,7 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
         </span>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', overscrollBehaviorY:'contain', padding:'14px 16px', background:'#FFFFFF' }}>
+      <div ref={scrollBox} style={{ flex:1, overflowY:'auto', overscrollBehaviorY:'contain', padding:'14px 16px', background:'#FFFFFF' }}>
         {loading ? (
           <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:6,color:'#94A3B8' }}>
             <div style={{ width:13,height:13,border:'2px solid #D3E7DE',borderTopColor:'#00A884',borderRadius:'50%',animation:'spin 0.6s linear infinite' }}/>

@@ -513,3 +513,32 @@ Estaba rojo antes de tocar nada; se arreglo de paso.
 nombres del dia se conoce, asi que interpretar "no fue Mateo" es buscarlos en la frase: sale
 gratis, responde al instante y **no puede inventar un alumno**. Ante la duda no adivina,
 vuelve a preguntar UNA vez y despues lo deja estar.
+
+## #25 — El chat del inbox no dejaba subir a leer: el scroll se escapaba solo al fondo (11-08-2026)
+
+**La queja de Lukas, textual**: *"en la app del compu no puedo ir para arriba con los mensajes
+en un chat: al segundo se desliza para abajo solo"*. Pasaba igual en el telefono.
+
+**Causa raiz (con evidencia, no impresion)**: `ConversationView` refresca el chat cada 7 s
+(`setInterval` + `setMsgs`) y el `useEffect` del autoscroll dependia de `[msgs]`. Cada
+refresco crea un array NUEVO aunque los mensajes sean los mismos, asi que el efecto corria
+cada 7 s y mandaba el scroll al fondo. Subir a leer era imposible.
+
+**El arreglo (patron WhatsApp)**: bajar SOLO si cambio el id del ultimo mensaje Y ella estaba
+mirando el final (o es la primera carga). Si esta arriba leyendo, ni el refresco ni un mensaje
+nuevo la mueven. Lo que ella misma manda (texto, audio, foto) siempre baja a mostrarse:
+esos son los 3 puntos de envio y se cubrieron los 3, no solo el del texto.
+
+**La prueba**: `npm run test:chat-scroll` (nuevo, Playwright contra el build real): siembra un
+chat de 40 mensajes en la base, sube el scroll, espera un ciclo real de 7 s y comprueba que no
+se movio; tambien que un mensaje nuevo no la arrastra estando arriba, y que estando abajo si
+baja. Con el codigo viejo fallaban 2 de 6 (el bug reproducido); con el arreglo, 6/6.
+
+**La familia revisada antes de tocar**: el inbox (vivo) = arreglado; Asistente y Ensayo no se
+refrescan solos = sin tocar; `ConversationPanel` (Dashboard) tiene el mismo defecto pero es
+codigo muerto = sin tocar; y OJO: los paneles de chats de Anpalex/Medifis son codigo hermano
+y pueden arrastrar lo mismo — pendiente de revisar en su propia sesion.
+
+**Gotcha de la sesion**: el puerto 3011 estaba ocupado por un `next start` huerfano de una
+sesion anterior (levantado 17:33) — el test corria contra un build viejo sin avisar. Antes de
+levantar el server de prueba, revisar el puerto y matar el huerfano.

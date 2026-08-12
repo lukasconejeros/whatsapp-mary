@@ -68,6 +68,7 @@
     "test:avisos-envio": "tsx scripts/test-avisos-envio.ts",
     "test:respuesta-pase": "tsx scripts/test-respuesta-pase-lista.ts",
     "test:asistencia-api": "node scripts/test-asistencia-api.mjs",
+    "test:chat-scroll": "node scripts/test-chat-scroll.mjs",
     "humo:pase-lista": "tsx scripts/humo-pase-lista.ts"
   },
   "dependencies": {
