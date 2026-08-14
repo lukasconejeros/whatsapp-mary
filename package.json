@@ -18,6 +18,7 @@
     "doctor": "tsx scripts/doctor.ts",
     "pull:airtable": "tsx scripts/pull-airtable.ts",
     "import:contactos": "tsx scripts/import-contactos-arteluk.ts",
+    "test:gasto-ia": "tsx scripts/test-gasto-ia.ts",
     "test:contactos": "tsx scripts/test-contactos.ts",
     "test:feedback": "tsx scripts/test-feedback.ts",
     "test:outbox": "tsx scripts/test-outbox.ts",

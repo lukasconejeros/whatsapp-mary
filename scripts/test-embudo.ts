@@ -61,6 +61,7 @@ async function main() {
     history: getRecentHistory(personal.id, 20),
     conversationId: personal.id,
     phone: "56922222222",
+    prueba: true,
   });
   const personalFresh = getConversationById(personal.id);
   check("mensaje personal → bot NO responde (texto vacío)", r1.trim() === "", `(respondió: "${r1.slice(0,40)}")`);
@@ -74,6 +75,7 @@ async function main() {
     history: getRecentHistory(lead.id, 20),
     conversationId: lead.id,
     phone: "56933333333",
+    prueba: true,
   });
   const leadFresh = getConversationById(lead.id);
   check("lead real → bot SÍ responde (texto no vacío)", r2.trim().length > 0);

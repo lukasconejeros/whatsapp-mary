@@ -30,6 +30,7 @@ async function testConversation(nombre: string, mensajes: string[]) {
       history,
       conversationId: CONV_ID,
       phone: "56912345678",
+      prueba: true,
     });
 
     if (reply) {

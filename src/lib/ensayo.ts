@@ -10,6 +10,9 @@
 // Sin extensión .js: este módulo lo importan la API de Next y los scripts (db.ts hace igual).
 import { buildSystemPrompt } from "./system-prompt";
 import { toolDefinitions } from "./tools/index";
+import { logCostoIA } from "./db";
+import { tarifaPorModelo } from "./tarifas-ia";
+import { todaySantiago } from "./fechas";
 import type { AudioMary, EnsayoMensaje } from "./db";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -235,6 +238,7 @@ export function cuerpoEnsayo(system: string, messages: MensajeApi[], audios: Aud
 }
 
 async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: string, audios: AudioMary[] = []) {
+  const cuerpo = cuerpoEnsayo(system, messages, audios);
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
@@ -242,7 +246,7 @@ async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: st
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify(cuerpoEnsayo(system, messages, audios)),
+    body: JSON.stringify(cuerpo),
   });
   if (!res.ok) throw new Error(`La IA respondió ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = (await res.json()) as {
@@ -253,6 +257,16 @@ async function pedirAnthropic(system: string, messages: MensajeApi[], apiKey: st
   usoEnsayo.llamadas++;
   usoEnsayo.entrada += data.usage?.input_tokens ?? 0;
   usoEnsayo.salida += data.usage?.output_tokens ?? 0;
+
+  // Contabilidad de gasto (13-08-2026): el ensayo es SIEMPRE práctica, nunca un lead
+  // real (ver la cabecera del archivo), así que va entero al bolsillo de pruebas.
+  if (data.usage) {
+    try {
+      const t = tarifaPorModelo(cuerpo.model);
+      const usd = ((data.usage.input_tokens ?? 0) * t.in + (data.usage.output_tokens ?? 0) * t.out) / 1_000_000;
+      logCostoIA(usd, { prueba: true, dia: todaySantiago() });
+    } catch (e) { console.error("gasto IA (ensayo): no pude registrar el costo:", e); }
+  }
   return data;
 }
 

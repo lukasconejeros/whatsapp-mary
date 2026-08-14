@@ -391,6 +391,21 @@ CREATE TABLE IF NOT EXISTS lid_map (
   phone TEXT NOT NULL,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+-- Cuánto gasta el bot en IA (13-08-2026), como ya llevan Medifis, Anpalex y Conejeros.
+-- "prueba" separa el chat de ensayo y los npm run test:* del tráfico real de WhatsApp,
+-- para que correr un test no infle lo que Mary ve como gasto real. "marca" es solo
+-- para que los tests puedan borrar sus propias filas sin tocar el gasto real de nadie.
+CREATE TABLE IF NOT EXISTS gasto_ia (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usd REAL NOT NULL,
+  prueba INTEGER NOT NULL DEFAULT 0,
+  dia TEXT NOT NULL,
+  conversation_id INTEGER,
+  marca TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_gasto_ia_dia ON gasto_ia(dia, prueba);
 `;
 
 interface Ctx {
@@ -2086,4 +2101,72 @@ export function listPushSubs(): PushSub[] {
 
 export function deletePushSub(endpoint: string): void {
   ctx().db.prepare("DELETE FROM push_subs WHERE endpoint = ?").run(endpoint);
+}
+
+// ── Gasto de IA ──────────────────────────────────────────────────────────
+// Antes este bot gastaba a ciegas, a diferencia de Medifis/Anpalex/Conejeros. Cada
+// llamada anota su costo estimado; "prueba" separa el chat de ensayo y los
+// `npm run test:*` del tráfico real, para no ensuciar el número que Mary ve.
+
+export function logCostoIA(usd: number, opts: {
+  conversationId?: number | null; prueba: boolean; dia: string; marca?: string | null;
+}): void {
+  ctx().db
+    .prepare("INSERT INTO gasto_ia (usd, prueba, dia, conversation_id, marca) VALUES (?, ?, ?, ?, ?)")
+    .run(usd, opts.prueba ? 1 : 0, opts.dia, opts.conversationId ?? null, opts.marca ?? null);
+}
+
+export interface GastoDia { dia: string; usd: number; llamadas: number }
+export interface GastoIA {
+  total_usd: number;
+  llamadas: number;
+  hoy_usd: number;
+  este_mes_usd: number;
+  ultimos_7_dias: GastoDia[];
+  pruebas_usd: number;
+  pruebas_llamadas: number;
+}
+
+/** Lo que el bot ha gastado en IA, real vs pruebas. `hoy` es YYYY-MM-DD y `mes` YYYY-MM
+ * (ver todaySantiago/monthSantiago en fechas.ts) — se piden aparte para no atarse aquí
+ * a la zona horaria de Chile. */
+export function getGastoIA(hoy: string, mes: string): GastoIA {
+  const db = ctx().db;
+  const reales = db.prepare("SELECT dia, usd FROM gasto_ia WHERE prueba = 0 ORDER BY dia DESC LIMIT 20000")
+    .all() as { dia: string; usd: number }[];
+  const pruebas = db.prepare("SELECT usd FROM gasto_ia WHERE prueba = 1 ORDER BY id DESC LIMIT 20000")
+    .all() as { usd: number }[];
+
+  let total = 0, hoyUsd = 0, mesUsd = 0;
+  const porDia: Record<string, { usd: number; llamadas: number }> = {};
+  for (const r of reales) {
+    total += r.usd;
+    if (r.dia === hoy) hoyUsd += r.usd;
+    if (r.dia.slice(0, 7) === mes) mesUsd += r.usd;
+    if (!porDia[r.dia]) porDia[r.dia] = { usd: 0, llamadas: 0 };
+    porDia[r.dia].usd += r.usd;
+    porDia[r.dia].llamadas += 1;
+  }
+  let pruebasUsd = 0;
+  for (const r of pruebas) pruebasUsd += r.usd;
+
+  const ultimos7 = Object.entries(porDia)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 7)
+    .map(([dia, v]) => ({ dia, usd: +v.usd.toFixed(4), llamadas: v.llamadas }));
+
+  return {
+    total_usd: +total.toFixed(4),
+    llamadas: reales.length,
+    hoy_usd: +hoyUsd.toFixed(4),
+    este_mes_usd: +mesUsd.toFixed(4),
+    ultimos_7_dias: ultimos7,
+    pruebas_usd: +pruebasUsd.toFixed(4),
+    pruebas_llamadas: pruebas.length,
+  };
+}
+
+/** Solo para tests: borra las filas que dejó una corrida marcada. */
+export function borrarGastoIADeMarca(marca: string): number {
+  return ctx().db.prepare("DELETE FROM gasto_ia WHERE marca = ?").run(marca).changes as number;
 }

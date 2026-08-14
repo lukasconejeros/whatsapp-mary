@@ -3,6 +3,8 @@ import type { Message } from "./db.js";
 import { toolDefinitions, executeTool } from "./tools/index.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import { computeState } from "./state-manager.js";
+import { logCostoIA } from "./db.js";
+import { todaySantiago } from "./fechas.js";
 
 const MODEL   = process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5";
 const MAX_TURNS  = 12;
@@ -22,6 +24,11 @@ export function presupuestoRazonamientoBot(): number {
   const v = parseInt(process.env.RAZONAMIENTO_ENSAYO ?? "", 10);
   return Number.isFinite(v) && v >= 0 ? v : 0;
 }
+
+// Tarifas y estimarUSD viven en tarifas-ia.ts (sin imports .js) para que ensayo.ts,
+// que sí lo pilla el build de Next, pueda usarlas sin arrastrar todo ai.ts.
+export { tarifaPorModelo, estimarUSD } from "./tarifas-ia.js";
+import { estimarUSD } from "./tarifas-ia.js";
 
 let _client: OpenAI | null = null;
 // Se apaga solo si el proveedor rechaza el razonamiento, y queda apagado para no repetir el
@@ -177,6 +184,7 @@ export async function generateReply(input: {
   history: Message[];
   conversationId: number;
   phone?: string;
+  prueba?: boolean;
 }): Promise<string> {
   return (await generateReplyDetallado(input)).texto;
 }
@@ -185,6 +193,9 @@ export async function generateReplyDetallado(input: {
   history: Message[];
   conversationId: number;
   phone?: string;
+  // `true` para los npm run test:* que llaman a la IA de verdad: separa su gasto del
+  // tráfico real de WhatsApp (ver logCostoIA). Por defecto es tráfico real.
+  prueba?: boolean;
 }): Promise<RespuestaBot> {
   const client   = getClient();
   const sysprompt = buildSystemPrompt();
@@ -230,7 +241,7 @@ export async function generateReplyDetallado(input: {
 async function conversarConElModelo(
   client: OpenAI,
   threadInicial: OpenAI.Chat.ChatCompletionMessageParam[],
-  input: { conversationId: number; phone?: string; sysprompt: string; estadoContext: string }
+  input: { conversationId: number; phone?: string; sysprompt: string; estadoContext: string; prueba?: boolean }
 ): Promise<{ texto: string; silencio: boolean; usoHerramientas: boolean }> {
   const { sysprompt, estadoContext } = input;
   let turns = 0;
@@ -271,12 +282,24 @@ async function conversarConElModelo(
     // o si las apoderadas escriben tan espaciado que expira antes de reusarse.
     const uso = response.usage as unknown as {
       prompt_tokens?: number;
+      completion_tokens?: number;
       prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
     } | undefined;
     if (uso) {
       console.info(
         `[ia] entrada ${uso.prompt_tokens ?? 0} · leído de caché ${uso.prompt_tokens_details?.cached_tokens ?? 0} · guardado ${uso.prompt_tokens_details?.cache_write_tokens ?? 0}`
       );
+      // Contabilidad de gasto (13-08-2026), igual que Medifis/Anpalex/Conejeros. El
+      // estimado no descuenta la caché (OpenRouter no la desglosa en el precio), así
+      // que puede quedar algo caro de más — mejor eso que esconder gasto real.
+      try {
+        const usd = estimarUSD(MODEL, uso.prompt_tokens ?? 0, uso.completion_tokens ?? 0);
+        logCostoIA(usd, {
+          conversationId: input.conversationId,
+          prueba: !!input.prueba,
+          dia: todaySantiago(),
+        });
+      } catch (e) { console.error("gasto IA: no pude registrar el costo:", e); }
     }
 
     const choice = response.choices[0];
