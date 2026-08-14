@@ -542,3 +542,29 @@ y pueden arrastrar lo mismo — pendiente de revisar en su propia sesion.
 **Gotcha de la sesion**: el puerto 3011 estaba ocupado por un `next start` huerfano de una
 sesion anterior (levantado 17:33) — el test corria contra un build viejo sin avisar. Antes de
 levantar el server de prueba, revisar el puerto y matar el huerfano.
+
+---
+
+## #26 — Importar algo de `ai.ts` desde `ensayo.ts` rompe el build de Next (13-08-2026)
+
+**Que se hizo**: se agrego contabilidad de gasto de IA (tabla `gasto_ia`, `logCostoIA`/
+`getGastoIA`), igual a lo que ya tenian Medifis, Anpalex y Conejeros. `ai.ts` (el bot real,
+via WhatsApp) y `ensayo.ts` (el chat de practica de Mary) necesitaban las mismas tarifas.
+
+**El error**: poner `tarifaPorModelo` en `ai.ts` e importarla desde `ensayo.ts` con
+`import { tarifaPorModelo } from "./ai"` compilaba bien con `tsc` pero **rompia
+`npm run build`**: `Module not found: Can't resolve './tools/index.js'`, apuntando a
+`ai.ts:3`. Causa: `ai.ts` usa imports con `.js` (`./tools/index.js`, `./db.js`...) porque
+solo lo consume el bot via `tsx` (Node ESM real); nunca antes lo habia arrastrado el build
+de Next. `ensayo.ts` si lo empaqueta Next (via `/api/ensayo`), y ahi esos imports `.js` no
+resuelven. `tsc --noEmit` no lo cazo porque typecheck y el bundler de Next resuelven
+distinto.
+
+**La leccion**: antes de importar algo de `ai.ts` en un archivo que toca `src/app/api/`,
+comprobar si `ai.ts` ya entraba al build de Next (`grep` por `from ".../lib/ai"` dentro de
+`src/app`) — si nunca habia entrado, es señal de que no es seguro arrastrarlo.
+
+**El arreglo**: las tarifas se sacaron a `src/lib/tarifas-ia.ts`, sin ningun import propio,
+y las dos partes (`ai.ts` con `.js`, `ensayo.ts` sin extension) lo importan de ahi. `ai.ts`
+re-exporta `tarifaPorModelo`/`estimarUSD` para no romper a quien ya las importaba de ahi
+(el test). Verificado con `npm run build` limpio despues del cambio.
