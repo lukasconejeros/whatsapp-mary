@@ -5,6 +5,7 @@ import { buildSystemPrompt } from "./system-prompt.js";
 import { computeState } from "./state-manager.js";
 import { logCostoIA } from "./db.js";
 import { todaySantiago } from "./fechas.js";
+import { bienvenidaPara } from "./mensajes.js";
 
 const MODEL   = process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5";
 const MAX_TURNS  = 12;
@@ -197,6 +198,15 @@ export async function generateReplyDetallado(input: {
   // tráfico real de WhatsApp (ver logCostoIA). Por defecto es tráfico real.
   prueba?: boolean;
 }): Promise<RespuestaBot> {
+  // Saludo pelado de alguien nuevo: contesta el texto que Mary escribió en "Entrenar IA", sin pasar
+  // por el modelo (ver mensajes.ts: el atajo es angosto a propósito y no se salta ningún filtro,
+  // porque el prompt ya obliga a contestar SIEMPRE el primer mensaje de alguien nuevo).
+  const saludoFijo = bienvenidaPara(input.history);
+  if (saludoFijo) {
+    console.log(`[BOT conv=${input.conversationId}] 👋 saludo fijo del panel (sin llamar a la IA)`);
+    return { texto: saludoFijo, motivo: null };
+  }
+
   const client   = getClient();
   const sysprompt = buildSystemPrompt();
   const messages  = normalizeHistory(input.history);

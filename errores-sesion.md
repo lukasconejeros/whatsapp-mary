@@ -568,3 +568,30 @@ comprobar si `ai.ts` ya entraba al build de Next (`grep` por `from ".../lib/ai"`
 y las dos partes (`ai.ts` con `.js`, `ensayo.ts` sin extension) lo importan de ahi. `ai.ts`
 re-exporta `tarifaPorModelo`/`estimarUSD` para no romper a quien ya las importaba de ahi
 (el test). Verificado con `npm run build` limpio despues del cambio.
+
+## #27 — El saludo fijo del panel: un atajo así se pasa de goloso si nadie enumera la familia (17-08-2026)
+
+**Encargo.** Lukas: *"quiero que la app tenga un entrenar ia con toda la info y tambien con el saludo
+principal igual que en las app medifis y anpalex"*. Al preguntarle: solo el saludo del primer "hola".
+
+**El acierto (antes de escribir código).** Se listó la familia COMPLETA de primeros mensajes y qué le
+pasa a cada uno. Ahí saltaron dos casos que un atajo copiado tal cual de Anpalex se habría llevado
+puestos:
+- **Mary contesta desde su propio teléfono** (`role: 'human'`). Anpalex solo mira si hay `assistant`
+  en el historial; acá eso significaba mandarle la plantilla del bot ENCIMA del saludo que Mary ya
+  había escrito a mano. `bienvenidaPara` exige que NO haya ningún mensaje que no sea del usuario.
+- **El primer mensaje con foto**: hay que describirla, no saludar. También queda fuera.
+
+**El filtro de entrada NO se salta.** El atajo responde sin pasar por el modelo, así que la duda real
+era si se saltaba el silenciador de charla personal. No: el prompt (`negocio.md`, FILTRO DE ENTRADA)
+ya manda contestar SIEMPRE el primer mensaje de alguien nuevo. El atajo solo dispara ahí.
+
+**Gotcha de la prueba, no del código.** Probando la API con `curl` desde Git Bash, el saludo llegaba
+con las tildes rotas y parecía un bug de la app. Era la consola: mandando el mismo cuerpo desde un
+archivo UTF-8 (`--data-binary @body.json`) queda perfecto. Antes de acusar al código, repetir el POST
+con un archivo UTF-8.
+
+**Prueba que vale doble.** `npm run test:saludo` llama a `generateReply` DE VERDAD sin clave de
+OpenRouter: si contesta, es porque el saludo salió sin tocar el modelo. Un "hola" pelado dejó de
+costar plata.
+

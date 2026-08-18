@@ -9,6 +9,7 @@ import {
   sanear,
   type ClaveSeccion,
 } from "@/lib/secciones-negocio";
+import { getBienvenida, setBienvenida, validarBienvenida, DEFAULT_BIENVENIDA } from "@/lib/mensajes";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,9 @@ export async function GET() {
       // El nombre en cristiano para el panel; las reglas del repo se muestran con su título tal cual.
       etiqueta: b.clave ? ETIQUETAS[b.clave] : b.titulo,
     }));
-    return NextResponse.json({ ok: true, bloques });
+    // El saludo viaja junto a los bloques para que la pantalla se cargue y se guarde de una sola vez:
+    // dos botones de guardar hacían que la secretaria de otra clínica perdiera lo que no apretó.
+    return NextResponse.json({ ok: true, bloques, saludo: getBienvenida(), saludoDeFabrica: DEFAULT_BIENVENIDA });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
@@ -45,8 +48,19 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { secciones?: Partial<Record<ClaveSeccion, string>> };
+    const body = (await req.json()) as {
+      secciones?: Partial<Record<ClaveSeccion, string>>;
+      saludo?: string;
+    };
+    // El saludo se guarda aunque no vengan secciones (y al revés): son dos cosas independientes.
+    if (typeof body?.saludo === "string") {
+      const v = validarBienvenida(body.saludo);
+      if (!v.ok) return NextResponse.json({ ok: false, error: v.motivo }, { status: 400 });
+      setBienvenida(body.saludo);
+    }
     if (!body?.secciones || typeof body.secciones !== "object") {
+      // Solo el saludo también es una petición válida.
+      if (typeof body?.saludo === "string") return NextResponse.json({ ok: true, guardadas: ["saludo"] });
       return NextResponse.json({ ok: false, error: "Formato inválido" }, { status: 400 });
     }
     // `sanear` deja fuera cualquier clave que no sea de Mary y neutraliza los encabezados: por el

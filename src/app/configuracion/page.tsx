@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import AppNav from '@/components/AppNav'
-import { RefreshCw, Check, AlertTriangle, Sparkles, Settings2 } from 'lucide-react'
+import { RefreshCw, Check, AlertTriangle, Sparkles, Settings2, MessageSquare, RotateCcw } from 'lucide-react'
 
 type Bloque = { titulo: string; etiqueta: string; contenido: string; editable: boolean; clave: string | null }
 
@@ -12,12 +12,21 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showTech, setShowTech] = useState(false)
+  // El saludo del primer "hola". Va aparte de los bloques porque no es un trozo del cerebro: es un
+  // texto que se manda tal cual, sin pasar por la IA.
+  const [saludo, setSaludo] = useState('')
+  const [saludoFabrica, setSaludoFabrica] = useState('')
+  const [errorSaludo, setErrorSaludo] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const d = await fetch('/api/config').then(r => r.json())
-      if (d.ok) setBloques(d.bloques)
+      if (d.ok) {
+        setBloques(d.bloques)
+        setSaludo(d.saludo ?? '')
+        setSaludoFabrica(d.saludoDeFabrica ?? '')
+      }
     } finally { setLoading(false) }
   }, [])
 
@@ -29,7 +38,7 @@ export default function ConfiguracionPage() {
   }
 
   async function save() {
-    setSaving(true); setSaved(false)
+    setSaving(true); setSaved(false); setErrorSaludo('')
     try {
       // Solo viajan los datos del negocio. Las reglas del bot las mantiene el programa: si se
       // mandaran desde acá, un arreglo del cerebro dejaría de llegar en el próximo deploy.
@@ -37,9 +46,14 @@ export default function ConfiguracionPage() {
       for (const b of bloques) if (b.editable && b.clave) secciones[b.clave] = b.contenido
       const r = await fetch('/api/config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secciones }),
+        body: JSON.stringify({ secciones, saludo }),
       })
       if (r.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500) }
+      else {
+        // El servidor rechaza un saludo con marcadores o larguísimo: se dice por qué, en cristiano.
+        const e = await r.json().catch(() => ({}))
+        setErrorSaludo(e?.error || 'No se pudo guardar. Intenta de nuevo.')
+      }
     } finally { setSaving(false) }
   }
 
@@ -86,6 +100,41 @@ export default function ConfiguracionPage() {
                 banco y quiénes hacen las clases. Los cambios se aplican al bot al instante, sin
                 reiniciar nada, y ya no se borran cuando se actualiza el sistema.
               </p>
+            </div>
+
+            {/* El saludo del primer hola */}
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+              Saludo del bot
+            </p>
+            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #D3E7DE', overflow: 'hidden', boxShadow: '0 1px 2px rgba(30,58,95,0.04)', marginBottom: 32 }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid #F3F9F6', background: '#F3F9F6', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MessageSquare size={14} style={{ color: '#00A884' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#054D44' }}>La primera frase que lee alguien nuevo</span>
+                <div style={{ flex: 1 }} />
+                <button onClick={() => { setSaludo(saludoFabrica); setSaved(false); setErrorSaludo('') }}
+                  className="flex items-center gap-1"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', padding: 0 }}>
+                  <RotateCcw size={12} /> Volver al original
+                </button>
+              </div>
+              <textarea
+                value={saludo}
+                onChange={e => { setSaludo(e.target.value); setSaved(false); setErrorSaludo('') }}
+                rows={3}
+                placeholder="Si lo dejas vacío, el asistente saluda con sus propias palabras, como antes."
+                style={{ width: '100%', border: 'none', outline: 'none', resize: 'vertical', padding: '12px 16px',
+                  fontSize: 13, lineHeight: 1.6, color: '#334155', fontFamily: 'inherit', background: '#fff' }}
+              />
+              <p style={{ fontSize: 12, color: '#64748B', lineHeight: 1.5, padding: '0 16px 12px' }}>
+                Se manda tal cual, solo cuando alguien nuevo escribe un “hola” a secas. Si además
+                pregunta algo, contesta el asistente como siempre.
+              </p>
+              {errorSaludo && (
+                <div style={{ display: 'flex', gap: 8, padding: '10px 16px', background: '#FEF2F2', borderTop: '1px solid #FECACA' }}>
+                  <AlertTriangle size={14} style={{ color: '#B91C1C', flexShrink: 0, marginTop: 1 }} />
+                  <span style={{ fontSize: 12, color: '#B91C1C' }}>{errorSaludo}</span>
+                </div>
+              )}
             </div>
 
             {/* Secciones de negocio */}
