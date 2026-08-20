@@ -5,6 +5,7 @@ import AppNav from '@/components/AppNav'
 import ConversationView from '@/components/ConversationView'
 import { Avatar } from '@/components/Avatar'
 import { Conversation, CATEGORIA_CONFIG, Categoria } from '@/lib/types'
+import { PESTANAS, perteneceALaPestana, pagoLaPrueba, envioPorDefecto, type Pestana, type Envio } from '@/lib/inbox-filtros'
 import { RefreshCw, Search, X, ArrowLeft, MessageCircle } from 'lucide-react'
 import { sonarAviso } from '@/lib/push-client'
 
@@ -19,15 +20,9 @@ function timeAgo(ts: string | number): string {
   return `${Math.floor(s / 86400)}d`
 }
 
-// Pestañas del inbox. Meta = leads sin cerrar (envío de promo). Seguimiento = leads que
-// pagaron la prueba (botón del chat los mueve aquí) = envío de seguimiento.
-type Tab = 'todos' | 'arteluk' | 'meta' | 'seguimiento'
-const FILTERS: { key: Tab; label: string }[] = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'arteluk', label: 'Arteluk' },
-  { key: 'meta', label: 'Meta' },
-  { key: 'seguimiento', label: 'Seguimiento' },
-]
+// Pestañas del inbox: solo Todos y Meta (19-08-2026). Dentro de Meta conviven los leads
+// del anuncio y los que ya pagaron la prueba; el envío se elige con el selector.
+// La lógica de a qué pestaña va cada chat vive en src/lib/inbox-filtros.ts (probada).
 
 // Chips para RECLASIFICAR una conversación de categoría (dentro del chat).
 const CATS: Categoria[] = ['mary', 'arteluk', 'potencial']
@@ -39,7 +34,9 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<Tab>('todos')
+  const [filter, setFilter] = useState<Pestana>('todos')
+  // Dentro de Meta: a quién se le prepara el envío masivo.
+  const [envio, setEnvio] = useState<Envio>('meta')
   const [segStats, setSegStats] = useState<{ pendientes: number; enviados: number } | null>(null)
   const [candMeta, setCandMeta] = useState(0)
   const [candSeg, setCandSeg] = useState(0)
@@ -52,8 +49,8 @@ export default function InboxPage() {
   const [editando, setEditando] = useState(false)
   const msgLoadedRef = useRef(false)
 
-  // Al cambiar de pestaña, el mensaje vuelve a estar plegado.
-  useEffect(() => { setEditando(false) }, [filter])
+  // Al cambiar de pestaña o de envío, el mensaje vuelve a estar plegado.
+  useEffect(() => { setEditando(false) }, [filter, envio])
 
   // Progreso + candidatos de ambos envíos + las dos plantillas (se cargan una vez).
   const cargarSeguimiento = useCallback(async () => {
@@ -154,24 +151,16 @@ export default function InboxPage() {
     return () => clearInterval(t)
   }, [load])
 
-  // En Meta o Seguimiento, carga el progreso y lo refresca cada 6 s.
+  // En Meta (los dos envíos viven ahí), carga el progreso y lo refresca cada 6 s.
   useEffect(() => {
-    if (filter !== 'meta' && filter !== 'seguimiento') return
+    if (filter !== 'meta') return
     cargarSeguimiento()
     const t = setInterval(cargarSeguimiento, 6000)
     return () => clearInterval(t)
   }, [filter, cargarSeguimiento])
 
   const filtered = useMemo(() => {
-    let list = conversations.filter(c => {
-      const cat = (c.categoria ?? 'mary') as Categoria
-      const cerrado = !!c.cerrado
-      if (filter === 'todos') return true
-      if (filter === 'arteluk') return cat === 'arteluk'
-      if (filter === 'meta') return cat === 'potencial' && !cerrado
-      if (filter === 'seguimiento') return cat === 'potencial' && cerrado
-      return true
-    })
+    let list = conversations.filter(c => perteneceALaPestana(c, filter))
     const q = search.trim().toLowerCase()
     if (q) list = list.filter(c =>
       c.contact.name.toLowerCase().includes(q) ||
@@ -189,10 +178,12 @@ export default function InboxPage() {
     } catch { /* la UI ya se actualizó de forma optimista */ }
   }
 
-  // Botón del chat: mueve el lead a Seguimiento (pagó la prueba) o lo devuelve a Meta.
+  // Botón del chat: marca que pagó la prueba (o lo devuelve a Meta). El chat se queda
+  // en la pestaña Meta; lo que cambia es la marca y a quién apunta el envío.
   async function marcarCerrado(id: number, cerrado: boolean) {
     setConversations(p => p.map(c => c.id === id ? { ...c, cerrado } : c))
-    setFilter(cerrado ? 'seguimiento' : 'meta')
+    setFilter('meta')
+    setEnvio(envioPorDefecto(cerrado))
     try {
       await fetch(`/api/cerrado/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cerrado }) })
     } catch { /* la UI ya se actualizó de forma optimista */ }
@@ -300,7 +291,7 @@ export default function InboxPage() {
                 {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 9, cursor: 'pointer', color: '#8696A0', background: 'none', border: 'none', display: 'flex' }}><X size={13} /></button>}
               </div>
               <div className="flex" style={{ gap: 6, flexWrap: 'wrap' }}>
-                {FILTERS.map(f => {
+                {PESTANAS.map(f => {
                   const on = filter === f.key
                   return (
                     <button key={f.key} onClick={() => setFilter(f.key)}
@@ -314,14 +305,35 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {filter === 'meta' && panelEnvio('meta')}
-            {filter === 'seguimiento' && panelEnvio('seguimiento')}
+            {filter === 'meta' && (
+              <>
+                {/* A quién se le manda: los leads del anuncio, o los que ya pagaron la prueba.
+                    Antes esto eran dos pestañas distintas (Meta y Seguimiento). */}
+                <div className="flex" style={{ gap: 6, padding: '8px 12px 0' }}>
+                  {([
+                    { key: 'meta' as Envio, label: 'Leads de Meta', n: candMeta },
+                    { key: 'seguimiento' as Envio, label: 'Pagaron la prueba', n: candSeg },
+                  ]).map(o => {
+                    const on = envio === o.key
+                    return (
+                      <button key={o.key} onClick={() => setEnvio(o.key)}
+                        style={{ flex: 1, minHeight: 44, fontSize: 13, fontWeight: 700, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                          border: on ? '1px solid #00A884' : '1px solid #D3E7DE',
+                          background: on ? '#E3F6EC' : '#fff', color: on ? '#008069' : '#667781' }}>
+                        {o.label} <span style={{ opacity: 0.7 }}>({o.n})</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {panelEnvio(envio)}
+              </>
+            )}
 
             <div className="flex-1 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p style={{ fontSize: 13, color: '#9AA7AD', textAlign: 'center', padding: '30px 16px' }}>
                   {conversations.length === 0 ? 'Aún no hay conversaciones. Conecta WhatsApp para empezar a recibirlas.'
-                    : filter === 'seguimiento' ? 'Sin chats en seguimiento. En un chat de Meta toca "Pagó la prueba" para moverlo aquí.'
+                    : filter === 'meta' ? 'Todavía no hay leads del anuncio de Meta.'
                     : 'Nada por aquí con ese filtro.'}
                 </p>
               ) : filtered.map(conv => {
@@ -341,6 +353,9 @@ export default function InboxPage() {
                         <span style={{ fontSize: 11.5, color: '#8696A0', whiteSpace: 'nowrap', flexShrink: 0 }}>{timeAgo(conv.lastMessage?.createdAt || conv.updatedAt)}</span>
                       </div>
                       <p style={{ fontSize: 13.5, color: '#667781', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {pagoLaPrueba(conv) && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#8B5CF6', background: '#EDE9FE', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>★ Pagó</span>
+                        )}
                         {(conv.categoria === 'potencial') && conv.contactado && (
                           <span style={{ fontSize: 10, fontWeight: 700, color: '#008069', background: '#D9FDD3', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>✓ Enviado</span>
                         )}
@@ -387,7 +402,7 @@ export default function InboxPage() {
                           Volver a Meta
                         </button>
                       ) : (
-                        <button onClick={() => marcarCerrado(selected.id, true)} title="Pagó la clase de prueba → pasar a Seguimiento"
+                        <button onClick={() => marcarCerrado(selected.id, true)} title="Pagó la clase de prueba (se marca en la lista y entra al envío de seguimiento)"
                           style={{ fontSize: 12.5, fontWeight: 700, padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: '#00A884', color: '#fff' }}>
                           Pagó la prueba
                         </button>
