@@ -14,25 +14,26 @@ import { logCostoIA } from "./db";
 import { tarifaPorModelo } from "./tarifas-ia";
 import { todaySantiago } from "./fechas";
 import type { AudioMary, EnsayoMensaje } from "./db";
+import { PRESUPUESTO_RAZONAMIENTO, TOKENS_RAZONANDO } from "./ia-proveedor";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_VUELTAS = 6;
 // Con razonamiento encendido, `max_tokens` tiene que ser MAYOR que el presupuesto de
 // razonamiento: es el total, no lo que sobra para la respuesta. Con los 1024 de antes la
-// API rechazaba la petición entera y Mary veía el bot mudo.
-const MAX_TOKENS = 3072;
-// 1024 es el mínimo que acepta Anthropic si algún día se vuelve a encender.
-export const RAZONAMIENTO_TOKENS = 1024;
+// API rechazaba la petición entera y Mary veía el bot mudo. Mismo techo que el bot de
+// WhatsApp para que la práctica se parezca a lo que de verdad atiende.
+const MAX_TOKENS = TOKENS_RAZONANDO;
+// El mínimo que acepta Anthropic es 1024; la casa usa el mismo que el bot.
+export const RAZONAMIENTO_TOKENS = PRESUPUESTO_RAZONAMIENTO;
 /**
- * Razonamiento APAGADO por defecto, y medido antes de apagarlo (Lukas, 10-08-2026: "si el sin
- * razonamiento alcanza, igual está bien, la idea es que gaste pocos tokens"). Mismos aciertos
- * en los dos arneses reales, la mitad de tiempo y 3,3 veces menos tokens de salida.
- * `RAZONAMIENTO_ENSAYO=1024` lo enciende otra vez, aquí y en el bot (ai.ts lee la misma
- * variable: si se separan, Mary ensaya con un bot que no es el que atiende).
+ * Razonamiento ENCENDIDO por defecto desde el 19-08-2026 (encargo de Lukas: el mismo
+ * razonamiento que la app de Conejeros). Estuvo apagado del 10 al 19-08 por gasto.
+ * `RAZONAMIENTO_ENSAYO=0` lo apaga otra vez, aquí y en el bot (ai.ts lee la misma variable:
+ * si se separan, Mary ensaya con un bot que no es el que atiende).
  */
 export function presupuestoRazonamiento(): number {
   const v = parseInt(process.env.RAZONAMIENTO_ENSAYO ?? "", 10);
-  return Number.isFinite(v) && v >= 0 ? v : 0;
+  return Number.isFinite(v) && v >= 0 ? v : PRESUPUESTO_RAZONAMIENTO;
 }
 
 /** Lo que llevan gastado las llamadas de este proceso, para comparar coste con y sin pensar. */

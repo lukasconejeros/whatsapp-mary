@@ -6,24 +6,27 @@ import { computeState } from "./state-manager.js";
 import { logCostoIA } from "./db.js";
 import { todaySantiago } from "./fechas.js";
 import { bienvenidaPara } from "./mensajes.js";
+import {
+  elegirIA,
+  razonamientoDe,
+  PRESUPUESTO_RAZONAMIENTO,
+  TOKENS_SIN_RAZONAR,
+} from "./ia-proveedor";
 
-const MODEL   = process.env.OPENROUTER_MODEL ?? "anthropic/claude-haiku-4-5";
 const MAX_TURNS  = 12;
-// `max_tokens` es el total e incluye lo que el modelo gasta pensando, así que tiene que
-// superar el presupuesto de razonamiento o la petición se cae y el bot queda mudo.
-const MAX_TOKENS = 3072;
 /**
- * El razonamiento va APAGADO (Lukas, 10-08-2026: "si el sin razonamiento alcanza, igual está
- * bien, la idea es que gaste pocos tokens"). Se midió antes de apagarlo, no de oído: con y sin
- * pensar, los dos arneses reales (`ensayo:cerebro` y `ensayo:arrastre`, 5 corridas) dieron los
- * MISMOS aciertos, y sin pensar contesta en la mitad de tiempo (~5,7 s → ~2,5 s por respuesta)
- * con 3,3 veces menos tokens de salida. Aquí no hay agenda que calzar ni reservas que calcular:
- * el bot informa, y para eso Haiku no necesita pensar antes.
- * Para volver a encenderlo: `RAZONAMIENTO_ENSAYO=1024` (vale para el bot y para la práctica).
+ * El razonamiento va ENCENDIDO (Lukas, 19-08-2026: *"quiero activar la IA … con el mismo
+ * modelo de razonamiento que ocupa la app de conejeros"*). Estuvo apagado del 10 al 19-08 para
+ * gastar menos tokens; el interruptor de marcha atrás sigue puesto por si el gasto se dispara:
+ * `RAZONAMIENTO_ENSAYO=0` lo apaga en el bot Y en la práctica de Mary a la vez (si se separaran,
+ * ella ensayaría con un bot que no es el que atiende).
+ *
+ * Solo piensa por el camino de Anthropic: OpenRouter es la salida de emergencia y pedirle algo
+ * que puede rechazar dejaría al bot mudo justo cuando es lo único que queda.
  */
 export function presupuestoRazonamientoBot(): number {
   const v = parseInt(process.env.RAZONAMIENTO_ENSAYO ?? "", 10);
-  return Number.isFinite(v) && v >= 0 ? v : 0;
+  return Number.isFinite(v) && v >= 0 ? v : PRESUPUESTO_RAZONAMIENTO;
 }
 
 // Tarifas y estimarUSD viven en tarifas-ia.ts (sin imports .js) para que ensayo.ts,
@@ -42,17 +45,41 @@ let _razonando = true;
 // espaciados que expira antes de reusarse, saldría más caro y hay que poder apagarla.
 let _cacheando = process.env.CACHE_PROMPT !== "0";
 
+// Con qué clave y contra qué modelo habla el bot. Lo decide `elegirIA`: Anthropic directo si
+// la clave está puesta (es el único camino que acepta el razonamiento; en Arteluk esa clave ya
+// vive en el servidor porque es la que lee las fotos), OpenRouter si no.
+let _model = "";
+let _proveedor = "";
+
+/** El proveedor y el modelo ya resueltos, sin crear el cliente (lo miran los candados). */
+function iaActual(proveedorForzado?: string): { model: string; proveedor: string } {
+  if (!_proveedor) {
+    const ia = elegirIA(process.env as Record<string, string | undefined>);
+    if (ia.ok) { _model = ia.model; _proveedor = ia.proveedor; }
+  }
+  const proveedor = proveedorForzado ?? _proveedor;
+  const model = _model || (proveedor === "anthropic" ? "claude-haiku-4-5" : "anthropic/claude-haiku-4-5");
+  return { model, proveedor };
+}
+
 function getClient(): OpenAI {
   if (_client) return _client;
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey?.trim()) throw new Error("Falta OPENROUTER_API_KEY en .env.local");
+  const ia = elegirIA(process.env as Record<string, string | undefined>);
+  if (!ia.ok) throw new Error(ia.motivo);
+
+  _model = ia.model;
+  _proveedor = ia.proveedor;
+  console.log(`[ia] ${ia.motivo}`);
   _client = new OpenAI({
-    apiKey,
-    baseURL: "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer": "https://conejeros-solutions.cl",
-      "X-Title": "Orion.AI WhatsApp Bot",
-    },
+    apiKey: ia.apiKey,
+    baseURL: ia.baseURL,
+    defaultHeaders:
+      ia.proveedor === "anthropic"
+        ? { "anthropic-version": "2023-06-01" }
+        : {
+            "HTTP-Referer": "https://conejeros-solutions.cl",
+            "X-Title": "Orion.AI WhatsApp Bot",
+          },
   });
   return _client;
 }
@@ -70,17 +97,27 @@ function buildTools(): OpenAI.Chat.ChatCompletionTool[] {
 
 /**
  * El cuerpo de la petición, aparte y sin efectos, para que `test:razonamiento` lo mire
- * sin gastar una llamada. `reasoning` es de OpenRouter (no está en los tipos del SDK de
- * OpenAI) y es lo que enciende el razonamiento de Haiku 4.5.
+ * sin gastar una llamada. `thinking` no está en los tipos del SDK de OpenAI: viaja por la
+ * capa compatible de Anthropic, que sí lo aplica (medido en la app de Conejeros).
+ *
+ * `max_tokens` es el TOTAL e incluye lo pensado; por eso sube al doble cuando el bot razona.
+ * Con un techo por debajo del presupuesto, la petición se cae entera y la persona ve el bot mudo.
  */
-export function cuerpoBot(messages: OpenAI.Chat.ChatCompletionMessageParam[], razonando = true) {
-  const presupuesto = presupuestoRazonamientoBot();
+export function cuerpoBot(
+  messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  razonando = true,
+  proveedorForzado?: string
+) {
+  const { model, proveedor } = iaActual(proveedorForzado);
+  const r = razonando
+    ? razonamientoDe(proveedor, presupuestoRazonamientoBot())
+    : { max_tokens: TOKENS_SIN_RAZONAR };
   return {
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
+    model,
+    max_tokens: r.max_tokens,
     tools: buildTools(),
     tool_choice: "auto" as const,
-    ...(razonando && presupuesto > 0 ? { reasoning: { max_tokens: presupuesto } } : {}),
+    ...(r.thinking ? { thinking: r.thinking } : {}),
     messages,
   };
 }
@@ -303,7 +340,7 @@ async function conversarConElModelo(
       // estimado no descuenta la caché (OpenRouter no la desglosa en el precio), así
       // que puede quedar algo caro de más — mejor eso que esconder gasto real.
       try {
-        const usd = estimarUSD(MODEL, uso.prompt_tokens ?? 0, uso.completion_tokens ?? 0);
+        const usd = estimarUSD(iaActual().model, uso.prompt_tokens ?? 0, uso.completion_tokens ?? 0);
         logCostoIA(usd, {
           conversationId: input.conversationId,
           prueba: !!input.prueba,

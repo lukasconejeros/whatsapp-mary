@@ -48,6 +48,7 @@
     "ensayo:cerebro": "tsx scripts/ensayo-cerebro.ts",
     "ensayo:arrastre": "tsx scripts/ensayo-arrastre.ts",
     "test:razonamiento": "tsx scripts/test-razonamiento.ts",
+    "test:ia-proveedor": "tsx scripts/test-ia-proveedor.ts",
     "test:secciones": "tsx scripts/test-secciones.ts",
     "humo:razonamiento": "tsx scripts/humo-razonamiento.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
