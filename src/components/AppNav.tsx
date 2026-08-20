@@ -3,18 +3,20 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot, GraduationCap } from 'lucide-react'
+import { MENU, type NombreIcono } from '@/lib/menu'
 
-// El Asistente salió del menú (Lukas, 09-08-2026: "sácalo nomás, no lo va a ocupar
-// mi mamá"). La pantalla /asistente y su API siguen vivas: volver a ponerlo es
-// añadir una línea aquí.
-const items = [
-  { href: '/inbox',      Icon: MessagesSquare, label: 'Chats'      },
-  { href: '/finanzas',   Icon: Wallet,        label: 'Finanzas'   },
-  { href: '/calendario', Icon: CalendarDays,  label: 'Calendario' },
-  { href: '/ensayo',     Icon: Bot,           label: 'Bot'        },
-  { href: '/conexion',   Icon: Plug,          label: 'Conexión'   },
-]
+// La lista vive en src/lib/menu.ts para poder probarla sin navegador y para que no
+// vuelva a pasar lo de "Entrenar IA": una pantalla desplegada y sin botón que lleve.
+const ICONOS: Record<NombreIcono, typeof MessagesSquare> = {
+  chats: MessagesSquare,
+  finanzas: Wallet,
+  calendario: CalendarDays,
+  bot: Bot,
+  entrenar: GraduationCap,
+  conexion: Plug,
+}
+const items = MENU.map(i => ({ href: i.href, Icon: ICONOS[i.icono], label: i.label, labelCorto: i.labelCorto }))
 
 export default function AppNav() {
   const path = usePathname()
@@ -56,7 +58,7 @@ export default function AppNav() {
       {/* Navegación */}
       <p className="app-menuLabel" style={{ fontSize: 10, fontWeight: 700, color: '#9AA7AD', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '16px 20px 6px' }}>Menú</p>
       <div className="app-navitems flex flex-col gap-1" style={{ padding: '0 10px' }}>
-        {items.map(({ href, Icon, label }) => {
+        {items.map(({ href, Icon, label, labelCorto }) => {
           const active = path.startsWith(href)
           const isConexion = href === '/conexion'
           const dotColor = connected === null ? null : connected ? '#22C55E' : '#F59E0B'
@@ -71,7 +73,8 @@ export default function AppNav() {
               onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#F3F9F6' }}
               onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
               <Icon size={22} strokeWidth={active ? 2.2 : 1.7} style={{ color: active ? '#00A884' : '#8696A0' }} />
-              <span style={{ flex: 1 }}>{label}</span>
+              <span className="app-label-largo" style={{ flex: 1 }}>{label}</span>
+              {labelCorto && <span className="app-label-corto" style={{ flex: 1 }}>{labelCorto}</span>}
               {isConexion && dotColor && (
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor,
                   boxShadow: connected ? '0 0 8px rgba(34,197,94,0.55)' : '0 0 0 3px rgba(245,158,11,0.2)',

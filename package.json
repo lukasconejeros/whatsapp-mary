@@ -54,6 +54,8 @@
     "test:entrenar-pantalla": "node scripts/test-entrenar-pantalla.mjs",
     "test:inbox-filtros": "tsx scripts/test-inbox-filtros.ts",
     "test:interruptor-bot": "tsx scripts/test-interruptor-bot.ts",
+    "test:menu": "tsx scripts/test-menu.ts",
+    "test:menu-pantalla": "node scripts/test-menu-pantalla.mjs",
     "humo:razonamiento": "tsx scripts/humo-razonamiento.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
     "test:botones": "node scripts/test-botones-tactiles.mjs",

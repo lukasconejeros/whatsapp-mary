@@ -139,7 +139,15 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   }
 
   .app-sidebar .app-navitems a span { flex: 0 0 auto !important; }
+
+  /* En la barra de abajo no cabe "Entrenar IA" en una línea: se muestra la
+     etiqueta corta y se esconde la larga (20-08-2026). En el computador es al revés. */
+  .app-sidebar .app-navitems a .app-label-largo:has(+ .app-label-corto) { display: none !important; }
+  .app-sidebar .app-navitems a .app-label-corto { display: inline !important; }
 }
+
+/* Por defecto (computador) manda el nombre largo. */
+.app-label-corto { display: none; }
 
 /* El botón flotante del Asistente (pincel brillante) se eliminó el 09-08-2026: en el
    teléfono tapaba el botón de enviar de los chats. El Asistente vive ahora en el menú. */
