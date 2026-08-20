@@ -342,10 +342,20 @@ export async function handleIncomingMessages(
     // lead de un anuncio pagado.
     const antesDeDecidir = getConversationById(convo.id);
     if (antesDeDecidir && puedeDecidirElSistema(antesDeDecidir)) {
-      const modo = modoAutomatico(antesDeDecidir.categoria);
+      // Al desconocido se le mira lo que ESCRIBE (o lo que se transcribió de su audio): el bot
+      // solo abre la puerta si viene preguntando por el taller. Antes lo decidía el modelo y se
+      // le colaban respuestas a la vida personal de Mary (encargo de Lukas, 19-08-2026).
+      const modo = modoAutomatico(antesDeDecidir.categoria, {
+        texto: text,
+        modoActual: antesDeDecidir.mode,
+      });
       if (antesDeDecidir.mode !== modo) {
         setModeAutomatico(convo.id, modo);
         logger.info({ phone, categoria: antesDeDecidir.categoria, modo }, "🤖 modo automático aplicado");
+      }
+      // Queda anotado por qué este chat se quedó sin respuesta, en vez de perderse.
+      if (modo === "HUMAN" && antesDeDecidir.categoria === "mary") {
+        registrarMudo(convo.id, "desconocido_sin_señal_de_taller", text.slice(0, 120));
       }
     }
 

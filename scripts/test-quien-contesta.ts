@@ -18,8 +18,29 @@ console.log("\n🧪 TEST a quién le contesta el bot de Arteluk\n");
 // ── La familia COMPLETA de quien le escribe a Mary ────────────────────────────
 console.log("— la decisión, caso por caso —");
 check("lead de un anuncio de Meta → contesta el bot", modoAutomatico("potencial") === "AI");
-check("número desconocido → contesta el bot (el filtro del prompt decide)", modoAutomatico("mary") === "AI");
 check("apoderado ya inscrito → callado, lo ve Mary", modoAutomatico("arteluk") === "HUMAN");
+
+// ── El candado duro del desconocido (Lukas, 19-08-2026) ──────────────────────
+// Antes cualquier desconocido encendía el bot y era el modelo, leyendo el mensaje, quien
+// decidía callarse. Eso le contestaba a las amigas de Mary cuando el filtro fallaba, y
+// gastaba una llamada a la IA para descubrir que no había que contestar.
+console.log("\n— desconocido: solo si viene a preguntar por el taller —");
+const desc = (texto: string, modoActual?: "AI" | "HUMAN") => modoAutomatico("mary", { texto, modoActual });
+check("'hola quiero mas info' → contesta", desc("hola quiero mas info") === "AI");
+check("pregunta por las clases → contesta", desc("Hola! tienen clases de arte para niños?") === "AI");
+check("pregunta el precio → contesta", desc("cuanto vale el taller mensual?") === "AI");
+check("pregunta el horario → contesta", desc("a que hora son las clases los sabados") === "AI");
+check("pregunta por la clase de prueba → contesta", desc("quiero una clase de prueba para mi hija") === "AI");
+check("pide la dirección → contesta", desc("donde quedan uds?") === "AI");
+check("'hola' pelado → mudo hasta que diga para qué (decisión de Lukas, 19-08)", desc("hola") === "HUMAN");
+check("'buenas tardes' pelado → mudo", desc("buenas tardes") === "HUMAN");
+check("la amiga de Mary → mudo", desc("Mary llegas a almorzar?") === "HUMAN");
+check("un cobro / tema personal → mudo", desc("te deposité el arriendo ayer") === "HUMAN");
+check("un saludo de cumpleaños → mudo", desc("feliz cumple amiga!! 🎉") === "HUMAN");
+check("un sticker o emoji suelto → mudo", desc("😂") === "HUMAN");
+check("conversación YA abierta por el bot → no se apaga a mitad", desc("gracias!", "AI") === "AI");
+check("y el lead de anuncio no depende de lo que escriba", modoAutomatico("potencial", { texto: "hola" }) === "AI");
+check("el apoderado sigue mudo aunque pregunte por clases", modoAutomatico("arteluk", { texto: "cuanto vale el taller?" }) === "HUMAN");
 
 console.log("\n— la decisión de Mary manda sobre el automático —");
 check("nadie la tocó → el sistema decide", puedeDecidirElSistema({ mode_manual: 0 }));

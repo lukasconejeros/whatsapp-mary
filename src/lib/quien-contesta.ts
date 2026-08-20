@@ -19,9 +19,52 @@ import type { Categoria, ConversationMode } from "./db.js";
 // la decisión de callar es justamente el error #51 de Medifis: metía la plantilla de
 // Meta ("Quiero resolver una duda (anuncio)") en el saco de los mensajes que no se
 // contestan, y se perdían leads pagados.
-export function modoAutomatico(categoria: Categoria): ConversationMode {
+// ¿El desconocido viene a preguntar por el taller, o es la vida personal de Mary?
+//
+// Hasta el 19-08-2026 esto lo decidía el MODELO leyendo el mensaje (el FILTRO DE ENTRADA del
+// prompt), y por eso se le colaban respuestas a las amigas de ella cada vez que el filtro
+// fallaba — además de gastar una llamada a la IA para descubrir que no había que contestar.
+// Ahora la puerta la abre una regla dura y el prompt queda como segunda barrera, no como única.
+//
+// Se mira SOLO el primer mensaje que abre la conversación: una vez que el bot está encendido,
+// nada de esto lo apaga a mitad (para eso están Mary y el interruptor del panel).
+const SENALES_DE_TALLER: RegExp[] = [
+  /\b(clase|clases|clasecita|taller|talleres|curso|cursos|academia)\b/,
+  /\b(arte|pintura|pintar|dibujo|dibujar|ceramica|manualidades)\b/,
+  /\b(precio|precios|valor|valores|cuesta|cuestan|vale|valen|mensualidad|arancel|matricula)\b/,
+  /\bcuanto\b/,
+  /\b(horario|horarios)\b/,
+  /\b(info|informacion|informes)\b/,
+  /\b(inscribir|inscripcion|inscribo|matricular|cupo|cupos|disponibilidad)\b/,
+  /\b(prueba)\b/,                       // "clase de prueba", "quiero una prueba"
+  /\b(direccion|ubicacion|donde\s+(qued|est|funcion|ubic))/,
+  /\b(mi\s+(hijo|hija|nino|nina|pequeñ|peque))/,
+];
+
+function sinTildes(s: string): string {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+export function preguntaPorElTaller(texto: string): boolean {
+  const t = sinTildes(texto);
+  return SENALES_DE_TALLER.some((r) => r.test(t));
+}
+
+export interface ContextoDelMensaje {
+  /** Lo que escribió (o lo que se transcribió del audio). */
+  texto?: string;
+  /** Cómo está la conversación AHORA: si el bot ya estaba encendido, no se apaga por un mensaje. */
+  modoActual?: ConversationMode;
+}
+
+export function modoAutomatico(categoria: Categoria, ctx: ContextoDelMensaje = {}): ConversationMode {
   if (categoria === "arteluk") return "HUMAN";
-  return "AI"; // potencial (anuncio) y mary (desconocido)
+  if (categoria === "potencial") return "AI"; // plata pagada: nunca se le calla
+
+  // Desconocido: solo si viene a preguntar por el taller (decisión de Lukas, 19-08-2026,
+  // incluido el "hola" pelado, que queda mudo hasta que diga para qué escribe).
+  if (ctx.modoActual === "AI") return "AI";
+  return preguntaPorElTaller(ctx.texto ?? "") ? "AI" : "HUMAN";
 }
 
 // ¿El bot puede tomar esta conversación por su cuenta?
