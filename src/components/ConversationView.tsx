@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Conversation, Message, CHANNEL_CONFIG } from '@/lib/types'
 import { Send, Smile, Mic, Trash2, Image as ImageIcon } from 'lucide-react'
 import { ImageNote, AudioNote, VideoNote } from './MediaContent'
+import { siguienteModo, textoInterruptor } from '@/lib/interruptor-bot'
 import { Avatar } from './Avatar'
 
 const EMOJIS = ['😀','😃','😄','😁','😊','🙂','😉','😍','🥰','😘','😅','😂','🤣','😌','😎','🤩','🥳','😇','🤗','🤔','🙃','😢','😭','👍','👎','👏','🙏','💪','🎉','✨','🔥','❤️','💕','💖','💐','🌸','🎨','🖌️','👋','🙌','✅','❌','📅','📸','💬','⭐','😴','🤝']
@@ -51,7 +52,11 @@ function showText(m: Message): boolean {
   return true
 }
 
-export default function ConversationView({ conv }: { conv: Conversation }) {
+export default function ConversationView({ conv, onBotChange }: {
+  conv: Conversation
+  /** Avisa al inbox para que la lista refleje el interruptor sin esperar al refresco. */
+  onBotChange?: (id: number, botActive: boolean) => void
+}) {
   const [msgs, setMsgs] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
@@ -61,6 +66,9 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
   const [grabando, setGrabando] = useState(false)
   const [segundos, setSegundos] = useState(0)
   const [sendError, setSendError] = useState('')
+  // Interruptor del bot: `botPendiente` es el valor optimista mientras viaja la petición.
+  const [botPendiente, setBotPendiente] = useState<boolean | null>(null)
+  const [cambiandoBot, setCambiandoBot] = useState(false)
   const recRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -237,6 +245,34 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
     if(last?.date===date) last.msgs.push(m); else grouped.push({date,msgs:[m]})
   })
 
+  // ── Interruptor del bot ────────────────────────────────────────────────────
+  const botOn = botPendiente ?? conv.botActive
+  const txtBot = textoInterruptor(botOn)
+
+  // En cuanto la lista trae el valor nuevo, se suelta el optimista.
+  useEffect(() => {
+    if (botPendiente !== null && conv.botActive === botPendiente) setBotPendiente(null)
+  }, [conv.botActive, botPendiente])
+
+  async function cambiarBot() {
+    const modo = siguienteModo(botOn)
+    const encendido = modo === 'AI'
+    setBotPendiente(encendido)
+    setCambiandoBot(true)
+    try {
+      const r = await fetch(`/api/mode/${conv.id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: modo }),
+      })
+      if (!r.ok) throw new Error(String(r.status))
+      onBotChange?.(conv.id, encendido)
+    } catch {
+      setBotPendiente(null)
+      setSendError(encendido ? 'No se pudo encender el bot. Intenta de nuevo.' : 'No se pudo apagar el bot. Intenta de nuevo.')
+    } finally {
+      setCambiandoBot(false)
+    }
+  }
+
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%', fontFamily:'inherit' }}>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom:'1px solid #E7F1EC', background:'#fff', flexShrink:0 }}>
@@ -251,9 +287,20 @@ export default function ConversationView({ conv }: { conv: Conversation }) {
             {conv.contact.phone && <span style={{fontSize:12,color:'#94A3B8'}}>{conv.contact.phone}</span>}
           </div>
         </div>
-        <span style={{ display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:500,padding:'4px 9px',borderRadius:8,border:'1px solid #D3E7DE',color: conv.botActive ? '#00A884' : '#94A3B8',background:'#F3F9F6',flexShrink:0 }}>
-          {conv.botActive ? '● Bot activo' : '○ Bot apagado'}
+      </div>
+
+      {/* Interruptor del bot de ESTE chat: grande y con el estado escrito en cristiano. */}
+      <div style={{ display:'flex',alignItems:'center',gap:10,padding:'8px 16px',borderBottom:'1px solid #E7F1EC',background: botOn ? '#F3F9F6' : '#FFF7ED',flexShrink:0 }}>
+        <span style={{ display:'flex',alignItems:'center',gap:6,flex:1,minWidth:0,fontSize:13.5,fontWeight:600,color: botOn ? '#008069' : '#B45309' }}>
+          <span style={{ width:9,height:9,borderRadius:'50%',background: botOn ? '#00A884' : '#F59E0B',flexShrink:0,display:'inline-block' }}/>
+          <span style={{ overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{txtBot.estado}</span>
         </span>
+        <button type="button" onClick={cambiarBot} disabled={cambiandoBot}
+          title={botOn ? 'Deja de contestar solo en este chat: contestas tú' : 'Vuelve a contestar solo en este chat'}
+          style={{ minHeight:44,padding:'0 20px',borderRadius:12,border:'none',cursor: cambiandoBot ? 'wait' : 'pointer',fontFamily:'inherit',fontSize:14.5,fontWeight:800,flexShrink:0,
+            background: cambiandoBot ? '#CBD5E1' : botOn ? '#DC2626' : '#00A884', color:'#fff' }}>
+          {cambiandoBot ? 'Cambiando…' : txtBot.accion}
+        </button>
       </div>
 
       <div ref={scrollBox} style={{ flex:1, overflowY:'auto', overscrollBehaviorY:'contain', padding:'14px 16px', background:'#FFFFFF' }}>

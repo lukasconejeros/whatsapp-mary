@@ -52,6 +52,7 @@
     "test:interes-prueba": "tsx scripts/test-interes-prueba.ts",
     "test:secciones": "tsx scripts/test-secciones.ts",
     "test:inbox-filtros": "tsx scripts/test-inbox-filtros.ts",
+    "test:interruptor-bot": "tsx scripts/test-interruptor-bot.ts",
     "humo:razonamiento": "tsx scripts/humo-razonamiento.ts",
     "humo:recordatorios": "tsx scripts/humo-recordatorios.ts",
     "test:botones": "node scripts/test-botones-tactiles.mjs",

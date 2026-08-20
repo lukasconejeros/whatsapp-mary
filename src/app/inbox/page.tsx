@@ -411,7 +411,8 @@ export default function InboxPage() {
                   )}
                 </div>
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                  <ConversationView key={selected.id} conv={selected} />
+                  <ConversationView key={selected.id} conv={selected}
+                    onBotChange={(id, botActive) => setConversations(p => p.map(c => c.id === id ? { ...c, botActive } : c))} />
                 </div>
               </>
             ) : (
