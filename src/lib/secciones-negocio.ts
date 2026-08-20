@@ -22,12 +22,13 @@ const CLAVE = "secciones_negocio";
 
 // Solo estas secciones son DATO de Mary. Cualquier otra es una regla del repo y NO se persiste
 // (si se persistiera, un arreglo del prompt nunca volvería a aplicarse).
-export type ClaveSeccion = "ubicacion" | "horarios" | "precios" | "transferencia" | "equipo";
+export type ClaveSeccion = "ubicacion" | "horarios" | "precios" | "promociones" | "transferencia" | "equipo";
 
 export const ETIQUETAS: Record<ClaveSeccion, string> = {
   ubicacion: "Dónde están",
   horarios: "Días y horarios",
   precios: "Precios y talleres",
+  promociones: "Promociones y descuentos",
   transferencia: "Datos para transferir",
   equipo: "Quiénes hacen las clases",
 };
@@ -44,6 +45,8 @@ export function claveDeSeccion(titulo: string): ClaveSeccion | null {
   if (t.startsWith("datos para transferir") || t.startsWith("transferencia")) return "transferencia";
   if (t.startsWith("donde")) return "ubicacion";
   if (t.startsWith("precio")) return "precios";
+  // "Promociones", "Promociones vigentes (agosto)", "Descuentos": la misma seccion.
+  if (t.startsWith("promo") || t.startsWith("descuento")) return "promociones";
   if (t.startsWith("quienes") || t.startsWith("equipo")) return "equipo";
   return null; // regla del repo
 }

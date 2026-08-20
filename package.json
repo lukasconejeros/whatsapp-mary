@@ -51,6 +51,7 @@
     "test:ia-proveedor": "tsx scripts/test-ia-proveedor.ts",
     "test:interes-prueba": "tsx scripts/test-interes-prueba.ts",
     "test:secciones": "tsx scripts/test-secciones.ts",
+    "test:entrenar-pantalla": "node scripts/test-entrenar-pantalla.mjs",
     "test:inbox-filtros": "tsx scripts/test-inbox-filtros.ts",
     "test:interruptor-bot": "tsx scripts/test-interruptor-bot.ts",
     "humo:razonamiento": "tsx scripts/humo-razonamiento.ts",

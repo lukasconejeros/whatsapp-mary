@@ -96,9 +96,9 @@ export default function ConfiguracionPage() {
             <div style={{ display: 'flex', gap: 12, padding: '14px 16px', borderRadius: 12, background: '#E7F1EC', border: '1px solid #A7D8CC', marginBottom: 24 }}>
               <Sparkles size={18} style={{ color: '#00A884', flexShrink: 0, marginTop: 1 }} />
               <p style={{ fontSize: 13, color: '#054D44', lineHeight: 1.55 }}>
-                Acá entrenas tu asistente: la dirección, los horarios, los precios, la cuenta del
-                banco y quiénes hacen las clases. Los cambios se aplican al bot al instante, sin
-                reiniciar nada, y ya no se borran cuando se actualiza el sistema.
+                Acá entrenas tu asistente: la dirección, los horarios, los precios, las promociones,
+                la cuenta del banco y quiénes hacen las clases. Los cambios se aplican al bot al
+                instante, sin reiniciar nada, y ya no se borran cuando se actualiza el sistema.
               </p>
             </div>
 
