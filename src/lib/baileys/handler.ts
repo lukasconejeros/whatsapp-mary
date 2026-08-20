@@ -26,6 +26,7 @@ import { generateReplyDetallado } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
+import { quiereLaClaseDePrueba, apartarParaMary } from "../interes-prueba.js";
 import { procesarRespuestaPaseLista } from "../avisos-mary-loop.js";
 import { telefonoDelBot } from "../recordatorios-wa-loop.js";
 import pino from "pino";
@@ -423,6 +424,25 @@ export async function handleIncomingMessages(
           await humanDelay();
           const fresh2 = getConversationById(convId);
           if (!fresh2 || fresh2.mode !== "AI") return;
+
+          // Ya dijo que quiere la clase de prueba: el bot no sigue vendiendo. Manda la frase
+          // fija, se apaga en este chat y le avisa a Mary (encargo de Lukas, 19-08-2026).
+          // Preguntar por la prueba NO cuenta: eso lo contesta el bot (ver interes-prueba.ts).
+          if (quiereLaClaseDePrueba(text)) {
+            apartarParaMary({
+              conversationId: convId,
+              phone: fresh2.phone,
+              texto: text,
+              nombre: fresh2.name || fresh2.phone,
+              avisar: ({ titulo, cuerpo }) => {
+                enviarPush({ titulo, cuerpo, url: "/inbox", tag: `prueba-${convId}` })
+                  .catch(() => { /* nunca rompe el flujo del bot */ });
+              },
+            });
+            logger.info({ convId, phone }, "🙋 quiere la clase de prueba — bot apagado y Mary avisada");
+            return;
+          }
+
           const history = getRecentHistory(convId, 20);
           const { texto: reply, motivo } = await generateReplyDetallado({ history, conversationId: convId, phone });
           if (!reply) {
