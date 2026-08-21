@@ -14,6 +14,7 @@ import {
   validarBienvenida,
 } from "../src/lib/mensajes.js";
 import { generateReply } from "../src/lib/ai.js";
+import { buildSystemPrompt } from "../src/lib/system-prompt.js";
 import type { Message } from "../src/lib/db.js";
 
 let pass = 0, fail = 0;
@@ -96,6 +97,26 @@ check("el bot responde el texto del panel", respuesta.startsWith("¡Hola! 😊 S
 console.log("\n— si Mary deja la caja vacía, vuelve a improvisar la IA —");
 setBienvenida("");
 check("caja vacía → NO hay texto fijo", bienvenidaPara([msg("user", "hola")]) === "");
+
+
+// ── Lo que reclamó Lukas el 21-08-2026: el saludo del panel tiene que mandar TAMBIÉN cuando
+// contesta la IA. El caso real es el botón del anuncio de Meta ("¡Hola! Quiero más información"):
+// no es un saludo pelado, así que lo contesta el modelo — y el modelo leía el saludo VIEJO
+// escrito a mano dentro de prompts/negocio.md, no el del panel.
+console.log("\n— el saludo del panel manda también cuando contesta la IA —");
+setBienvenida("Hola, soy Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, ¿para quién sería la clase?");
+const cerebro1 = buildSystemPrompt();
+check("el cerebro del bot lleva el saludo que Mary escribió", cerebro1.includes("profesora de la academia Arteluk desde hace 5 años"));
+check(
+  "y ya NO lleva el saludo viejo escrito a mano en el prompt",
+  !cerebro1.includes("magíster en psicología, ingeniera y artista, y directora de Academia")
+);
+// El panel y el bot son procesos distintos: si el caché del cerebro no mira el saludo, Mary
+// guardaría y el bot seguiría diciendo lo anterior hasta reiniciar el contenedor.
+setBienvenida("Hola, soy Mary y enseño arte en Valdivia, ¿para quién sería la clase?");
+check("si ella lo cambia, el cerebro se entera al toque (caché)", buildSystemPrompt().includes("enseño arte en Valdivia"));
+setBienvenida("");
+check("caja vacía → el cerebro vuelve al saludo de fábrica", buildSystemPrompt().includes("magíster en psicología"));
 
 // Deja la base como estaba (si no había nada guardado, queda el texto de fábrica: es el mismo
 // que usaba antes, así que el bot saluda igual).
