@@ -34,6 +34,10 @@ export function presupuestoRazonamientoBot(): number {
 export { tarifaPorModelo, estimarUSD } from "./tarifas-ia.js";
 import { estimarUSD } from "./tarifas-ia.js";
 
+// La frase que sale cuando el modelo se queda sin respuesta. La lee el apoderado, así que va de
+// usted como todo lo que escribimos nosotros (regla antituteo, 24-08-2026).
+export const FRASE_ESPERA_IA = "Deme un momento, vuelvo con usted enseguida.";
+
 let _client: OpenAI | null = null;
 // Se apaga solo si el proveedor rechaza el razonamiento, y queda apagado para no repetir el
 // error en cada mensaje. Vuelve a encenderse al reiniciar el bot.
@@ -419,5 +423,5 @@ async function conversarConElModelo(
   // Se acabaron los turnos sin una respuesta: si el silencio era a propósito se
   // respeta, y si no, no se deja a nadie esperando.
   if (silencio) return { texto: "", silencio, usoHerramientas };
-  return { texto: "Déjame un momento, vuelvo contigo enseguida.", silencio, usoHerramientas };
+  return { texto: FRASE_ESPERA_IA, silencio, usoHerramientas };
 }

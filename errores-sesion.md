@@ -633,3 +633,26 @@ sin contexto.
 **Y el segundo botón de Meta.** Los anuncios no mandan un solo texto: además del habitual
 "¡Hola! Quiero más información" hay uno que dice "¡Hola! Me gustaría conseguir más información
 sobre esto.". Cualquier filtro que mire el primer mensaje de un lead tiene que contemplar los dos.
+
+## 30 — Arreglar el tuteo solo donde se vio, y dejar los otros textos fijos igual (24-08-2026)
+
+**Qué pasó.** Por la tarde, al verificar en producción el deploy del antituteo, aparecieron otros
+textos que el sistema manda TAL CUAL a los apoderados y que seguían tuteando: la invitación a la
+clase de prueba que se les manda a los leads de Meta (*"Me encantaría invitarte… ¿Te gustaría?"*),
+el mensaje de después de la clase de prueba (*"Me encantó tenerte… inscribirte"*), el relleno de
+`{alumno}` cuando no sabemos el nombre del niño (*"tu hijo/a"*), la frase que sale cuando el modelo
+se queda sin respuesta (*"Déjame un momento, vuelvo contigo enseguida"*) y el ejemplo que se le da
+al bot al pasarle la conversación a Mary (*"Te paso con una persona del equipo"*), que el modelo
+copia palabra por palabra. Los dos primeros estaban así en producción, sin editar (comprobado con
+`GET /api/seguimiento`).
+
+**La lección.** El arreglo de la mañana se hizo sobre los textos que se vieron fallando en una
+conversación real. "De usted con TODOS, siempre" es una regla sobre una FAMILIA: todos los textos
+que escribimos nosotros y que lee un apoderado. Al cerrar una regla así, la lista de la familia se
+hace de una (un `grep` de los textos fijos del código) y se mete entera en el test — si no, cada
+miembro suelto aparece semanas después, en producción y delante del cliente.
+
+**Lo que no cuenta.** Los textos del chat con Mary (avisos del pase de lista, feedback, ensayo) se
+quedan tuteando a propósito: ella no es la apoderada. `src/lib/openrouter.ts` también tutea, pero
+es código muerto: no lo importa nadie (verificado con grep en `src/` y `scripts/`).
+

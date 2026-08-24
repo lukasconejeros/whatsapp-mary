@@ -13,7 +13,14 @@ import "./env-loader.js";
 import { readFileSync } from "node:fs";
 import { detectarTuteo } from "../src/lib/antituteo.js";
 import { FRASE_ESPERA } from "../src/lib/interes-prueba.js";
+import { FRASE_ESPERA_IA } from "../src/lib/ai.js";
+import { INSTRUCCION_DERIVAR } from "../src/lib/tools/derivar-humano.js";
 import { DEFAULT_BIENVENIDA } from "../src/lib/mensajes.js";
+import {
+  MENSAJE_META_DEFAULT,
+  MENSAJE_SEGUIMIENTO_DEFAULT,
+  personalizarMensaje,
+} from "../src/lib/seguimiento.js";
 import { buildSystemPrompt } from "../src/lib/system-prompt.js";
 
 let pass = 0, fail = 0;
@@ -58,6 +65,47 @@ check(
 const negocio = readFileSync("prompts/negocio.md", "utf8");
 check("«Mary te contesta en un rato» ya no está", !/Mary te contesta/i.test(negocio));
 check("«te confirma la hora» ya no está", !/te confirma la hora/i.test(negocio));
+
+
+// -- Los 2 mensajes que el bot manda SOLO, sin pasar por la IA (24-08-2026) --
+// Encontrados al verificar el deploy del antituteo: la invitación a la clase de prueba que se
+// les manda a los leads de Meta y el mensaje de después de la prueba estaban tuteando
+// ("invitarte", "¿Te gustaría?", "inscribirte") y así estaban en producción, sin editar.
+// Los manda el sistema tal cual, así que acá se cazan enteros.
+console.log("\n— los 2 mensajes de seguimiento tratan de usted —");
+check(
+  "la invitación a la clase de prueba (leads de Meta)",
+  detectarTuteo(MENSAJE_META_DEFAULT).length === 0,
+  JSON.stringify(detectarTuteo(MENSAJE_META_DEFAULT))
+);
+check(
+  "el mensaje de después de la clase de prueba",
+  detectarTuteo(MENSAJE_SEGUIMIENTO_DEFAULT).length === 0,
+  JSON.stringify(detectarTuteo(MENSAJE_SEGUIMIENTO_DEFAULT))
+);
+// El relleno de {alumno} cuando no sabemos el nombre del niño también hablaba de tú.
+const rellenado = personalizarMensaje("Le escribo por {alumno}, {nombre}.", "", "");
+check(
+  `y el relleno de «{alumno}» tampoco tutea: «${rellenado}»`,
+  detectarTuteo(rellenado).length === 0,
+  JSON.stringify(detectarTuteo(rellenado))
+);
+
+
+// Los otros dos textos que le llegan al apoderado sin que Mary los escriba (24-08-2026):
+// la frase que sale cuando el modelo se queda sin respuesta, y el ejemplo que se le da al bot
+// cuando pasa la conversación a Mary — ese ejemplo el modelo lo copia palabra por palabra.
+console.log("\n— la frase de emergencia y el traspaso a Mary tratan de usted —");
+check(
+  `la frase de cuando la IA no contesta: «${FRASE_ESPERA_IA}»`,
+  detectarTuteo(FRASE_ESPERA_IA).length === 0,
+  JSON.stringify(detectarTuteo(FRASE_ESPERA_IA))
+);
+check(
+  "el ejemplo de cuando le pasa la conversación a Mary",
+  detectarTuteo(INSTRUCCION_DERIVAR).length === 0,
+  JSON.stringify(detectarTuteo(INSTRUCCION_DERIVAR))
+);
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} ok, ${fail} fallando\n`);
 process.exit(fail === 0 ? 0 : 1);

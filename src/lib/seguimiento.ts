@@ -25,18 +25,18 @@ export const MSG_SEGUIMIENTO_KEY = "msg_seguimiento";
 // Plantilla META (promo a los leads). Sin nombre del apoderado/niño: de los leads no
 // lo sabemos, así que el mensaje es genérico.
 export const MENSAJE_META_DEFAULT =
-  "¡Hola! 🎨 Soy Mary, de la academia de arte Arteluk. Me encantaría invitarte a nuestra clase de prueba. Tenemos una promoción: la clase de prueba queda en $18.000 (antes $25.000). ¿Te gustaría que agendemos un día para venir a probar?";
+  "¡Hola! 🎨 Soy Mary, de la academia de arte Arteluk. Me encantaría invitarlos a nuestra clase de prueba. Tenemos una promoción: la clase de prueba queda en $18.000 (antes $25.000). ¿Le gustaría que agendemos un día para venir a probar?";
 
 // Plantilla SEGUIMIENTO (a los que ya pagaron la prueba, para que se inscriban). Genérico.
 export const MENSAJE_SEGUIMIENTO_DEFAULT =
-  "¡Hola! 🎨 Soy Mary, de la academia de arte Arteluk. Me encantó tenerte en la clase de prueba y me encantaría que sigas aprendiendo con nosotros. ¿Te gustaría que conversemos para inscribirte en el taller?";
+  "¡Hola! 🎨 Soy Mary, de la academia de arte Arteluk. Me encantó tenerlos en la clase de prueba y me encantaría que sigan aprendiendo con nosotros. ¿Le gustaría que conversemos para inscribir a su hijo/a en el taller?";
 
 // Reemplaza {nombre}/{alumno} por los datos del contacto y limpia espacios sobrantes
 // si algún dato falta. Lo que Mary escribe es lo que se manda (sin reescritura de IA).
 export function personalizarMensaje(template: string, nombre?: string | null, alumno?: string | null): string {
   return template
     .replace(/\{nombre\}/gi, (nombre && nombre.trim()) || "")
-    .replace(/\{alumno\}/gi, (alumno && alumno.trim()) || "tu hijo/a")
+    .replace(/\{alumno\}/gi, (alumno && alumno.trim()) || "su hijo/a")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/Hola\s+,/g, "Hola,")
     .replace(/\s+([.!?,])/g, "$1")
