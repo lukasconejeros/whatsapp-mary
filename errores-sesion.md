@@ -595,3 +595,41 @@ con un archivo UTF-8.
 OpenRouter: si contesta, es porque el saludo salió sin tocar el modelo. Un "hola" pelado dejó de
 costar plata.
 
+## 28 — Ordenarle al modelo que copie un texto NO garantiza que lo copie (24-08-2026)
+
+**Qué pasó.** El saludo que Mary escribe en "Entrenar IA" viajaba dentro del prompt con la orden
+explícita *"dilo con ESAS palabras, no lo reescribas ni le agregues cosas"* (dos veces, líneas 57
+y 310 de `prompts/negocio.md`). El modelo igual lo parafraseó en producción: ella escribió
+*"hola buenas un gusto… cuéntame cuál es **su** nombre"* y salió *"¡Hola como estai!… cuál es **tu**
+nombre"* (conv 365, 12:28) y *"hola como esta!"* (conv 364, 12:22), con la dirección agregada de
+su cosecha. Mary entró a corregirlo a mano a las 12:29.
+
+**La lección.** Si un texto tiene que salir palabra por palabra, no puede pasar por el modelo. Se
+manda desde el código. La orden en el prompt sirve para el tono, no para la literalidad. Esto ya se
+había decidido al revés el 21-08 (se le ofreció a Lukas mandarlo literal y prefirió que lo dijera la
+IA "por si encadena con una pregunta"): la salida buena era **las dos cosas** — el texto literal
+primero y la IA contestando aparte lo que hayan preguntado.
+
+**De regalo, el origen del "como estai".** Estaba escrito en el propio prompt, en la línea 15, como
+EJEMPLO de charla personal que hay que silenciar. El modelo lo leyó como muestra del tono de la
+casa. Los ejemplos de un prompt se copian aunque estén puestos para lo contrario: si una frase no
+puede salir por WhatsApp, no se escribe en el prompt ni como ejemplo negativo.
+
+## 29 — Un filtro que mira el mensaje suelto, sin saber de qué se venía hablando (24-08-2026)
+
+**Qué pasó.** `quiereLaClaseDePrueba()` apagaba el bot y le pasaba el chat a Mary cuando cazaba
+"me interesa" o "me gustaría". Dos personas que solo pedían información quedaron esperando:
+conv 364 (*"Me interesa conocer más sobre la academia para mi hija de 8 años"*, 24-08 12:26) y
+conv 358 (el botón de Meta *"¡Hola! Me gustaría conseguir más información sobre esto."*,
+21-08 15:19). El comentario del propio archivo lo decía sin darse cuenta: *"no hace falta que
+nombren la clase de prueba: a esta altura de la conversación es de lo único que se está hablando"*
+— esa suposición es verdadera en el mensaje 8 y falsa en el primero.
+
+**La lección.** Cuando una regla depende de "a esta altura de la conversación", el historial es un
+argumento de la función, no un supuesto en un comentario. Ahora recibe si el bot o Mary ya habían
+nombrado la clase de prueba; nombrarla, pedir hora, inscribir o agendar sigue apagando el bot solo,
+sin contexto.
+
+**Y el segundo botón de Meta.** Los anuncios no mandan un solo texto: además del habitual
+"¡Hola! Quiero más información" hay uno que dice "¡Hola! Me gustaría conseguir más información
+sobre esto.". Cualquier filtro que mire el primer mensaje de un lead tiene que contemplar los dos.
