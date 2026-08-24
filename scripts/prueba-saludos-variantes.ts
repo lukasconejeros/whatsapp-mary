@@ -19,7 +19,7 @@ function check(n: string, ok: boolean, extra = "") {
 
 // Cómo podría escribir Mary su saludo. Incluye lo que tiene guardado hoy en producción.
 const VARIANTES = [
-  "hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuéntame cuál es su nombre y para quién sería la clase?",
+  "hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuénteme cuál es su nombre y para quién sería la clase?",
   "¡Hola! 😊 Soy Mary Quinteros, directora de Academia Arteluk. Cuénteme, ¿para quién sería la clase?",
   "hola buenas un gusto, soy Mary de Arteluk",
   "Hola, ¿cómo está? Soy Mary de la academia Arteluk",

@@ -3,7 +3,7 @@
 import { conSaludoDeHora } from "../src/lib/mensajes.js";
 
 const REAL =
-  "hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuéntame cuál es su nombre y para quién sería la clase?";
+  "hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuénteme cuál es su nombre y para quién sería la clase?";
 
 console.log("\nEl saludo que Mary tiene guardado hoy:\n  " + REAL + "\n");
 for (const h of [8, 13, 21, 3]) {

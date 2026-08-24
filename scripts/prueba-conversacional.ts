@@ -25,7 +25,7 @@ const SALIDA = process.env.SALIDA_PRUEBA ?? "prueba-conversacional.txt";
 
 // El saludo REAL que Mary tiene guardado en producción (GET /api/config, 24-08 13:55).
 const SALUDO_REAL =
-  "hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuéntame cuál es su nombre y para quién sería la clase?";
+  "hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuénteme cuál es su nombre y para quién sería la clase?";
 
 const gastado = () => getGastoIA(todaySantiago(), monthSantiago()).pruebas_usd;
 const INICIAL = gastado();
