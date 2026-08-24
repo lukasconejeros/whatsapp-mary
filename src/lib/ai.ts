@@ -5,7 +5,7 @@ import { buildSystemPrompt } from "./system-prompt.js";
 import { computeState } from "./state-manager.js";
 import { logCostoIA } from "./db.js";
 import { todaySantiago } from "./fechas.js";
-import { bienvenidaPara } from "./mensajes.js";
+import { saludoDeEntrada } from "./mensajes.js";
 import {
   elegirIA,
   razonamientoDe,
@@ -235,15 +235,34 @@ export async function generateReplyDetallado(input: {
   // tráfico real de WhatsApp (ver logCostoIA). Por defecto es tráfico real.
   prueba?: boolean;
 }): Promise<RespuestaBot> {
-  // Saludo pelado de alguien nuevo: contesta el texto que Mary escribió en "Entrenar IA", sin pasar
-  // por el modelo (ver mensajes.ts: el atajo es angosto a propósito y no se salta ningún filtro,
-  // porque el prompt ya obliga a contestar SIEMPRE el primer mensaje de alguien nuevo).
-  const saludoFijo = bienvenidaPara(input.history);
-  if (saludoFijo) {
-    console.log(`[BOT conv=${input.conversationId}] 👋 saludo fijo del panel (sin llamar a la IA)`);
-    return { texto: saludoFijo, motivo: null };
+  // Primer contacto: el saludo que Mary escribió en "Entrenar IA" sale TAL CUAL, sin pasar por el
+  // modelo — es la única forma de que salga palabra por palabra (ver mensajes.ts, 24-08-2026).
+  // Si además preguntaron algo en ese mismo primer contacto, la IA contesta ESO a continuación,
+  // con la orden de no volver a saludar.
+  const entrada = saludoDeEntrada(input.history);
+  if (entrada.texto && !entrada.ademasResponder) {
+    console.log(`[BOT conv=${input.conversationId}] 👋 saludo del panel tal cual (sin llamar a la IA)`);
+    return { texto: entrada.texto, motivo: null };
+  }
+  if (entrada.texto) {
+    console.log(`[BOT conv=${input.conversationId}] 👋 saludo del panel + la IA contesta lo que preguntaron`);
+    const resto = await responderConElModelo({ ...input, yaSaludado: entrada.texto });
+    const cola = resto.texto.trim();
+    return { texto: cola ? `${entrada.texto}\n\n${cola}` : entrada.texto, motivo: null };
   }
 
+  return responderConElModelo(input);
+}
+
+// El camino normal: todo lo que contesta el modelo. `yaSaludado` viene con el texto del saludo
+// que ya se mandó delante, para que no vuelva a presentarse encima.
+async function responderConElModelo(input: {
+  history: Message[];
+  conversationId: number;
+  phone?: string;
+  prueba?: boolean;
+  yaSaludado?: string;
+}): Promise<RespuestaBot> {
   const client   = getClient();
   const sysprompt = buildSystemPrompt();
   const messages  = normalizeHistory(input.history);
@@ -253,7 +272,10 @@ export async function generateReplyDetallado(input: {
   const metaStr     = Object.keys(turnoState.estadoMeta).length
     ? " META:" + JSON.stringify(turnoState.estadoMeta)
     : "";
-  const estadoContext = `[ESTADO_TURNO: ${turnoState.estado}${metaStr}]`;
+  const yaSaludo = input.yaSaludado
+    ? ` [YA_SALUDASTE: acabas de mandar este saludo, va delante de lo que escribas: "${input.yaSaludado}". NO te vuelvas a presentar ni a saludar: contesta solo lo que te preguntaron.]`
+    : "";
+  const estadoContext = `[ESTADO_TURNO: ${turnoState.estado}${metaStr}]${yaSaludo}`;
 
   if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
     return { texto: "", motivo: "sin_mensaje_del_usuario" };

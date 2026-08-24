@@ -64,25 +64,44 @@ export function esSaludoPuro(mensaje: string): boolean {
   return /^(h?ola+s?|holi+s?|buenas|buenas tardes|buenas noches|buenos dias|buen dia|que tal|hey|saludos|alo)$/.test(t);
 }
 
-// LA DECISIÓN. Devuelve el texto a mandar, o "" si este caso NO es del texto fijo (y entonces
-// contesta la IA, exactamente como hasta hoy).
+// Lo que llega SOLO por abrir la conversación y no pregunta nada: un saludo pelado, o el texto
+// que WhatsApp manda solo al tocar el botón de un anuncio de Meta ("¡Hola! Quiero más información",
+// "¡Hola! Me gustaría conseguir más información sobre esto."). Con esto no hace falta molestar al
+// modelo: el saludo de Mary ya dice todo lo que hay que decir y además pregunta para quién es.
+function esSoloEntrada(mensaje: string): boolean {
+  const t = norm(mensaje).replace(/[!¡?¿.,;:]/g, " ").replace(/\s+/g, " ").trim();
+  if (!t) return true;
+  return /^(h?ola+s?|holi+s?|buenas|buenas tardes|buenas noches|buenos dias|buen dia|que tal|hey|saludos|alo)?\s*((me\s+)?(gustaria|interesa|interesaria|encantaria)|quiero|quisiera|queria|necesito|busco)?\s*(conseguir|obtener|recibir|tener|saber|pedir|solicitar)?\s*(mas\s+)?(informacion|info|datos)?\s*(sobre\s+esto|al\s+respecto|por\s+favor|porfavor|gracias)?$/.test(t);
+}
+
+// LA DECISIÓN. `texto` es el saludo de Mary a mandar tal cual (o "" si este caso no es suyo y
+// contesta la IA como siempre). `ademasResponder` avisa de que en el mismo primer contacto
+// preguntaron algo, y entonces la IA responde ESO en un segundo mensaje, sin volver a saludar.
+//
+// POR QUÉ SALE SIN PASAR POR EL MODELO (24-08-2026): el prompt ya le ordenaba decirlo "con ESAS
+// palabras, sin adornos" y el modelo igual lo reescribía — "hola buenas un gusto" le salió como
+// "¡Hola como estai!" y el "su nombre" de ella como "tu nombre" (conv 364 y 365). Mary lo corrigió
+// a mano. La única forma de que salga palabra por palabra es no pasarlo por la IA.
 //
 // La familia completa, caso por caso:
-//   · "hola" pelado, primer contacto            → texto fijo
-//   · "hola, ¿cuánto vale?"                     → IA (no es saludo puro)
+//   · "hola" pelado, primer contacto            → su saludo tal cual, sin IA
+//   · botón de Meta, primer contacto            → su saludo tal cual, sin IA
+//   · "hola, ¿cuánto vale?"                     → su saludo tal cual + la IA contesta el precio
 //   · saluda de nuevo a mitad de conversación   → IA (ya hay respuestas antes)
 //   · Mary contestó a mano (role 'human')       → IA (no se le pisa el saludo)
 //   · el saludo viene con foto o audio          → IA (la foto hay que mirarla)
 //   · el 4º mensaje suyo sin respuesta          → IA (ya no es un primer contacto)
 //   · la caja del panel vacía                   → IA (Mary la borró a propósito)
-export function bienvenidaPara(history: Message[]): string {
+export function saludoDeEntrada(history: Message[]): { texto: string; ademasResponder: boolean } {
+  const NADA = { texto: "", ademasResponder: false };
   const ultimo = history[history.length - 1];
-  if (!ultimo || ultimo.role !== "user") return "";
-  if (ultimo.media) return "";
+  if (!ultimo || ultimo.role !== "user") return NADA;
+  if (history.some((m) => m.media)) return NADA;
   // Ni el bot ni Mary escribieron todavía: 'human' son los mensajes que Mary manda desde su teléfono.
-  if (history.some((m) => m.role !== "user")) return "";
+  if (history.some((m) => m.role !== "user")) return NADA;
   // Tope de mensajes: si insistió cuatro veces, ya no es el primer "hola" y merece una respuesta real.
-  if (history.length > 3) return "";
-  if (!esSaludoPuro(ultimo.content)) return "";
-  return getBienvenida().trim();
+  if (history.length > 3) return NADA;
+  const texto = getBienvenida().trim();
+  if (!texto) return NADA;
+  return { texto, ademasResponder: history.some((m) => !esSoloEntrada(m.content)) };
 }

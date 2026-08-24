@@ -10,7 +10,7 @@ import {
   getBienvenida,
   setBienvenida,
   esSaludoPuro,
-  bienvenidaPara,
+  saludoDeEntrada,
   validarBienvenida,
 } from "../src/lib/mensajes.js";
 import { generateReply } from "../src/lib/ai.js";
@@ -48,36 +48,16 @@ check("guarda lo que ella escribe", getBienvenida().startsWith("¡Hola! 😊 Soy
 check("el texto de fábrica sigue disponible para restaurar", DEFAULT_BIENVENIDA.includes("Mary Quinteros"));
 
 // ── La familia completa: cuándo se dispara y cuándo NO ───────────────────────
+// (los casos uno por uno están más abajo, en el bloque del 24-08; acá va lo que no se repite)
 console.log("\n— cuándo contesta el texto fijo —");
 check(
   "«hola» pelado de alguien nuevo → sale el texto del panel",
-  bienvenidaPara([msg("user", "hola")]).startsWith("¡Hola! 😊 Soy Mary de Arteluk")
+  saludoDeEntrada([msg("user", "hola")]).texto.startsWith("¡Hola! 😊 Soy Mary de Arteluk")
 );
 check(
-  "«hola, cuánto vale?» → NO, contesta la IA",
-  bienvenidaPara([msg("user", "hola, cuánto vale?")]) === ""
+  "el último mensaje es del bot → NO (nadie está esperando respuesta)",
+  saludoDeEntrada([msg("user", "hola"), msg("assistant", "¡Hola!")]).texto === ""
 );
-check(
-  "saluda de nuevo a mitad de conversación → NO",
-  bienvenidaPara([msg("user", "hola"), msg("assistant", "¡Hola! ¿para quién sería?"), msg("user", "hola")]) === ""
-);
-check(
-  "Mary ya le había contestado a mano → NO (no la pisa)",
-  bienvenidaPara([msg("user", "hola"), msg("human", "hola! cuéntame"), msg("user", "hola")]) === ""
-);
-check(
-  "primer contacto con foto → NO (la foto se describe, no se saluda)",
-  bienvenidaPara([msg("user", "hola", "IMG-1.jpg")]) === ""
-);
-check(
-  "cuatro mensajes suyos sin respuesta → NO (ya no es el primer contacto)",
-  bienvenidaPara([msg("user", "hola"), msg("user", "hola?"), msg("user", "?"), msg("user", "hola")]) === ""
-);
-check(
-  "el último mensaje es del bot → NO",
-  bienvenidaPara([msg("user", "hola"), msg("assistant", "¡Hola!")]) === ""
-);
-check("historial vacío → NO", bienvenidaPara([]) === "");
 
 // ── Lo que el panel no deja guardar ──────────────────────────────────────────
 console.log("\n— lo que el panel no deja guardar —");
@@ -96,7 +76,7 @@ check("el bot responde el texto del panel", respuesta.startsWith("¡Hola! 😊 S
 
 console.log("\n— si Mary deja la caja vacía, vuelve a improvisar la IA —");
 setBienvenida("");
-check("caja vacía → NO hay texto fijo", bienvenidaPara([msg("user", "hola")]) === "");
+check("caja vacía → NO hay texto fijo", saludoDeEntrada([msg("user", "hola")]).texto === "");
 
 
 // ── Lo que reclamó Lukas el 21-08-2026: el saludo del panel tiene que mandar TAMBIÉN cuando
@@ -117,6 +97,81 @@ setBienvenida("Hola, soy Mary y enseño arte en Valdivia, ¿para quién sería l
 check("si ella lo cambia, el cerebro se entera al toque (caché)", buildSystemPrompt().includes("enseño arte en Valdivia"));
 setBienvenida("");
 check("caja vacía → el cerebro vuelve al saludo de fábrica", buildSystemPrompt().includes("magíster en psicología"));
+
+// ── Lo que reclamó Mary el 24-08-2026: el bot NO decía su saludo palabra por palabra ─────────
+// Ella escribió "hola buenas un gusto… cuéntame cuál es SU nombre" y el bot mandó "¡Hola como
+// estai! … cuéntame cuál es TU nombre" (conv 365, 12:28) y "hola como esta!" (conv 364, 12:22):
+// el modelo lo parafraseaba aunque el prompt le ordena decirlo tal cual. Decisión de Lukas
+// (24-08): el saludo sale LITERAL, sin pasar por la IA, y si además preguntaron algo, la IA
+// contesta eso aparte.
+console.log("\n— el saludo sale palabra por palabra, sin pasar por la IA —");
+const suyo = "hola buenas un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años, cuéntame cuál es su nombre y para quién sería la clase?";
+setBienvenida(suyo);
+
+check(
+  "botón de Meta «¡Hola! Quiero más información» → sale su saludo TAL CUAL",
+  saludoDeEntrada([msg("user", "¡Hola! Quiero más información")]).texto === suyo
+);
+check(
+  "…y no hace falta molestar a la IA (no preguntaron nada)",
+  saludoDeEntrada([msg("user", "¡Hola! Quiero más información")]).ademasResponder === false
+);
+check(
+  "el otro botón «Me gustaría conseguir más información sobre esto» → también su saludo tal cual",
+  saludoDeEntrada([msg("user", "¡Hola! Me gustaría conseguir más información sobre esto.")]).texto === suyo
+);
+check(
+  "«hola» pelado → su saludo tal cual, sin IA",
+  saludoDeEntrada([msg("user", "hola")]).texto === suyo &&
+    saludoDeEntrada([msg("user", "hola")]).ademasResponder === false
+);
+
+// El caso exacto de la conv 365: saludó y en el mismo minuto preguntó dónde quedan.
+const conv365 = [msg("user", "¡Hola! Quiero más información"), msg("user", "Donde estan ubiscados")];
+check(
+  "saludo + pregunta (conv 365) → su saludo tal cual…",
+  saludoDeEntrada(conv365).texto === suyo
+);
+check(
+  "…y además la IA contesta la pregunta",
+  saludoDeEntrada(conv365).ademasResponder === true
+);
+check(
+  "«hola, ¿cuánto vale la clase?» → saludo tal cual + la IA contesta el precio",
+  saludoDeEntrada([msg("user", "hola, cuánto vale la clase?")]).texto === suyo &&
+    saludoDeEntrada([msg("user", "hola, cuánto vale la clase?")]).ademasResponder === true
+);
+
+console.log("\n— y NO se mete donde no lo llaman (esto no cambió) —");
+check(
+  "a mitad de conversación → nada, contesta la IA",
+  saludoDeEntrada([msg("user", "hola"), msg("assistant", "¡Hola!"), msg("user", "y los horarios?")]).texto === ""
+);
+check(
+  "Mary ya contestó a mano → nada (no la pisa)",
+  saludoDeEntrada([msg("user", "hola"), msg("human", "hola! cuéntame"), msg("user", "hola")]).texto === ""
+);
+check(
+  "primer contacto con foto → nada (la foto se mira)",
+  saludoDeEntrada([msg("user", "hola", "IMG-1.jpg")]).texto === ""
+);
+check(
+  "cuatro mensajes suyos sin respuesta → nada",
+  saludoDeEntrada([msg("user", "hola"), msg("user", "hola?"), msg("user", "?"), msg("user", "hola")]).texto === ""
+);
+check("historial vacío → nada", saludoDeEntrada([]).texto === "");
+setBienvenida("");
+check(
+  "caja vacía → nada, improvisa la IA como antes",
+  saludoDeEntrada([msg("user", "¡Hola! Quiero más información")]).texto === ""
+);
+
+// De punta a punta: si esto funciona sin clave de OpenRouter en este PC, es porque el saludo
+// salió sin pasar por el modelo — la prueba de que sale palabra por palabra.
+console.log("\n— el bot completo con el botón de Meta, sin llamar a la IA —");
+setBienvenida(suyo);
+const rMeta = await generateReply({ history: [msg("user", "¡Hola! Quiero más información")], conversationId: 1 });
+check("el bot responde su saludo, letra por letra", rMeta === suyo, rMeta);
 
 // Deja la base como estaba (si no había nada guardado, queda el texto de fábrica: es el mismo
 // que usaba antes, así que el bot saluda igual).
