@@ -18,7 +18,7 @@
 import { insertMessage, enqueueOutbox, setMode } from "./db";
 
 /** Lo que se le manda a la persona antes de apartarse. Lo eligió Lukas el 19-08-2026. */
-export const FRASE_ESPERA = "Dame unos minutos y te confirmo disponibilidad";
+export const FRASE_ESPERA = "Deme unos minutos y le confirmo disponibilidad";
 
 // "Quiero saber", "quisiera consultar": eso es una pregunta, no querer la clase. Van primero
 // porque llevan dentro un verbo de querer y si no se descartan aquí, disparan de más.

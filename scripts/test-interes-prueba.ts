@@ -17,6 +17,7 @@
  */
 import "./env-loader.js";
 import { quiereLaClaseDePrueba, FRASE_ESPERA, apartarParaMary } from "../src/lib/interes-prueba";
+import { detectarTuteo } from "../src/lib/antituteo.js";
 import {
   getOrCreateConversation,
   getConversationById,
@@ -60,7 +61,8 @@ ok(no("gracias!!"), "gracias");
 ok(no(""), "un mensaje vacío no dispara nada");
 
 console.log("\n— la frase que se manda —");
-ok(FRASE_ESPERA === "Dame unos minutos y te confirmo disponibilidad", `es la que eligió Lukas: "${FRASE_ESPERA}"`);
+ok(FRASE_ESPERA === "Deme unos minutos y le confirmo disponibilidad", `es la que eligió Lukas, de usted: "${FRASE_ESPERA}"`);
+ok(detectarTuteo(FRASE_ESPERA).length === 0, "y no tutea (regla antituteo del 24-08-2026)");
 ok(!/:/.test(FRASE_ESPERA), "sin dos puntos, como el resto de los mensajes de la casa");
 
 // ── Contra la base de verdad: la frase sale, el bot se apaga y Mary se entera ──

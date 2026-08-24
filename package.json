@@ -32,6 +32,7 @@
     "test:quien-contesta": "tsx scripts/test-quien-contesta.ts",
     "test:mudos": "tsx scripts/test-mudos.ts",
     "test:saludo": "tsx scripts/test-saludo.ts",
+    "test:antituteo": "tsx scripts/test-antituteo.ts",
     "test:seguimiento": "tsx scripts/test-seguimiento.ts",
     "test:monitor": "tsx scripts/test-monitor.ts",
     "typecheck": "tsc --noEmit",

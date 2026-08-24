@@ -11,7 +11,7 @@
 // EL ATAJO ES DELIBERADAMENTE ANGOSTO. El prompt manda que el primer mensaje de alguien nuevo SIEMPRE
 // se conteste, así que responder de una no se salta ningún filtro. Pero cualquier otro caso sí lo
 // haría: por eso NO dispara si Mary ya contestó a mano, si la conversación viene rodando, si el
-// mensaje trae foto, o si además del saludo preguntan algo. Ver `bienvenidaPara`.
+// mensaje trae foto. Ver `saludoDeEntrada`.
 // Sin extensión .js en el import: este módulo lo cargan la API de Next, el bot y los scripts.
 import { getConfig, setConfig } from "./db";
 import type { Message } from "./db";
@@ -21,7 +21,7 @@ const K_BIENVENIDA = "msg_bienvenida";
 // El texto de fábrica es EXACTAMENTE el que el prompt manda decir hoy en el paso 1 de "El camino de
 // la conversación" (prompts/negocio.md). Si nadie edita nada en el panel, nadie nota la diferencia.
 export const DEFAULT_BIENVENIDA =
-  "¡Hola! 😊 Soy Mary Quinteros, magíster en psicología, ingeniera y artista, y directora de Academia Arteluk. Cuéntame, ¿para quién sería la clase?";
+  "¡Hola! 😊 Soy Mary Quinteros, magíster en psicología, ingeniera y artista, y directora de Academia Arteluk. Cuénteme, ¿para quién sería la clase?";
 
 // Vacío guardado NO es lo mismo que nunca guardado: si Mary borra la caja, quiere que vuelva a
 // improvisar la IA. `getConfig` devuelve el valor guardado aunque sea "", y el de fábrica solo
