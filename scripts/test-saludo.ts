@@ -223,6 +223,21 @@ check(
 check("solo «hola» → queda el saludo de la hora a secas", conSaludoDeHora("hola!", 9) === "Buenos días");
 check("vacío sigue vacío (Mary apagó la caja)", conSaludoDeHora("", 9) === "");
 check(
+  "«Hola, cómo están? Soy Mary» → no deja la «n» suelta (bug del barrido, 24-08)",
+  conSaludoDeHora("Hola, cómo están? Soy Mary de Arteluk", 15) === "Buenas tardes. Soy Mary de Arteluk",
+  conSaludoDeHora("Hola, cómo están? Soy Mary de Arteluk", 15)
+);
+check(
+  "«hola como estai, soy Mary» → no deja la «i» suelta (bug del barrido, 24-08)",
+  conSaludoDeHora("hola como estai, soy Mary", 15) === "Buenas tardes, soy Mary",
+  conSaludoDeHora("hola como estai, soy Mary", 15)
+);
+check(
+  "«hola, ¿cómo le va? soy Mary» sigue saliendo entero",
+  conSaludoDeHora("hola, ¿cómo le va? soy Mary", 9) === "Buenos días, soy Mary",
+  conSaludoDeHora("hola, ¿cómo le va? soy Mary", 9)
+);
+check(
   "el «buenas» de más adentro NO se toca",
   conSaludoDeHora("hola, tenemos buenas noticias para usted", 15) === "Buenas tardes, tenemos buenas noticias para usted"
 );

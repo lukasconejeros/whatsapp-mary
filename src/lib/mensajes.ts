@@ -66,8 +66,10 @@ export function saludoPorHora(hora: number = hourSantiago()): string {
 
 // Las aperturas que se comen: el "hola", el "buenas" y las fórmulas de cortesía con las que
 // arranca un saludo. Solo al principio del texto — el "buenas noticias" de más adentro no se toca.
+// El (?!letra) del final es el que evita cortar una palabra por la mitad: sin él, "cómo están"
+// dejaba una "n" suelta y "como estai" una "i" (cazados en el barrido de 30 variantes, 24-08).
 const RE_APERTURA =
-  /^[\s¡!¿?.,;:–—-]*(hol+a+s?|holi+s?|buenas\s+(tardes|noches|d[ií]as)|buenos\s+d[ií]as|buen\s+d[ií]a|buenas|hey|al[oó]|saludos|qu[eé]\s+tal|c[oó]mo\s+(est[aá]s?|estai|est[aá]n|le\s+va|te\s+va)|como\s+(estas?|estai|estan|le\s+va|te\s+va))[\s¡!¿?.,;:–—-]*/iu;
+  /^[\s¡!¿?.,;:–—-]*(hol+a+s?|holi+s?|buenas\s+(tardes|noches|d[ií]as)|buenos\s+d[ií]as|buen\s+d[ií]a|buenas|hey|al[oó]|saludos|qu[eé]\s+tal|c[oó]mo\s+(est[aá]s?|estai|est[aá]n|le\s+va|te\s+va)|como\s+(estas?|estai|estan|le\s+va|te\s+va))(?![a-záéíóúñ0-9])[\s¡!¿?.,;:–—-]*/iu;
 
 export function conSaludoDeHora(texto: string, hora: number = hourSantiago()): string {
   let resto = (texto || "").trim();
