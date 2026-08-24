@@ -26,7 +26,7 @@ import { generateReplyDetallado } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
-import { quiereLaClaseDePrueba, apartarParaMary } from "../interes-prueba.js";
+import { quiereLaClaseDePrueba, yaSeHabloDeLaClaseDePrueba, apartarParaMary } from "../interes-prueba.js";
 import { procesarRespuestaPaseLista } from "../avisos-mary-loop.js";
 import { telefonoDelBot } from "../recordatorios-wa-loop.js";
 import pino from "pino";
@@ -425,10 +425,14 @@ export async function handleIncomingMessages(
           const fresh2 = getConversationById(convId);
           if (!fresh2 || fresh2.mode !== "AI") return;
 
+          const history = getRecentHistory(convId, 20);
+
           // Ya dijo que quiere la clase de prueba: el bot no sigue vendiendo. Manda la frase
           // fija, se apaga en este chat y le avisa a Mary (encargo de Lukas, 19-08-2026).
           // Preguntar por la prueba NO cuenta: eso lo contesta el bot (ver interes-prueba.ts).
-          if (quiereLaClaseDePrueba(text)) {
+          // El historial va de la mano: un "me interesa" solo significa que la quiere si el bot
+          // o Mary ya le habían hablado de la prueba (24-08-2026, conv 364).
+          if (quiereLaClaseDePrueba(text, yaSeHabloDeLaClaseDePrueba(history))) {
             apartarParaMary({
               conversationId: convId,
               phone: fresh2.phone,
@@ -443,7 +447,6 @@ export async function handleIncomingMessages(
             return;
           }
 
-          const history = getRecentHistory(convId, 20);
           const { texto: reply, motivo } = await generateReplyDetallado({ history, conversationId: convId, phone });
           if (!reply) {
             // Nadie se enteraba de esto: quedaba en el registro del contenedor y el

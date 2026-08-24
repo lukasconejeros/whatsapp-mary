@@ -16,7 +16,7 @@
  *   npx tsx scripts/test-interes-prueba.ts
  */
 import "./env-loader.js";
-import { quiereLaClaseDePrueba, FRASE_ESPERA, apartarParaMary } from "../src/lib/interes-prueba";
+import { quiereLaClaseDePrueba, yaSeHabloDeLaClaseDePrueba, FRASE_ESPERA, apartarParaMary } from "../src/lib/interes-prueba";
 import { detectarTuteo } from "../src/lib/antituteo.js";
 import {
   getOrCreateConversation,
@@ -59,6 +59,49 @@ ok(no("quisiera consultar por los horarios"), "quisiera consultar por los horari
 ok(no("hola"), "hola pelado");
 ok(no("gracias!!"), "gracias");
 ok(no(""), "un mensaje vacío no dispara nada");
+
+console.log("\n— el interés GENÉRICO del primer mensaje NO apaga el bot (24-08-2026) —");
+// Pasó de verdad: conv 364 hoy 12:26. "Me interesa conocer más sobre la academia para mi hija de
+// 8 años" llevaba un "me interesa" y el bot se apartó y le pasó el chat a Mary — esa señora solo
+// pedía información. Y el otro botón de Meta ("Me gustaría conseguir más información sobre esto")
+// hacía lo mismo en el PRIMER mensaje (conv 358, 21-08 15:19).
+const sinContexto = (t: string) => !quiereLaClaseDePrueba(t, false);
+ok(sinContexto("Me interesa conocer más sobre la academia para mi hija de 8 años"), "conv 364: me interesa conocer más sobre la academia");
+ok(sinContexto("¡Hola! Me gustaría conseguir más información sobre esto."), "conv 358: el botón de Meta con «me gustaría»");
+ok(sinContexto("me interesa"), "«me interesa» a secas, sin que nadie haya nombrado la prueba");
+ok(sinContexto("hola, me interesa para mi hijo de 6"), "me interesa para mi hijo de 6");
+
+console.log("\n— pero si YA se estaba hablando de la clase de prueba, sí la quiere —");
+const conContexto = (t: string) => quiereLaClaseDePrueba(t, true);
+ok(conContexto("me interesa"), "el bot le explicó la prueba y contesta «me interesa»");
+ok(conContexto("ya, me interesa para mi hija"), "«me interesa para mi hija» después de explicársela");
+ok(conContexto("cuando puede ser?"), "«cuándo puede ser?» después de explicársela");
+ok(!quiereLaClaseDePrueba("quiero saber los precios", true), "«quiero saber los precios» sigue siendo pregunta");
+
+console.log("\n— nombrar la prueba o pedir hora apaga el bot aunque sea el primer mensaje —");
+ok(quiereLaClaseDePrueba("quiero la clase de prueba", false), "«quiero la clase de prueba» de entrada");
+ok(quiereLaClaseDePrueba("me gustaria inscribirla", false), "«me gustaría inscribirla» de entrada");
+ok(quiereLaClaseDePrueba("como la agendo?", false), "«cómo la agendo?» de entrada");
+
+console.log("\n— ¿se habló ya de la clase de prueba en este chat? —");
+const h = (role: string, content: string) => ({ role, content }) as never;
+ok(!yaSeHabloDeLaClaseDePrueba([]), "chat vacío → no");
+ok(
+  !yaSeHabloDeLaClaseDePrueba([h("user", "hola, me interesa")]),
+  "solo mensajes de la persona → no (lo que ella diga no cuenta)"
+);
+ok(
+  yaSeHabloDeLaClaseDePrueba([h("user", "hola"), h("assistant", "Antes de ingresar hacemos una clase de prueba de $19.990 😊")]),
+  "el bot ya se la explicó → sí"
+);
+ok(
+  yaSeHabloDeLaClaseDePrueba([h("human", "la clase de prueba es el sábado")]),
+  "Mary ya la nombró a mano → sí"
+);
+ok(
+  !yaSeHabloDeLaClaseDePrueba([h("assistant", "Estamos en Picarte 804 😊")]),
+  "el bot habló de otra cosa → no"
+);
 
 console.log("\n— la frase que se manda —");
 ok(FRASE_ESPERA === "Deme unos minutos y le confirmo disponibilidad", `es la que eligió Lukas, de usted: "${FRASE_ESPERA}"`);

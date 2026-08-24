@@ -40,16 +40,49 @@ const LO_QUIERE: RegExp[] = [
   /\bllevarla\b|\bllevarlo\b/,
 ];
 
+// Pedir la clase con todas sus letras: nombrarla, o pedir hora, o decir que la inscribe. Esto
+// vale por sí solo, aunque nadie haya hablado de la prueba todavía.
+const EXPLICITO: RegExp[] = [
+  /\b(clase\s+de\s+prueba|la\s+prueba|clase\s+gratis|clase\s+gratuita)\b/,
+  /\b(inscribir|inscribirla|inscribirlo|inscribo|inscribirme|matricular)\b/,
+  /\b(agendar|agendo|agendamos|reservar|reservo|apartar|tomar\s+la\s+(clase|hora))\b/,
+  /\bcomo\s+(la|lo|me)\s+(agendo|inscribo|reservo|anoto)\b/,
+  /\b(la|lo)\s+(inscribo|llevo|mando)\b/,
+  /\bllevarla\b|\bllevarlo\b/,
+];
+
 function sinTildes(s: string): string {
   return (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-/** ¿Ya dijo que la quiere, o todavía está preguntando? */
-export function quiereLaClaseDePrueba(texto: string): boolean {
+/**
+ * ¿Ya dijo que la quiere, o todavía está preguntando?
+ *
+ * `yaSeHabloDeLaPrueba` es lo que arregla el error del 24-08-2026: un "me interesa" solo
+ * significa que quiere la clase SI se venía hablando de ella. En el primer mensaje no significa
+ * eso, significa "cuénteme". Sin este dato, el bot se apagaba con la señora de la conv 364
+ * ("Me interesa conocer más sobre la academia para mi hija de 8 años", 12:26) y con el botón de
+ * Meta de la conv 358 — dos personas que solo pedían información y quedaron esperando a Mary.
+ */
+export function quiereLaClaseDePrueba(texto: string, yaSeHabloDeLaPrueba = false): boolean {
   const t = sinTildes(texto);
   if (!t.trim()) return false;
   if (SOLO_PREGUNTA.some((r) => r.test(t))) return false;
-  return LO_QUIERE.some((r) => r.test(t));
+  if (!LO_QUIERE.some((r) => r.test(t))) return false;
+  if (EXPLICITO.some((r) => r.test(t))) return true;
+  return yaSeHabloDeLaPrueba;
+}
+
+/**
+ * ¿Alguien ya nombró la clase de prueba en este chat? Solo cuenta si la nombró el BOT o MARY:
+ * si la nombra la persona, su mensaje ya pasa por `EXPLICITO` y no hace falta mirar atrás.
+ */
+export function yaSeHabloDeLaClaseDePrueba(history: { role: string; content: string }[]): boolean {
+  return history.some(
+    (m) =>
+      m.role !== "user" &&
+      /\b(clase\s+de\s+prueba|la\s+prueba|clase\s+gratis|clase\s+gratuita)\b/.test(sinTildes(m.content || ""))
+  );
 }
 
 /**
