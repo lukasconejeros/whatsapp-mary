@@ -12,6 +12,8 @@ import {
   esSaludoPuro,
   saludoDeEntrada,
   validarBienvenida,
+  saludoPorHora,
+  conSaludoDeHora,
 } from "../src/lib/mensajes.js";
 import { generateReply } from "../src/lib/ai.js";
 import { buildSystemPrompt } from "../src/lib/system-prompt.js";
@@ -52,7 +54,7 @@ check("el texto de fábrica sigue disponible para restaurar", DEFAULT_BIENVENIDA
 console.log("\n— cuándo contesta el texto fijo —");
 check(
   "«hola» pelado de alguien nuevo → sale el texto del panel",
-  saludoDeEntrada([msg("user", "hola")]).texto.startsWith("¡Hola! 😊 Soy Mary de Arteluk")
+  saludoDeEntrada([msg("user", "hola")]).texto === conSaludoDeHora("¡Hola! 😊 Soy Mary de Arteluk, ¿para quién sería la clase?")
 );
 check(
   "el último mensaje es del bot → NO (nadie está esperando respuesta)",
@@ -72,7 +74,7 @@ check("de 400 letras para arriba NO", !validarBienvenida("hola ".repeat(120)).ok
 console.log("\n— el bot completo, sin llamar a la IA —");
 setBienvenida("¡Hola! 😊 Soy Mary de Arteluk, cuéntame para quién sería la clase.");
 const respuesta = await generateReply({ history: [msg("user", "hola")], conversationId: 1 });
-check("el bot responde el texto del panel", respuesta.startsWith("¡Hola! 😊 Soy Mary de Arteluk"), respuesta);
+check("el bot responde el texto del panel", respuesta === conSaludoDeHora("¡Hola! 😊 Soy Mary de Arteluk, cuéntame para quién sería la clase."), respuesta);
 
 console.log("\n— si Mary deja la caja vacía, vuelve a improvisar la IA —");
 setBienvenida("");
@@ -110,7 +112,7 @@ setBienvenida(suyo);
 
 check(
   "botón de Meta «¡Hola! Quiero más información» → sale su saludo TAL CUAL",
-  saludoDeEntrada([msg("user", "¡Hola! Quiero más información")]).texto === suyo
+  saludoDeEntrada([msg("user", "¡Hola! Quiero más información")]).texto === conSaludoDeHora(suyo)
 );
 check(
   "…y no hace falta molestar a la IA (no preguntaron nada)",
@@ -118,11 +120,11 @@ check(
 );
 check(
   "el otro botón «Me gustaría conseguir más información sobre esto» → también su saludo tal cual",
-  saludoDeEntrada([msg("user", "¡Hola! Me gustaría conseguir más información sobre esto.")]).texto === suyo
+  saludoDeEntrada([msg("user", "¡Hola! Me gustaría conseguir más información sobre esto.")]).texto === conSaludoDeHora(suyo)
 );
 check(
   "«hola» pelado → su saludo tal cual, sin IA",
-  saludoDeEntrada([msg("user", "hola")]).texto === suyo &&
+  saludoDeEntrada([msg("user", "hola")]).texto === conSaludoDeHora(suyo) &&
     saludoDeEntrada([msg("user", "hola")]).ademasResponder === false
 );
 
@@ -130,7 +132,7 @@ check(
 const conv365 = [msg("user", "¡Hola! Quiero más información"), msg("user", "Donde estan ubiscados")];
 check(
   "saludo + pregunta (conv 365) → su saludo tal cual…",
-  saludoDeEntrada(conv365).texto === suyo
+  saludoDeEntrada(conv365).texto === conSaludoDeHora(suyo)
 );
 check(
   "…y además la IA contesta la pregunta",
@@ -138,7 +140,7 @@ check(
 );
 check(
   "«hola, ¿cuánto vale la clase?» → saludo tal cual + la IA contesta el precio",
-  saludoDeEntrada([msg("user", "hola, cuánto vale la clase?")]).texto === suyo &&
+  saludoDeEntrada([msg("user", "hola, cuánto vale la clase?")]).texto === conSaludoDeHora(suyo) &&
     saludoDeEntrada([msg("user", "hola, cuánto vale la clase?")]).ademasResponder === true
 );
 
@@ -171,7 +173,59 @@ check(
 console.log("\n— el bot completo con el botón de Meta, sin llamar a la IA —");
 setBienvenida(suyo);
 const rMeta = await generateReply({ history: [msg("user", "¡Hola! Quiero más información")], conversationId: 1 });
-check("el bot responde su saludo, letra por letra", rMeta === suyo, rMeta);
+check("el bot responde su saludo, letra por letra tras el saludo de la hora", rMeta === conSaludoDeHora(suyo), rMeta);
+
+
+// ── El saludo por hora del día (encargo de Lukas, 24-08-2026) ────────────────
+// Reclamó: "no quiero que diga cómo estás en el hola, quiero buenos días / buenas tardes /
+// buenas noches según la hora que sea, reactivo". El "hola como esta!" no lo inventa la IA:
+// lo escribió Mary en la caja de Entrenar IA (comprobado en producción, 24-08 13:55). Así que
+// el bot le cambia SOLO la apertura y deja el resto de su texto intacto.
+// Tramos que eligió: días hasta las 12, tardes de 12 a 20, noches de 20 a 6.
+console.log("\n— buenos días / buenas tardes / buenas noches según la hora —");
+check("6 de la mañana → Buenos días", saludoPorHora(6) === "Buenos días");
+check("11 de la mañana → Buenos días", saludoPorHora(11) === "Buenos días");
+check("12 en punto → Buenas tardes", saludoPorHora(12) === "Buenas tardes");
+check("7 de la tarde → Buenas tardes", saludoPorHora(19) === "Buenas tardes");
+check("8 de la noche → Buenas noches", saludoPorHora(20) === "Buenas noches");
+check("medianoche → Buenas noches", saludoPorHora(0) === "Buenas noches");
+check("5 de la madrugada → Buenas noches", saludoPorHora(5) === "Buenas noches");
+
+console.log("\n— la apertura se cambia, el resto de su texto no se toca —");
+check(
+  "el saludo REAL de Mary a las 15:00",
+  conSaludoDeHora("hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk", 15) ===
+    "Buenas tardes, un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk",
+  conSaludoDeHora("hola como esta! un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk", 15)
+);
+check(
+  "«hola buenas un gusto…» a las 9 → Buenos días",
+  conSaludoDeHora("hola buenas un gusto, soy Mary", 9) === "Buenos días, un gusto, soy Mary"
+);
+check(
+  "el de fábrica («¡Hola! 😊 Soy Mary…») a las 21 → punto y el emoji queda",
+  conSaludoDeHora(DEFAULT_BIENVENIDA, 21) === "Buenas noches. " + DEFAULT_BIENVENIDA.replace("¡Hola! ", ""),
+  conSaludoDeHora(DEFAULT_BIENVENIDA, 21)
+);
+check(
+  "si ella escribió «Buenos días» y son las 15, se corrige a Buenas tardes",
+  conSaludoDeHora("Buenos días, soy Mary de Arteluk", 15) === "Buenas tardes, soy Mary de Arteluk"
+);
+check(
+  "«¿Cómo estás? Soy Mary» a las 10 → Buenos días. Soy Mary",
+  conSaludoDeHora("¿Cómo estás? Soy Mary", 10) === "Buenos días. Soy Mary"
+);
+check(
+  "un texto sin ningún saludo se respeta entero",
+  conSaludoDeHora("Soy Mary Quinteros, dígame para quién sería la clase.", 21) ===
+    "Buenas noches. Soy Mary Quinteros, dígame para quién sería la clase."
+);
+check("solo «hola» → queda el saludo de la hora a secas", conSaludoDeHora("hola!", 9) === "Buenos días");
+check("vacío sigue vacío (Mary apagó la caja)", conSaludoDeHora("", 9) === "");
+check(
+  "el «buenas» de más adentro NO se toca",
+  conSaludoDeHora("hola, tenemos buenas noticias para usted", 15) === "Buenas tardes, tenemos buenas noticias para usted"
+);
 
 // Deja la base como estaba (si no había nada guardado, queda el texto de fábrica: es el mismo
 // que usaba antes, así que el bot saluda igual).

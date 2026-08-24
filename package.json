@@ -79,6 +79,7 @@
     "test:respuesta-pase": "tsx scripts/test-respuesta-pase-lista.ts",
     "test:asistencia-api": "node scripts/test-asistencia-api.mjs",
     "test:chat-scroll": "node scripts/test-chat-scroll.mjs",
+    "humo:saludo-hora": "tsx scripts/humo-saludo-hora.ts",
     "humo:pase-lista": "tsx scripts/humo-pase-lista.ts"
   },
   "dependencies": {

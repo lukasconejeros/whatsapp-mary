@@ -14,6 +14,7 @@
 // mensaje trae foto. Ver `saludoDeEntrada`.
 // Sin extensión .js en el import: este módulo lo cargan la API de Next, el bot y los scripts.
 import { getConfig, setConfig } from "./db";
+import { hourSantiago } from "./fechas";
 import type { Message } from "./db";
 
 const K_BIENVENIDA = "msg_bienvenida";
@@ -44,6 +45,45 @@ export function validarBienvenida(texto: string): { ok: true } | { ok: false; mo
   if (t.length > 400) return { ok: false, motivo: "El saludo es demasiado largo (máximo 400 letras)." };
   if (/\{[a-z_]+\}/i.test(t)) return { ok: false, motivo: "El saludo no admite marcadores como {nombre}: se envía tal cual." };
   return { ok: true };
+}
+
+
+// EL SALUDO SEGÚN LA HORA (encargo de Lukas, 24-08-2026)
+//
+// Reclamó: "no quiero que diga cómo estás en el hola, quiero buenos días / buenas tardes / buenas
+// noches según la hora que sea, reactivo". El "hola como esta!" NO lo inventaba la IA: lo escribió
+// Mary en la caja de Entrenar IA (leído en producción el 24-08 a las 13:55), y desde que el saludo
+// sale palabra por palabra, salía tal cual.
+//
+// Por eso el cambio va acá y no en el prompt: se le reemplaza SOLO la apertura y el resto de su
+// texto queda intacto, escriba lo que escriba. Tramos que eligió Lukas: días hasta las 12, tardes
+// de 12 a 20, noches de 20 a 6. Alcance que eligió: solo el saludo de entrada.
+export function saludoPorHora(hora: number = hourSantiago()): string {
+  if (hora >= 6 && hora < 12) return "Buenos días";
+  if (hora >= 12 && hora < 20) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+// Las aperturas que se comen: el "hola", el "buenas" y las fórmulas de cortesía con las que
+// arranca un saludo. Solo al principio del texto — el "buenas noticias" de más adentro no se toca.
+const RE_APERTURA =
+  /^[\s¡!¿?.,;:–—-]*(hol+a+s?|holi+s?|buenas\s+(tardes|noches|d[ií]as)|buenos\s+d[ií]as|buen\s+d[ií]a|buenas|hey|al[oó]|saludos|qu[eé]\s+tal|c[oó]mo\s+(est[aá]s?|estai|est[aá]n|le\s+va|te\s+va)|como\s+(estas?|estai|estan|le\s+va|te\s+va))[\s¡!¿?.,;:–—-]*/iu;
+
+export function conSaludoDeHora(texto: string, hora: number = hourSantiago()): string {
+  let resto = (texto || "").trim();
+  if (!resto) return "";
+  // Pueden venir varias piezas pegadas ("hola buenas", "hola como esta!"), por eso el bucle.
+  // El tope de 4 vueltas es para que un texto raro no lo deje dando vueltas.
+  for (let i = 0; i < 4; i++) {
+    const limpio = resto.replace(RE_APERTURA, "");
+    if (limpio === resto) break;
+    resto = limpio;
+  }
+  const saludo = saludoPorHora(hora);
+  if (!resto) return saludo;
+  // Coma si lo que sigue va en minúscula ("Buenas tardes, un gusto"); punto si arranca en
+  // mayúscula o con un emoji, porque "Buenas tardes, Soy Mary" se lee mal.
+  return /^\p{Ll}/u.test(resto) ? `${saludo}, ${resto}` : `${saludo}. ${resto}`;
 }
 
 // Quita emojis, tildes y signos para comparar. "Buenos días 👋" y "buenos dias" son lo mismo.
@@ -103,5 +143,6 @@ export function saludoDeEntrada(history: Message[]): { texto: string; ademasResp
   if (history.length > 3) return NADA;
   const texto = getBienvenida().trim();
   if (!texto) return NADA;
-  return { texto, ademasResponder: history.some((m) => !esSoloEntrada(m.content)) };
+  // La apertura la pone la hora ("Buenas tardes, un gusto…"), el resto es de ella palabra por palabra.
+  return { texto: conSaludoDeHora(texto), ademasResponder: history.some((m) => !esSoloEntrada(m.content)) };
 }
