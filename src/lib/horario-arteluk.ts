@@ -31,6 +31,13 @@ export interface FilaPlanilla {
   mensualidad?: number;
   /** Nombre EXACTO del alumno en CONTACTOS_ARTELUK, solo si la coincidencia es segura. */
   contacto?: string;
+  /**
+   * El nombre con el que esta fila se UNE a otra ficha. Lukas, 26-08-2026: en la
+   * academia "nadie tiene nombres iguales", asi que la Julieta del sabado y la
+   * Julieta Bratz del lunes son la misma nina viniendo dos dias. La fila conserva el
+   * texto literal de la planilla en 'alumno' (fidelidad) y aqui va el nombre bueno.
+   */
+  mismaQue?: string;
   /** La duda que hay que preguntarle a Mary antes de dar la fila por buena. */
   revisar?: string;
   notas?: string;
@@ -40,8 +47,7 @@ export interface FilaPlanilla {
 
 const SIN_LIBRETA = "no está en la libreta de apoderados: falta su teléfono";
 // La foto 7 llegó sin encabezado. Lukas lo preguntó y respondió el 26-08-2026:
-// es el JUEVES. La profesora de ese bloque sigue sin saberse.
-const SIN_PROFE_FOTO7 = "Lukas confirmó que vienen el jueves; falta saber qué profesora hace este bloque";
+// es el JUEVES y la clase es con MARY (que ese día hace hasta las 19:30).
 
 export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   // ── LUNES (fotos 1 y 2) ────────────────────────────────────────────────────
@@ -66,12 +72,12 @@ export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   { alumno: "Josefina Tomckowiack", dia: "Miercoles", hora: "17:30", horaFin: "19:30", profe: "Mary", contacto: "Josefina Tomckowiack" },
   { alumno: "Gabriela Martínez", dia: "Miercoles", hora: "17:30", horaFin: "19:30", profe: "Mary", contacto: "Gabriela Martínez Schmitz" },
   { alumno: "Valentina Roa", dia: "Miercoles", hora: "18:30", horaFin: "19:30", profe: "Paula", contacto: "Valentina Roa" },
-  { alumno: "Sofía", dia: "Miercoles", hora: "18:30", horaFin: "19:30", profe: "Paula", revisar: "¿Sofía Reyes Pinto o Sophia Iturra Sandoval? ¿y es la misma que Sofía Llancaleo del sábado?" },
+  { alumno: "Sofía", dia: "Miercoles", hora: "18:30", horaFin: "19:30", profe: "Paula", mismaQue: "Sofía Llancaleo" },
 
   // ── JUEVES · primera tabla (foto 5) ────────────────────────────────────────
   { alumno: "Barbara", dia: "Jueves", hora: "17:30", horaFin: "19:30", profe: "Mary", revisar: SIN_LIBRETA },
   { alumno: "diego", dia: "Jueves", hora: "17:30", horaFin: "18:30", profe: "Mary", revisar: "hay tres Diego en la libreta: Diego (de Sergio), Diego Torres y Diego Montoya" },
-  { alumno: "Amanda", dia: "Jueves", hora: "17:30", horaFin: "18:30", profe: "Mary", contacto: "Amanda Diaz", revisar: "¿la Amanda del jueves y la del viernes son la misma niña?" },
+  { alumno: "Amanda", dia: "Jueves", hora: "17:30", horaFin: "18:30", profe: "Mary", contacto: "Amanda Diaz" },
   { alumno: "Ema Niklitschek", dia: "Jueves", hora: "17:30", horaFin: "18:30", profe: "Mary", contacto: "Emma Niklitschek Santana" },
   { alumno: "francisca", dia: "Jueves", hora: "17:30", horaFin: "18:30", profe: "Mary", contacto: "Francisca Esperguel" },
 
@@ -81,27 +87,27 @@ export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   { alumno: "amapola", dia: "Jueves", hora: "16:00", horaFin: "18:00", profe: "Paula", mensualidad: 120000, contacto: "Amapola" },
   { alumno: "Amelia Brellenthin", dia: "Jueves", hora: "17:00", horaFin: "18:00", profe: "Paula", mensualidad: 60000, revisar: `${SIN_LIBRETA}. ¿es la misma Amelia que viene el lunes a las 16:00?` },
 
-  // ── FOTO 7 · llegó sin encabezado; Lukas confirmó el 26-08 que es el JUEVES ─
-  { alumno: "PAULINA", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: null, revisar: `${SIN_PROFE_FOTO7}. Además ${SIN_LIBRETA}` },
-  { alumno: "Violeta", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: null, contacto: "Violeta Sanhueza", revisar: SIN_PROFE_FOTO7 },
-  { alumno: "GRACE", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: null, revisar: `${SIN_PROFE_FOTO7}. Además ${SIN_LIBRETA}` },
+  // ── FOTO 7 · llegó sin encabezado; el 26-08 Lukas confirmó JUEVES y con MARY ─
+  { alumno: "PAULINA", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: "Mary", revisar: SIN_LIBRETA },
+  { alumno: "Violeta", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: "Mary", contacto: "Violeta Sanhueza" },
+  { alumno: "GRACE", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: "Mary", revisar: SIN_LIBRETA },
 
   // ── VIERNES (foto 8) ───────────────────────────────────────────────────────
   { alumno: "Florencia Aliaga", dia: "Viernes", hora: "17:30", horaFin: "19:30", profe: "Mary", mensualidad: 120000, revisar: `${SIN_LIBRETA} (la Florencia de la libreta es Florencia Mohr, otro apellido)` },
   { alumno: "Isabella Yobanolo", dia: "Viernes", hora: "17:30", horaFin: "18:30", profe: "Mary", mensualidad: 60000, contacto: "Isabella Yobanolo Baeza" },
-  { alumno: "Amanda", dia: "Viernes", hora: "17:30", horaFin: "18:30", profe: "Mary", mensualidad: 60000, contacto: "Amanda Diaz", revisar: "¿la Amanda del jueves y la del viernes son la misma niña?" },
+  { alumno: "Amanda", dia: "Viernes", hora: "17:30", horaFin: "18:30", profe: "Mary", mensualidad: 60000, contacto: "Amanda Diaz" },
   { alumno: "Emilia", dia: "Viernes", hora: "17:30", horaFin: "18:30", profe: "Mary", mensualidad: 60000, revisar: "hay dos en la libreta: Emilia Matus Cardenas y Emilia Rojas Guevara" },
   { alumno: "Tiara", dia: "Viernes", hora: "18:30", horaFin: "19:30", profe: "Paula", mensualidad: 60000, contacto: "Tiara Collica" },
-  { alumno: "elisa", dia: "Viernes", hora: "18:30", horaFin: "19:30", profe: "Paula", mensualidad: 60000, revisar: `${SIN_LIBRETA}. ¿es la misma que Elisa Bade, la del sábado?` },
+  { alumno: "elisa", dia: "Viernes", hora: "18:30", horaFin: "19:30", profe: "Paula", mensualidad: 60000, mismaQue: "Elisa Bade", revisar: SIN_LIBRETA },
 
   // ── SÁBADO (foto 9), el único día de mañana ────────────────────────────────
   { alumno: "Antonella", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Mary", mensualidad: 120000, contacto: "Antonella Garces Barría" },
-  { alumno: "Elisa Bade", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Mary", mensualidad: 70000, revisar: `${SIN_LIBRETA}. ¿es la misma que la Elisa del viernes?` },
+  { alumno: "Elisa Bade", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Mary", mensualidad: 70000, revisar: SIN_LIBRETA },
   { alumno: "Diego Torres", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Mary", mensualidad: 60000, contacto: "Diego Torres" },
-  { alumno: "Julieta", dia: "Sabado", hora: "11:00", horaFin: "12:00", profe: "Mary", mensualidad: 60000, revisar: "hay cuatro Julieta en la libreta: Bratz, Monsalve, Rivas y Mena" },
-  { alumno: "Valentina", dia: "Sabado", hora: "11:00", horaFin: "12:00", profe: "Mary", mensualidad: 60000, revisar: "¿la Valentina de Zunia Peña y Lillo, o la Valentina Roa que viene el miércoles?" },
+  { alumno: "Julieta", dia: "Sabado", hora: "11:00", horaFin: "12:00", profe: "Mary", mensualidad: 60000, mismaQue: "Julieta Bratz" },
+  { alumno: "Valentina", dia: "Sabado", hora: "11:00", horaFin: "12:00", profe: "Mary", mensualidad: 60000, mismaQue: "Valentina Roa" },
   { alumno: "Elena Jerez", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Paula", mensualidad: 100000, contacto: "Elena Jerez Ahrens" },
-  { alumno: "Sofía Llancaleo", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Paula", mensualidad: 60000, revisar: `${SIN_LIBRETA}. ¿es la misma que la Sofía del miércoles?` },
+  { alumno: "Sofía Llancaleo", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Paula", mensualidad: 60000, revisar: SIN_LIBRETA },
   // Repetido en la planilla, en la tabla de Paula. Lukas lo preguntó y confirmó el
   // 26-08-2026: el sábado es con Mary, así que esta fila NO se carga.
   { alumno: "Diego Torres", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Paula", mensualidad: 60000, duplicada: true },
@@ -135,7 +141,9 @@ export function construirHorario(): AlumnoPlan[] {
   const porNombre = new Map<string, AlumnoPlan>();
 
   for (const f of PLANILLA_AGOSTO_2026) {
-    const nombre = nombreDeFicha(f.alumno);
+    // 'mismaQue' junta dos filas de la planilla en una sola ficha: es la misma niña
+    // viniendo dos días, con el nombre completo de las dos veces que aparece.
+    const nombre = nombreDeFicha(f.mismaQue ?? f.alumno);
     let a = porNombre.get(nombre);
     if (!a) {
       const c = f.contacto ? CONTACTOS_ARTELUK.find((x) => x[1] === f.contacto) : undefined;
@@ -154,6 +162,18 @@ export function construirHorario(): AlumnoPlan[] {
       if (!a.mensualidad && f.mensualidad) a.mensualidad = f.mensualidad;
       if (!a.notas && f.notas) a.notas = f.notas;
       if (!a.revisar && f.revisar) a.revisar = f.revisar;
+      // Y si le faltaba el apoderado, se lo pone la otra fila (la Julieta del sábado
+      // no traía teléfono; la Julieta Bratz del lunes, sí).
+      if (!a.telefono && f.contacto) {
+        const c2 = CONTACTOS_ARTELUK.find((x) => x[1] === f.contacto);
+        if (c2) { a.apoderado = a.apoderado ?? c2[0]; a.telefono = c2[2] || null; }
+      }
+      // Dos mensualidades distintas para la misma niña NO se resuelven solas: la
+      // planilla le pone $60.000 el viernes y $70.000 el sábado a la misma Elisa.
+      if (f.mensualidad && a.mensualidad && f.mensualidad !== a.mensualidad) {
+        const dudaPlata = `la planilla le pone dos mensualidades distintas ($${a.mensualidad.toLocaleString("es-CL")} y $${f.mensualidad.toLocaleString("es-CL")}): ¿cuál es la buena?`;
+        a.revisar = a.revisar ? `${a.revisar}. Además ${dudaPlata}` : dudaPlata;
+      }
     }
     // La fila repetida de la planilla se cuenta, pero no se carga dos veces.
     if (!f.duplicada) {

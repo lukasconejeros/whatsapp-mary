@@ -29,7 +29,7 @@ const inscripciones = plan.flatMap((a) => a.inscripciones);
 const buscar = (n: string) => plan.find((a) => a.nombre === n);
 
 check("la planilla trae las 44 filas leídas de las fotos", PLANILLA_AGOSTO_2026.length === 44, String(PLANILLA_AGOSTO_2026.length));
-check("quedan 41 alumnos (los repetidos son la misma ficha)", plan.length === 41, String(plan.length));
+check("quedan 37 alumnos (los repetidos son la misma ficha)", plan.length === 37, String(plan.length));
 check("quedan 43 inscripciones (el Diego Torres duplicado se carga una vez)", inscripciones.length === 43, String(inscripciones.length));
 
 // Mateo viene lunes y martes: UNA ficha, DOS inscripciones.
@@ -57,9 +57,9 @@ check("y ya no lleva la marca de la profesora", !(buscar("Alison")?.revisar ?? "
 // La foto sin encabezado era del JUEVES (Lukas, 26-08-2026). La profesora sigue sin saberse,
 // así que se cargan en su día pero marcadas: no se inventa quién les hace la clase.
 for (const n of ["Paulina", "Violeta", "Grace"]) {
-  check(`${n} viene el jueves y sigue marcada por la profesora`,
-    buscar(n)?.inscripciones[0].dia === "Jueves" && buscar(n)?.inscripciones[0].profe === null && !!buscar(n)?.revisar,
-    `${buscar(n)?.inscripciones[0].dia} / ${buscar(n)?.inscripciones[0].profe} / ${buscar(n)?.revisar}`);
+  check(`${n} viene el jueves con Mary`,
+    buscar(n)?.inscripciones[0].dia === "Jueves" && buscar(n)?.inscripciones[0].profe === "Mary",
+    `${buscar(n)?.inscripciones[0].dia} / ${buscar(n)?.inscripciones[0].profe}`);
 }
 
 // Diego Torres: dos tablas a la misma hora = imposible, es duplicado de planilla.
@@ -72,17 +72,28 @@ check("y ya no queda marcado", !buscar("Diego Torres")?.revisar, String(buscar("
 check("Antonia Pontigo trae a su apoderada y su teléfono", buscar("Antonia Pontigo")?.telefono === "+56976242369" && buscar("Antonia Pontigo")?.apoderado === "Veronica Arteche", `${buscar("Antonia Pontigo")?.apoderado}/${buscar("Antonia Pontigo")?.telefono}`);
 check("Elena Jerez también", buscar("Elena Jerez")?.telefono === "+56945496234", String(buscar("Elena Jerez")?.telefono));
 check("Ignacia NO trae teléfono: hay dos candidatas en la libreta", buscar("Ignacia")?.telefono === null && !!buscar("Ignacia")?.revisar, `${buscar("Ignacia")?.telefono}`);
-check("Sofía tampoco: hay Sofía Reyes y Sophia Iturra", buscar("Sofía")?.telefono === null && !!buscar("Sofía")?.revisar);
+check("Sofía Llancaleo tampoco: no está en la libreta", buscar("Sofía Llancaleo")?.telefono === null && !!buscar("Sofía Llancaleo")?.revisar);
 check("Diego (jueves) tampoco: hay tres Diego", buscar("Diego")?.telefono === null && !!buscar("Diego")?.revisar);
-check("Julieta (sábado) tampoco: hay cuatro Julieta", buscar("Julieta")?.telefono === null && !!buscar("Julieta")?.revisar);
+// Julieta SÍ tiene teléfono desde que se supo que la del sábado es la Julieta Bratz
+// del lunes: la duda de las cuatro Julietas de la libreta quedó resuelta.
+check("Julieta Bratz ya trae su teléfono", buscar("Julieta Bratz")?.telefono === "+56956475871", String(buscar("Julieta Bratz")?.telefono));
 
-// Los 6 nombres que pueden ser 1 o 2 personas se cargan SEPARADOS y marcados.
-check("Amelia y Amelia Brellenthin son dos fichas", !!buscar("Amelia") && !!buscar("Amelia Brellenthin"));
-check("Julieta Bratz y Julieta son dos fichas", !!buscar("Julieta Bratz") && !!buscar("Julieta"));
-check("Valentina Roa y Valentina son dos fichas", !!buscar("Valentina Roa") && !!buscar("Valentina"));
-check("Sofía y Sofía Llancaleo son dos fichas", !!buscar("Sofía") && !!buscar("Sofía Llancaleo"));
-check("Elisa y Elisa Bade son dos fichas", !!buscar("Elisa") && !!buscar("Elisa Bade"));
-check("Amanda es una sola ficha con jueves y viernes, marcada", buscar("Amanda")?.inscripciones.length === 2 && !!buscar("Amanda")?.revisar, String(buscar("Amanda")?.inscripciones.length));
+// Los nombres repetidos: Lukas confirmó el 26-08-2026 que "nadie tiene nombres
+// iguales", o sea que cada par es la MISMA niña viniendo dos días. Se unen en una
+// ficha con el nombre completo, y la del sábado deja de aparecer suelta.
+check("la Julieta del sábado es la Julieta Bratz del lunes", buscar("Julieta Bratz")?.inscripciones.length === 2 && !buscar("Julieta"), String(buscar("Julieta Bratz")?.inscripciones.length));
+check("la Valentina del sábado es la Valentina Roa del miércoles", buscar("Valentina Roa")?.inscripciones.length === 2 && !buscar("Valentina"), String(buscar("Valentina Roa")?.inscripciones.length));
+check("la Sofía del miércoles es la Sofía Llancaleo del sábado", buscar("Sofía Llancaleo")?.inscripciones.length === 2 && !buscar("Sofía"), String(buscar("Sofía Llancaleo")?.inscripciones.length));
+check("la elisa del viernes es la Elisa Bade del sábado", buscar("Elisa Bade")?.inscripciones.length === 2 && !buscar("Elisa"), String(buscar("Elisa Bade")?.inscripciones.length));
+check("Amanda es una sola ficha con jueves y viernes", buscar("Amanda")?.inscripciones.length === 2, String(buscar("Amanda")?.inscripciones.length));
+check("y ya no le queda la duda de si eran dos niñas", !buscar("Amanda")?.revisar, String(buscar("Amanda")?.revisar));
+// La única que sigue partida: la libreta pone a Amelia y Amparo como hermanas
+// Sepúlveda y las dos vienen el lunes a las 16:00, así que unirla con Amelia
+// Brellenthin le pegaría el teléfono de otra familia. Pendiente de Lukas.
+check("Amelia y Amelia Brellenthin siguen separadas hasta que Lukas lo confirme", !!buscar("Amelia") && !!buscar("Amelia Brellenthin"));
+// Dos mensualidades para la misma niña no se resuelven solas: se marcan.
+check("Elisa Bade queda marcada porque la planilla le pone 60.000 y 70.000",
+  (buscar("Elisa Bade")?.revisar ?? "").includes("mensualidades distintas"), String(buscar("Elisa Bade")?.revisar));
 
 // Las mensualidades que se leen en las fotos.
 check("Agustina paga 120.000", buscar("Agustina")?.mensualidad === 120000, String(buscar("Agustina")?.mensualidad));
@@ -117,14 +128,14 @@ if (yaCargado) {
 } else {
 const antes = listAlumnos().length;
 const r1 = seedHorarioArteluk();
-check("la primera carga crea los 41 alumnos", r1.alumnos === 41, String(r1.alumnos));
+check("la primera carga crea los 37 alumnos", r1.alumnos === 37, String(r1.alumnos));
 check("y sus 43 inscripciones", r1.inscripciones === 43, String(r1.inscripciones));
 
 // Idempotente: correrla otra vez NO duplica (arranca en cada deploy).
 const r2 = seedHorarioArteluk();
 check("correrla otra vez no crea a nadie", r2.alumnos === 0, String(r2.alumnos));
 check("ni repite inscripciones", r2.inscripciones === 0, String(r2.inscripciones));
-check("en la base hay 41 alumnos nuevos, ni uno más", listAlumnos().length === antes + 41, String(listAlumnos().length - antes));
+check("en la base hay 37 alumnos nuevos, ni uno más", listAlumnos().length === antes + 37, String(listAlumnos().length - antes));
 
 // El calendario de verdad: un jueves cualquiera trae a los 9, cada uno con SU salida.
 const jueves = inscripcionesDeFecha("2026-08-27");
@@ -146,7 +157,7 @@ check("y sin inscripciones huérfanas", listInscripciones().length === 0, String
 // siguiente NO se los vuelve a poner (sería deshacerle el trabajo cada deploy).
 if (listAlumnos().length === 0) {
   const p1 = seedHorarioSiVacio();
-  check("con la tabla vacía, el arranque carga el horario", p1.alumnos === 41, String(p1.alumnos));
+  check("con la tabla vacía, el arranque carga el horario", p1.alumnos === 37, String(p1.alumnos));
   const p2 = seedHorarioSiVacio();
   check("con alumnos ya cargados, el arranque no toca nada", p2.alumnos === 0 && p2.inscripciones === 0, JSON.stringify(p2));
   deleteAlumno(listAlumnos()[0].id);
