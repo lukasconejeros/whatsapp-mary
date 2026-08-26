@@ -8,8 +8,9 @@
 //   que ella escribió · pagos fijos que caen ese día.
 import {
   clasesFijasDeFecha, listClasesRange, recordatoriosDeFecha,
-  pagosFijosDeFecha, listClientes,
+  pagosFijosDeFecha, listClientes, inscripcionesDeFecha, ausenciasRango,
 } from "./db.js";
+import { bloquesDelDia, type InscripcionConAlumno } from "./dia-clases.js";
 
 export interface ItemDia {
   hora: string | null; // "HH:MM"
@@ -42,9 +43,39 @@ export function armarDia(fecha: string): DiaDeMary {
     if (n && !alumnos.includes(n)) alumnos.push(n);
   };
 
+  // ── El horario de verdad: los alumnos inscritos ──────────────────────────
+  // Una sala por profesora, con la gente que le toca ese día. A quien avisó que
+  // no viene se le deja a la vista (para que Mary lo recuerde) pero NO entra al
+  // pase de lista: preguntarlo lo dejaría marcado como "faltó" cada semana.
+  const inscripciones = inscripcionesDeFecha(fecha).map<InscripcionConAlumno>((i) => ({
+    id: i.id, alumnoId: i.alumnoId, nombre: i.nombre, dia: i.dia,
+    hora: i.hora, horaFin: i.horaFin, profe: i.profe,
+  }));
+  const salas = bloquesDelDia(fecha, inscripciones, ausenciasRango(fecha, fecha));
+  for (const sala of salas) {
+    const nombres = sala.alumnos.map((a) =>
+      a.estado === "normal" ? a.nombre : `${a.nombre} (no viene)`
+    );
+    for (const a of sala.alumnos) if (a.estado === "normal") agregarAlumno(a.nombre);
+    items.push({
+      hora: sala.hora,
+      texto: `${sala.profe ?? "sin profesora"} · ${nombres.length ? nombres.join(", ") : "sin alumnos"}`,
+      tipo: "clase",
+    });
+  }
+
   // ── Clases que se repiten todas las semanas ──────────────────────────────
+  // El modelo viejo (una fila con la lista de nombres dentro). Sigue vivo por si
+  // Mary tiene algo cargado ahí; el horario nuevo va arriba, en inscripciones.
+  // Una clase fija cuyos alumnos YA están todos en el horario nuevo es la misma
+  // clase migrada: se salta, o el mensaje diría el día dos veces. Si trae a alguien
+  // que no está inscrito, se manda igual: nadie puede desaparecer del día de Mary.
+  const inscritos = new Set(
+    salas.flatMap((s) => s.alumnos.map((a) => a.nombre.trim().toLowerCase()))
+  );
   for (const f of clasesFijasDeFecha(fecha)) {
     const nombres = f.alumnos.filter(Boolean);
+    if (nombres.length > 0 && nombres.every((n) => inscritos.has(n.trim().toLowerCase()))) continue;
     nombres.forEach(agregarAlumno);
     items.push({
       hora: f.hora,

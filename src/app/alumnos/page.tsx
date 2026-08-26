@@ -19,6 +19,12 @@ type Ficha = {
   id: number; nombre: string; apoderado: string | null; telefono: string | null
   mensualidad: number; notas: string | null; revisar: string | null
   inscripciones: Inscripcion[]; faltas: string[]; vino: number
+  // El botón "no viene" del calendario (Lukas, 26-08-2026).
+  avisadas: string[]          // los días de ESTE mes que avisó que no venía
+  recuperativas: number       // faltas + días avisados: a cuántas clases puede optar
+  noVieneEsteMes: boolean     // "que se salga del CRM solo ese mes"
+  ausenciaMesId: number | null
+  motivoMes: string | null
 }
 
 const pesos = (n: number) => `$${n.toLocaleString('es-CL')}`
@@ -71,20 +77,34 @@ export default function AlumnosPage() {
     return f.inscripciones.some(i => i.dia === filtroDia)
   })
 
+  // Los que avisaron que no vienen en TODO el mes salen del listado normal y se
+  // juntan abajo ("que se salga del CRM solo ese mes"). No desaparecen: desde ahí
+  // Mary los devuelve con un toque, que si no el aviso sería un viaje sin vuelta.
+  const fueraDelMes = visibles.filter(f => f.noVieneEsteMes)
+  const activos = visibles.filter(f => !f.noVieneEsteMes)
+
   // Agrupadas por el día en que vienen: es lo que hace que no se lea como una lista plana.
   const grupos: { dia: string; fichas: Ficha[] }[] = []
   for (const dia of [...DIAS, SIN_DIA]) {
-    const dentro = visibles.filter(f => dia === SIN_DIA
+    const dentro = activos.filter(f => dia === SIN_DIA
       ? f.inscripciones.length > 0 && f.inscripciones.every(i => !i.dia)
       : f.inscripciones.some(i => i.dia === dia))
     if (dentro.length) grupos.push({ dia, fichas: dentro })
   }
-  const sueltos = visibles.filter(f => f.inscripciones.length === 0)
+  const sueltos = activos.filter(f => f.inscripciones.length === 0)
   if (sueltos.length) grupos.push({ dia: 'Todavía sin horario', fichas: sueltos })
 
   const porConfirmar = fichas.filter(f => f.revisar).length
   const sinTelefono = fichas.filter(f => !f.telefono).length
   const conFaltas = fichas.filter(f => f.faltas.length > 0).length
+  const vienenEsteMes = fichas.filter(f => !f.noVieneEsteMes).length
+  const fueraEsteMes = fichas.filter(f => f.noVieneEsteMes).length
+
+  // "Sí viene": borra el aviso del mes y el alumno vuelve al listado.
+  async function siViene(ausenciaId: number) {
+    await fetch(`/api/ausencias/${ausenciaId}`, { method: 'DELETE' })
+    await load(mes)
+  }
 
   async function guardar(id: number, cambios: Partial<Ficha>) {
     await fetch(`/api/alumnos/${id}`, {
@@ -121,10 +141,11 @@ export default function AlumnosPage() {
 
           {/* El resumen del mes: lo primero que Mary tiene que ver */}
           <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
-            <Resumen n={fichas.length} label="alumnos" color="#00A884" />
+            <Resumen n={vienenEsteMes} label={`alumnos en ${mesLargo(mes).split(' ')[0].toLowerCase()}`} color="#00A884" />
             <Resumen n={conFaltas} label={`con faltas en ${mesLargo(mes).split(' ')[0].toLowerCase()}`} color="#EF4444" />
             <Resumen n={porConfirmar} label="por confirmar con Mary" color="#D97706" />
             <Resumen n={sinTelefono} label="sin teléfono del apoderado" color="#8696A0" />
+            {fueraEsteMes > 0 && <Resumen n={fueraEsteMes} label={fueraEsteMes === 1 ? 'no viene este mes' : 'no vienen este mes'} color="#667781" />}
           </div>
 
           {/* Filtro por día: el mismo orden del calendario */}
@@ -158,6 +179,31 @@ export default function AlumnosPage() {
               </div>
             </section>
           ))}
+
+          {/* Los que este mes no vienen. Van al final, en gris, y con el botón para
+              devolverlos: el aviso tiene que poder deshacerse igual de fácil. */}
+          {!loading && fueraDelMes.length > 0 && (
+            <section data-fuera-del-mes style={{ marginBottom: 22 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#9AA7AD', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                No vienen en {mesLargo(mes).split(' ')[0].toLowerCase()} · {fueraDelMes.length}
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(268px, 1fr))', gap: 12, alignItems: 'start' }}>
+                {fueraDelMes.map(f => (
+                  <div key={`fuera-${f.id}`} style={{ border: '1px solid #E5E7EB', borderRadius: 14, background: '#F9FAFB', padding: '12px 14px' }}>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: '#667781', textDecoration: 'line-through' }}>{f.nombre}</p>
+                    <p style={{ fontSize: 11, color: '#8696A0', marginTop: 4 }}>
+                      {f.motivoMes ? f.motivoMes : 'avisó que no viene este mes'} · vuelve solo el mes que viene
+                    </p>
+                    <div className="flex" style={{ gap: 7, marginTop: 10 }}>
+                      <button onClick={() => f.ausenciaMesId && siViene(f.ausenciaMesId)}
+                        style={{ ...btnTexto, borderColor: '#00A884', color: '#047857' }}>Sí viene</button>
+                      <button onClick={() => setAbierta(f)} style={btnTexto}>Ver ficha</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
@@ -207,7 +253,17 @@ function Tarjeta({ f, onClick }: { f: Ficha; onClick: () => void }) {
             ? <span style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', background: '#FEE2E2', borderRadius: 999, padding: '3px 8px' }}>
                 faltó {f.faltas.length === 1 ? 'el' : 'los días'} {f.faltas.map(diaDelMes).join(', ')}
               </span>
-            : f.vino > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#047857', background: '#ECFDF5', borderRadius: 999, padding: '3px 8px' }}>sin faltas</span>}
+            : f.vino > 0 && f.avisadas.length === 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#047857', background: '#ECFDF5', borderRadius: 999, padding: '3px 8px' }}>sin faltas</span>}
+          {f.avisadas.length > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#667781', background: '#F3F4F6', borderRadius: 999, padding: '3px 8px' }}>
+              avisó que no viene {f.avisadas.length === 1 ? 'el' : 'los días'} {f.avisadas.map(diaDelMes).join(', ')}
+            </span>
+          )}
+          {f.recuperativas > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FEF3C7', borderRadius: 999, padding: '3px 8px' }}>
+              {f.recuperativas === 1 ? '1 recuperativa' : `${f.recuperativas} recuperativas`}
+            </span>
+          )}
         </div>
 
         <p style={{ fontSize: 11, color: '#667781', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -303,13 +359,30 @@ function Editor({ ficha, onCerrar, onGuardado, guardar }: {
           ))}
           <NuevoDia alumnoId={ficha.id} onListo={onGuardado} />
 
-          {ficha.faltas.length > 0 && (
+          {(ficha.faltas.length > 0 || ficha.avisadas.length > 0) && (
             <>
-              <p style={etiqueta}>Faltas de este mes</p>
-              <p style={{ fontSize: 12, color: '#B91C1C' }}>
-                {ficha.faltas.map(diaDelMes).join(', ')} — tiene derecho a {ficha.faltas.length === 1 ? 'una clase recuperativa' : `${ficha.faltas.length} clases recuperativas`}.
+              <p style={etiqueta}>Este mes</p>
+              {ficha.faltas.length > 0 && (
+                <p style={{ fontSize: 12, color: '#B91C1C' }}>
+                  Faltó sin avisar {ficha.faltas.length === 1 ? 'el' : 'los días'} {ficha.faltas.map(diaDelMes).join(', ')}.
+                </p>
+              )}
+              {ficha.avisadas.length > 0 && (
+                <p style={{ fontSize: 12, color: '#667781', marginTop: 3 }}>
+                  Avisó que no venía {ficha.avisadas.length === 1 ? 'el' : 'los días'} {ficha.avisadas.map(diaDelMes).join(', ')}.
+                </p>
+              )}
+              <p style={{ fontSize: 12, color: '#B45309', fontWeight: 700, marginTop: 5 }}>
+                Tiene derecho a {ficha.recuperativas === 1 ? 'una clase recuperativa' : `${ficha.recuperativas} clases recuperativas`}.
               </p>
             </>
+          )}
+          {ficha.noVieneEsteMes && (
+            <div style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 10, padding: 12, marginTop: 14 }}>
+              <p style={{ fontSize: 12, color: '#667781' }}>
+                Este mes no viene{ficha.motivoMes ? ` (${ficha.motivoMes})` : ''}. Su horario no se toca: vuelve solo el mes siguiente.
+              </p>
+            </div>
           )}
         </div>
 

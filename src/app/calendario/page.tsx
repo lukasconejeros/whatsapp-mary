@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
-import FormularioExtras, { type TipoExtra } from '@/components/FormularioExtras'
+import FormularioExtras, { type TipoExtra, type HorarioSala } from '@/components/FormularioExtras'
 import { DIA_LABEL, PROFES, PROFE_NOMBRES, profeColor, diaFromFecha } from '@/lib/calendario'
+import { bloquesDelDia, type Ausencia, type InscripcionConAlumno, type AlumnoEnDia } from '@/lib/dia-clases'
 import { Plus, Trash2, Pencil, X, ChevronLeft, ChevronRight, Mic, Keyboard } from 'lucide-react'
 
 type Clase = { id: number; fecha: string | null; dia: string; profe: string; hora: string | null; alumnos: (string | number)[]; nota: string | null }
@@ -65,6 +66,15 @@ export default function CalendarioPage() {
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([])
   const [clientes, setClientes] = useState<ClienteLite[]>([])
   const [asistencia, setAsistencia] = useState<AsistenciaRow[]>([])
+  // El horario de verdad: cada alumno con su día, su hora de salida y su profesora.
+  // Vale para todas las semanas, así que se pide UNA vez y dibuja el mes entero.
+  const [inscripciones, setInscripciones] = useState<InscripcionConAlumno[]>([])
+  // Los avisos de "no viene" (un día suelto o el mes entero): pintan el gris.
+  const [ausencias, setAusencias] = useState<Ausencia[]>([])
+  // El alumno cuyo menú está abierto (vino / faltó / no viene / sin marcar).
+  const [menu, setMenu] = useState<{ fecha: string; alumno: AlumnoEnDia | null; nombre: string } | null>(null)
+  // Segunda pregunta del menú: "¿solo este día o todo el mes?" (Lukas, 26-08-2026).
+  const [pasoNoViene, setPasoNoViene] = useState(false)
   const [filtro, setFiltro] = useState<string>('Todas')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -97,13 +107,15 @@ export default function CalendarioPage() {
   const load = useCallback(async (d: string, h: string) => {
     setLoading(true)
     try {
-      const [c, cl, fj, pg, rc, as] = await Promise.all([
+      const [c, cl, fj, pg, rc, as, ins, au] = await Promise.all([
         fetch(`/api/clases?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch('/api/clientes').then(r => r.json()),
         fetch('/api/clases-fijas').then(r => r.json()),
         fetch('/api/pagos-fijos').then(r => r.json()),
         fetch(`/api/recordatorios?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch(`/api/asistencia?desde=${d}&hasta=${h}`).then(r => r.json()),
+        fetch('/api/inscripciones').then(r => r.json()),
+        fetch(`/api/ausencias?desde=${d}&hasta=${h}`).then(r => r.json()),
       ])
       if (as.ok) setAsistencia(as.asistencia)
       if (c.ok) setClases(c.clases)
@@ -111,6 +123,8 @@ export default function CalendarioPage() {
       if (fj.ok) setFijas(fj.clasesFijas)
       if (pg.ok) setPagos(pg.pagosFijos)
       if (rc.ok) setRecordatorios(rc.recordatorios)
+      if (ins.ok) setInscripciones(ins.inscripciones)
+      if (au.ok) setAusencias(au.ausencias)
     } finally { setLoading(false) }
   }, [])
   useEffect(() => { load(desde, hasta) }, [load, desde, hasta])
@@ -254,18 +268,19 @@ export default function CalendarioPage() {
   const estadoAsis = (fecha: string, alumno: string) =>
     asistencia.find(a => a.fecha === fecha && a.alumno === alumno)?.estado ?? null
 
-  const ciclarAsis = async (fecha: string, alumno: string) => {
-    const actual = estadoAsis(fecha, alumno)
-    const siguiente = actual === null ? 'vino' : actual === 'vino' ? 'falto' : null
+  // Marca (o desmarca) a un alumno un día. Antes el chip ciclaba con cada toque;
+  // ahora abre un menú, porque los estados son cuatro y adivinar cuál venía
+  // después era una lotería (Lukas, 26-08-2026).
+  const fijarAsis = async (fecha: string, alumno: string, estado: 'vino' | 'falto' | null) => {
     // Se pinta al tiro y después se guarda: el toque tiene que sentirse inmediato.
     setAsistencia(prev => {
       const otros = prev.filter(a => !(a.fecha === fecha && a.alumno === alumno))
-      return siguiente ? [...otros, { id: -1, fecha, alumno, estado: siguiente, fuente: 'panel' }] : otros
+      return estado ? [...otros, { id: -1, fecha, alumno, estado, fuente: 'panel' }] : otros
     })
     try {
       const r = await fetch('/api/asistencia', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fecha, alumno, estado: siguiente }),
+        body: JSON.stringify({ fecha, alumno, estado }),
       })
       if (!r.ok) throw new Error('no se guardó')
     } catch {
@@ -274,17 +289,100 @@ export default function CalendarioPage() {
     }
   }
 
+  // ── El botón "no viene" ───────────────────────────────────────────────────
+  // Mary avisa ANTES de la clase y la app le pregunta si es solo ese día o el mes
+  // entero. NO es lo mismo que marcar "faltó": eso es lo que pasó, esto es lo que
+  // se sabe de antes, y por eso sale gris y no rojo.
+  async function noViene(alumnoId: number, nombre: string, fecha: string, tipo: 'dia' | 'mes') {
+    try {
+      const r = await fetch('/api/ausencias', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tipo === 'dia' ? { alumnoId, tipo, fecha } : { alumnoId, tipo, mes: fecha.slice(0, 7) }),
+      })
+      const d = await r.json() as { ok: boolean }
+      if (!d.ok) throw new Error('no se guardó')
+      // Si ese día ya estaba marcado (vino o faltó), el aviso manda y se limpia:
+      // no puede quedar en rojo alguien que avisó con tiempo. Las faltas de los
+      // OTROS días no se tocan: son historia real y dan sus recuperativas.
+      if (tipo === 'dia' && estadoAsis(fecha, nombre)) await fijarAsis(fecha, nombre, null)
+      load(desde, hasta)
+    } catch { alert('No se pudo guardar. Revisa tu internet.') }
+  }
+
+  async function siViene(ausenciaId: number) {
+    try {
+      await fetch(`/api/ausencias/${ausenciaId}`, { method: 'DELETE' })
+      load(desde, hasta)
+    } catch { alert('No se pudo guardar. Revisa tu internet.') }
+  }
+
+  // ── Quién viene cada día: las salas del horario de Mary ───────────────────
+  // Una sala por profesora, con la gente que le toca ese día; cada alumno con SU
+  // hora de salida. Es la misma función que usa el WhatsApp de las 10:00, para que
+  // la pantalla y el mensaje nunca digan cosas distintas.
+  const salasDe = (fecha: string) => {
+    const dia = diaFromFecha(fecha)
+    const delDia = inscripciones.filter(i => i.dia === dia && (filtro === 'Todas' || (i.profe ?? '') === filtro))
+    return bloquesDelDia(fecha, delDia, ausencias)
+  }
+  const salasSel = salasDe(sel)
+  const rangoSala = (h: string, f: string | null) => f ? `${h} a ${f}` : h
+
+  // Los horarios que ya existen, para el selector de "agregar un alumno": cada
+  // combinación de día + hora + profesora que ya tiene gente dentro.
+  const horariosExistentes: HorarioSala[] = (() => {
+    const m = new Map<string, HorarioSala>()
+    for (const i of inscripciones) {
+      if (!i.dia) continue
+      const clave = `${i.dia}|${i.hora}|${i.horaFin ?? ''}|${i.profe ?? ''}`
+      const ya = m.get(clave)
+      if (ya) ya.alumnos.push(i.nombre)
+      else m.set(clave, { clave, dia: i.dia, hora: i.hora, horaFin: i.horaFin, profe: i.profe, alumnos: [i.nombre] })
+    }
+    return [...m.values()].sort((a, b) => a.dia.localeCompare(b.dia) || a.hora.localeCompare(b.hora))
+  })()
+
+  // El chip de un alumno suelto (clases viejas y eventos puntuales): sin ficha no
+  // se le puede avisar una ausencia, así que solo lleva vino / faltó / sin marcar.
   const chipAlumno = (fecha: string, nombre: string, borde: string) => {
     const est = estadoAsis(fecha, nombre)
     return (
       // El botón mide 44 px de alto (lo mínimo para tocarlo bien en el teléfono),
       // pero el chip de dentro sigue siendo chico: se ve igual que antes.
-      <button key={`${fecha}-${nombre}`} onClick={() => ciclarAsis(fecha, nombre)}
+      <button key={`${fecha}-${nombre}`} onClick={() => setMenu({ fecha, alumno: null, nombre })}
         title={est === 'vino' ? 'Vino — toca para cambiar' : est === 'falto' ? 'Faltó — toca para cambiar' : 'Sin marcar — toca para marcar'}
         style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, minWidth: 44, padding: '0 2px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#374151', background: '#fff', border: `1px solid ${borde}`, borderRadius: 6, padding: '3px 7px' }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: est ? COLOR_ASIS[est] : '#D1D5DB' }} />
           {nombre}
+        </span>
+      </button>
+    )
+  }
+
+  // El chip de un alumno CON ficha: además de vino/faltó puede avisar que no viene,
+  // y entonces se ve gris y tachado ("que se ponga en gris en el calendario ese día").
+  const chipInscrito = (fecha: string, a: AlumnoEnDia, borde: string) => {
+    const avisado = a.estado !== 'normal'
+    const est = estadoAsis(fecha, a.nombre)
+    const titulo = a.estado === 'aviso-mes' ? 'No viene en todo el mes — toca para cambiar'
+      : a.estado === 'aviso-dia' ? 'Avisó que no viene este día — toca para cambiar'
+      : est === 'vino' ? 'Vino — toca para cambiar'
+      : est === 'falto' ? 'Faltó — toca para cambiar' : 'Sin marcar — toca para marcar'
+    return (
+      <button key={`i${a.inscripcionId}`} data-chip-alumno={a.nombre} data-estado={a.estado}
+        onClick={() => setMenu({ fecha, alumno: a, nombre: a.nombre })} title={titulo}
+        style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, minWidth: 44, padding: '0 2px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, borderRadius: 6, padding: '3px 7px',
+          color: avisado ? '#9AA7AD' : '#374151',
+          background: avisado ? '#F3F4F6' : '#fff',
+          border: `1px solid ${avisado ? '#E5E7EB' : borde}`,
+          textDecoration: avisado ? 'line-through' : 'none' }}>
+          <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: avisado ? '#C7CDD1' : est ? COLOR_ASIS[est] : '#D1D5DB' }} />
+          {a.nombre}
+          <span style={{ fontSize: 10, color: avisado ? '#9AA7AD' : '#8696A0' }}>
+            {a.hora}{a.horaFin ? `–${a.horaFin}` : ''}
+          </span>
         </span>
       </button>
     )
@@ -307,10 +405,18 @@ export default function CalendarioPage() {
 
   // Las clases que se repiten todas las semanas: a una fecha le tocan las de su día.
   // Solo las activas — el calendario muestra lo que de verdad se hace.
+  // Ojo con el doble: una clase fija vieja cuyos alumnos YA están todos en el horario
+  // nuevo es la misma clase migrada el 26-08-2026, y se vería dos veces. Se esconde
+  // solo en ese caso: si trae a alguien que no está inscrito, se sigue mostrando.
   const fijasDe = (fecha: string) => {
     const dia = diaFromFecha(fecha)
+    const inscritos = new Set(salasDe(fecha).flatMap(s => s.alumnos.map(a => a.nombre.toLowerCase())))
     return fijas
       .filter(f => f.activa && f.dia === dia && (filtro === 'Todas' || f.profe === filtro))
+      .filter(f => {
+        const nombres = f.alumnos.filter(Boolean)
+        return !(nombres.length > 0 && nombres.every(n => inscritos.has(n.toLowerCase())))
+      })
       .sort((a, b) => a.hora.localeCompare(b.hora))
   }
   const fijasSel = fijasDe(sel)
@@ -413,11 +519,20 @@ export default function CalendarioPage() {
                     // Primero las clases de todas las semanas y después las sueltas,
                     // que es el orden en que Mary piensa el día.
                     const chips = [
+                      // Las salas del horario: los que vienen, y aparte cuántos avisaron
+                      // que no. Así de un vistazo se ve si un día quedó a medias.
+                      ...salasDe(f).map(s => {
+                        const vienen = s.alumnos.filter(a => a.estado === 'normal').map(a => a.nombre)
+                        const fuera = s.alumnos.length - vienen.length
+                        const label = [vienen.join(', ') || 'nadie', fuera ? `${fuera} no ${fuera === 1 ? 'viene' : 'vienen'}` : '']
+                          .filter(Boolean).join(' · ')
+                        return { key: `s${f}-${s.profe ?? 'sp'}`, pc: profeColor(s.profe ?? ''), hora: s.hora, label, fija: true }
+                      }),
                       ...fijasDe(f).map(x => ({ key: `f${x.id}`, pc: profeColor(x.profe), hora: x.hora, label: x.alumnos.join(', ') || x.profe, fija: true })),
                       ...evs.map(x => ({ key: `c${x.id}`, pc: profeColor(x.profe), hora: x.hora ?? '', label: x.nota || (x.alumnos.length ? x.alumnos.map(etiquetaAlumno).join(', ') : x.profe), fija: false })),
                     ]
                     return (
-                      <button key={i} onClick={() => setSel(f)} className="cal-cell"
+                      <button key={i} onClick={() => setSel(f)} className="cal-cell" data-fecha={f}
                         style={{ position: 'relative', minHeight: 92, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
                           padding: '5px 5px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
                           border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #E7F1EC' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #E7F1EC' : 'none',
@@ -470,6 +585,29 @@ export default function CalendarioPage() {
                   </button>
                 </div>
                 <div style={{ padding: 12, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+                  {/* Las salas del horario: una por profesora, con su gente dentro y cada
+                      uno con SU hora de salida. Quien avisó que no viene sale en gris y
+                      tachado, sin desaparecer: Mary tiene que poder devolverlo con un toque. */}
+                  {!loading && salasSel.map(s => {
+                    const pc = profeColor(s.profe ?? '')
+                    const fuera = s.alumnos.length - s.vienen
+                    return (
+                      <div key={`sala-${s.profe ?? 'sp'}`} data-sala={s.profe ?? 'sin-profe'}
+                        style={{ background: '#fff', border: `1px solid ${pc.bd}`, borderLeft: `3px solid ${pc.color}`, borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
+                        <div className="flex items-center gap-2" style={{ marginBottom: 5, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 15, fontWeight: 800, color: '#1F2937' }}>{rangoSala(s.hora, s.horaFin)}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, flex: 1 }}>{s.profe ?? 'sin profesora'}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#667781', background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 999, padding: '2px 8px' }}>
+                            {s.vienen === 1 ? 'viene 1' : `vienen ${s.vienen}`}{fuera ? ` · ${fuera} no` : ''}
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#667781', background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 999, padding: '2px 8px' }}>todas las semanas</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {s.alumnos.map(a => chipInscrito(sel, a, pc.bd))}
+                        </div>
+                      </div>
+                    )
+                  })}
                   {/* Las de todas las semanas van primero y ordenadas por hora: es como
                       Mary lee su planilla. Se ven distintas de las clases sueltas para que
                       se note de un vistazo cuáles se repiten solas. */}
@@ -532,7 +670,7 @@ export default function CalendarioPage() {
                     </div>
                   ))}
                   {loading ? <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '24px 0' }}>Cargando…</p>
-                    : eventosSel.length === 0 && fijasSel.length === 0 && pagosSel.length === 0 && recordatoriosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin nada este día.<br />Toca «Agregar» para crear algo.</p>
+                    : eventosSel.length === 0 && fijasSel.length === 0 && salasSel.length === 0 && pagosSel.length === 0 && recordatoriosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin nada este día.<br />Toca «Agregar» para crear algo.</p>
                     : eventosSel.map(c => {
                       const pc = profeColor(c.profe)
                       return (
@@ -571,6 +709,66 @@ export default function CalendarioPage() {
           </div>
         </div>
       </div>
+
+      {/* Menú de un alumno: vino, faltó, avisó que no viene, o sin marcar.
+          Los cuatro estados a la vista y con su nombre completo: antes había que
+          adivinar cuál venía después de cada toque. */}
+      {menu && (() => {
+        const a = menu.alumno
+        const est = estadoAsis(menu.fecha, menu.nombre)
+        const cerrar = () => { setMenu(null); setPasoNoViene(false) }
+        const d = new Date(`${menu.fecha}T12:00:00`)
+        const soloEsteDia = capital(d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric' }))
+        const nombreMes = d.toLocaleDateString('es-CL', { month: 'long' })
+        const opcion = (texto: string, sub: string, color: string, fondo: string, onClick: () => void) => (
+          <button key={texto} onClick={onClick}
+            style={{ display: 'block', width: '100%', textAlign: 'left', minHeight: 48, padding: '10px 14px', marginBottom: 8, borderRadius: 10,
+              border: `1px solid ${color}33`, background: fondo, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 700, color }}>{texto}</span>
+            {sub && <span style={{ display: 'block', fontSize: 11, color: '#667781', marginTop: 2 }}>{sub}</span>}
+          </button>
+        )
+        return (
+          <div onClick={cerrar} data-menu-alumno={menu.nombre}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(6,77,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 16 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: 18, width: 340, maxWidth: '100%', boxShadow: '0 20px 50px rgba(6,77,68,0.25)' }}>
+              <div className="flex items-center" style={{ marginBottom: 4 }}>
+                <p style={{ fontSize: 16, fontWeight: 800, color: '#054D44', flex: 1 }}>{menu.nombre}</p>
+                <button onClick={cerrar} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8696A0', display: 'flex' }}><X size={16} /></button>
+              </div>
+              <p style={{ fontSize: 12, color: '#667781', marginBottom: 12 }}>{fechaLarga(menu.fecha)}</p>
+
+              {!pasoNoViene ? (
+                <>
+                  {a && a.estado !== 'normal' && a.ausenciaId
+                    ? opcion('Sí viene', a.estado === 'aviso-mes' ? 'quita el aviso de todo el mes' : 'quita el aviso de este día',
+                        '#00A884', '#ECFDF5', () => { siViene(a.ausenciaId!); cerrar() })
+                    : null}
+                  {opcion('Vino', 'estuvo en clase', '#047857', est === 'vino' ? '#ECFDF5' : '#fff',
+                    () => { fijarAsis(menu.fecha, menu.nombre, 'vino'); cerrar() })}
+                  {opcion('Faltó', 'no vino y no avisó', '#B91C1C', est === 'falto' ? '#FEE2E2' : '#fff',
+                    () => { fijarAsis(menu.fecha, menu.nombre, 'falto'); cerrar() })}
+                  {a && a.estado === 'normal'
+                    ? opcion('Avisó que no viene', 'queda en gris y le toca una clase recuperativa', '#667781', '#F3F4F6',
+                        () => setPasoNoViene(true))
+                    : null}
+                  {est ? opcion('Dejarlo sin marcar', 'como si nadie hubiera dicho nada', '#8696A0', '#fff',
+                    () => { fijarAsis(menu.fecha, menu.nombre, null); cerrar() }) : null}
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#054D44', marginBottom: 10 }}>¿No viene solo este día, o en todo {nombreMes}?</p>
+                  {opcion(`Solo el ${soloEsteDia}`, 'los otros días sigue viniendo igual', '#054D44', '#F3F9F6',
+                    () => { if (a) noViene(a.alumnoId, menu.nombre, menu.fecha, 'dia'); cerrar() })}
+                  {opcion(`Todo ${nombreMes}`, `sale del listado de alumnos de ${nombreMes} y vuelve solo el mes siguiente`, '#054D44', '#F3F9F6',
+                    () => { if (a) noViene(a.alumnoId, menu.nombre, menu.fecha, 'mes'); cerrar() })}
+                  {opcion('Volver', '', '#8696A0', '#fff', () => setPasoNoViene(false))}
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Modal AGENDAR POR VOZ */}
       {showVoz && (
@@ -634,7 +832,7 @@ export default function CalendarioPage() {
               <FormularioExtras
                 tipo={tipoForm}
                 fecha={form.fecha}
-                fijas={fijas}
+                horarios={horariosExistentes}
                 onClose={closeForm}
                 onGuardado={() => load(desde, hasta)}
               />

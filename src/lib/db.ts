@@ -2,6 +2,9 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { normalizeChilePhone } from "./phone";
+// El tipo de las ausencias vive en dia-clases.ts (módulo puro, sin base de datos)
+// porque el calendario del navegador también lo necesita.
+import type { Ausencia, TipoAusencia } from "./dia-clases.js";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
@@ -273,6 +276,29 @@ CREATE TABLE IF NOT EXISTS inscripciones (
 );
 CREATE INDEX IF NOT EXISTS idx_inscripciones_dia ON inscripciones(dia, hora);
 CREATE INDEX IF NOT EXISTS idx_inscripciones_alumno ON inscripciones(alumno_id);
+
+-- Cuando Mary AVISA que alguien no viene (Lukas, 26-08-2026: "el calendario nunca
+-- cambia (…) que pregunte la app si no viene en todo el mes o solo ese día").
+-- 🔑 NO es lo mismo que 'asistencia': ahí va lo que PASÓ (el pase de lista de las
+-- 21:00 dice vino o faltó); aquí va lo que se sabe ANTES. Por eso a quien avisó no
+-- se le pasa lista —si no, saldría "faltó" todas las semanas del mes— y en el
+-- calendario sale en gris en vez de rojo.
+-- 'dia' guarda la fecha exacta y da derecho a clase recuperativa; 'mes' saca al
+-- alumno del CRM y del calendario SOLO ese mes, sin tocar su horario de siempre.
+CREATE TABLE IF NOT EXISTS ausencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alumno_id INTEGER NOT NULL,
+  tipo TEXT NOT NULL CHECK(tipo IN ('dia','mes')),
+  fecha TEXT,                                  -- 'YYYY-MM-DD' cuando tipo='dia'
+  mes TEXT,                                    -- 'YYYY-MM'    cuando tipo='mes'
+  motivo TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+-- Un alumno no puede tener dos veces el mismo aviso: tocar el botón dos veces
+-- corrige el motivo, no duplica la fila.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ausencias_dia ON ausencias(alumno_id, fecha) WHERE fecha IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ausencias_mes ON ausencias(alumno_id, mes) WHERE mes IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ausencias_fecha ON ausencias(fecha);
 
 -- Los PAGOS que vuelven CADA MES (arriendo, sueldos, suscripción y "otros", que
 -- lleva descripción obligatoria). Lukas dijo "todas las semanas" pero al
@@ -1626,10 +1652,11 @@ export function updateAlumno(id: number, d: AlumnoInput): void {
          d.mensualidad ?? 0, d.notas ?? null, d.revisar ?? null, d.activo === false ? 0 : 1, id);
 }
 
-/** Borra al alumno Y sus inscripciones: si no, quedan huérfanas colgando del calendario. */
+/** Borra al alumno Y lo que cuelga de él: si no, quedan huérfanos en el calendario. */
 export function deleteAlumno(id: number): void {
   const db = ctx().db;
   db.prepare("DELETE FROM inscripciones WHERE alumno_id=?").run(id);
+  db.prepare("DELETE FROM ausencias WHERE alumno_id=?").run(id);
   db.prepare("DELETE FROM alumnos WHERE id=?").run(id);
 }
 
@@ -1658,6 +1685,21 @@ export function inscripcionesDeFecha(fecha: string): EnClase[] {
   return rows.map((r) => ({ ...parseInscripcion(r), nombre: r.nombre, mensualidad: r.mensualidad }));
 }
 
+/**
+ * Todas las inscripciones vivas con el nombre del alumno pegado: lo que necesita
+ * el calendario para dibujar un mes entero de una sola vez, sin una consulta por
+ * día. Solo alumnos activos e inscripciones activas.
+ */
+export function listInscripcionesConAlumno(): EnClase[] {
+  const rows = ctx().db
+    .prepare(`SELECT i.*, a.nombre AS nombre, a.mensualidad AS mensualidad
+              FROM inscripciones i JOIN alumnos a ON a.id = i.alumno_id
+              WHERE i.activa = 1 AND a.activo = 1
+              ORDER BY i.hora ASC, a.nombre COLLATE NOCASE ASC`)
+    .all() as (InscripcionRow & { nombre: string; mensualidad: number })[];
+  return rows.map((r) => ({ ...parseInscripcion(r), nombre: r.nombre, mensualidad: r.mensualidad }));
+}
+
 export function addInscripcion(d: InscripcionInput): number {
   const r = ctx().db
     .prepare("INSERT INTO inscripciones (alumno_id, dia, hora, hora_fin, profe, activa) VALUES (?,?,?,?,?,?)")
@@ -1673,6 +1715,96 @@ export function updateInscripcion(id: number, d: InscripcionInput): void {
 
 export function deleteInscripcion(id: number): void {
   ctx().db.prepare("DELETE FROM inscripciones WHERE id=?").run(id);
+}
+
+// ── Ausencias avisadas: el botón "no viene" ───────────────────────────────────
+// Lo que Mary sabe ANTES de la clase. Ver el comentario de la tabla en el SCHEMA:
+// no confundir con 'asistencia', que es lo que pasó de verdad.
+
+export type { Ausencia, TipoAusencia };
+export interface AusenciaInput {
+  alumnoId: number; tipo: TipoAusencia;
+  fecha?: string | null; mes?: string | null; motivo?: string | null;
+}
+interface AusenciaRow {
+  id: number; alumno_id: number; tipo: string;
+  fecha: string | null; mes: string | null; motivo: string | null;
+}
+function parseAusencia(r: AusenciaRow): Ausencia {
+  return {
+    id: r.id, alumnoId: r.alumno_id, tipo: r.tipo as TipoAusencia,
+    fecha: r.fecha, mes: r.mes, motivo: r.motivo,
+  };
+}
+
+/**
+ * Anota que un alumno no viene. Tocar el botón dos veces NO duplica: actualiza el
+ * motivo y devuelve el mismo id (por eso los índices únicos de la tabla).
+ * Un aviso de día guarda solo 'fecha'; uno de mes, solo 'mes'.
+ */
+export function avisarAusencia(d: AusenciaInput): number {
+  const fecha = d.tipo === "dia" ? (d.fecha ?? null) : null;
+  const mes = d.tipo === "mes" ? (d.mes ?? null) : null;
+  if (d.tipo === "dia" && !fecha) throw new Error("una ausencia de un día necesita la fecha");
+  if (d.tipo === "mes" && !mes) throw new Error("una ausencia de un mes necesita el mes");
+  const db = ctx().db;
+  const ya = db
+    .prepare("SELECT * FROM ausencias WHERE alumno_id=? AND tipo=? AND fecha IS ? AND mes IS ?")
+    .get(d.alumnoId, d.tipo, fecha, mes) as AusenciaRow | undefined;
+  if (ya) {
+    db.prepare("UPDATE ausencias SET motivo=? WHERE id=?").run(d.motivo ?? null, ya.id);
+    return ya.id;
+  }
+  const r = db
+    .prepare("INSERT INTO ausencias (alumno_id, tipo, fecha, mes, motivo) VALUES (?,?,?,?,?)")
+    .run(d.alumnoId, d.tipo, fecha, mes, d.motivo ?? null);
+  return r.lastInsertRowid as number;
+}
+
+/** "Sí viene después de todo": borra el aviso y el día vuelve a la normalidad. */
+export function quitarAusencia(id: number): void {
+  ctx().db.prepare("DELETE FROM ausencias WHERE id=?").run(id);
+}
+
+/** Todos los avisos de un alumno, el más reciente primero. */
+export function ausenciasDeAlumno(alumnoId: number): Ausencia[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM ausencias WHERE alumno_id=? ORDER BY created_at DESC, id DESC")
+    .all(alumnoId) as AusenciaRow[];
+  return rows.map(parseAusencia);
+}
+
+/**
+ * Los avisos que tocan un rango de fechas: los de un día que caen dentro, MÁS los
+ * de mes de cualquier mes que el rango pise (aunque el rango sea de un solo día).
+ * Es lo que necesita el calendario para pintar el gris de una pantalla completa.
+ */
+export function ausenciasRango(desde: string, hasta: string): Ausencia[] {
+  const rows = ctx().db
+    .prepare(
+      `SELECT * FROM ausencias
+       WHERE (fecha IS NOT NULL AND fecha BETWEEN ? AND ?)
+          OR (mes   IS NOT NULL AND mes   BETWEEN ? AND ?)
+       ORDER BY fecha ASC, mes ASC, id ASC`
+    )
+    .all(desde, hasta, desde.slice(0, 7), hasta.slice(0, 7)) as AusenciaRow[];
+  return rows.map(parseAusencia);
+}
+
+/** Los avisos de mes completo de un mes ('YYYY-MM'): los que salen del CRM. */
+export function ausenciasDeMes(mes: string): Ausencia[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM ausencias WHERE tipo='mes' AND mes=? ORDER BY id ASC")
+    .all(mes) as AusenciaRow[];
+  return rows.map(parseAusencia);
+}
+
+/** Los avisos de días sueltos dentro de un mes: cada uno da una clase recuperativa. */
+export function ausenciasDiaDeMes(mes: string): Ausencia[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM ausencias WHERE tipo='dia' AND fecha LIKE ? ORDER BY fecha ASC")
+    .all(`${mes}-%`) as AusenciaRow[];
+  return rows.map(parseAusencia);
 }
 
 // ── Pagos que vuelven cada mes ────────────────────────────────────────────────

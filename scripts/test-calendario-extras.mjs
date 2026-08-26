@@ -117,6 +117,9 @@ if (diaHoy === 'Domingo') {
   await page.getByRole('button', { name: 'Guardar' }).click()
   await page.waitForTimeout(900)
   ok((await page.getByText('PRUEBA Amelia').count()) > 0, 'el alumno aparece en su horario del día')
+  // Y entra al CRM: el formulario crea su ficha, no una lista de nombres suelta.
+  const enCrm = await (await ctx.request.get(BASE + '/api/alumnos')).json()
+  ok((enCrm.alumnos ?? []).some(a => a.nombre === 'PRUEBA Amelia'), 'y queda con ficha propia en la pestaña Alumnos')
   ok((await page.getByText('todas las semanas').count()) > 0, 'el horario queda marcado como de todas las semanas')
 }
 
@@ -129,11 +132,16 @@ const recs = await (await ctx.request.get(`${BASE}/api/recordatorios?desde=${HOY
 for (const r of recs.recordatorios ?? []) if (r.texto.startsWith('PRUEBA')) creados.recordatorios.push(r.id)
 const fijas = await (await ctx.request.get(BASE + '/api/clases-fijas')).json()
 for (const f of fijas.clasesFijas ?? []) if ((f.alumnos ?? []).some(a => String(a).startsWith('PRUEBA'))) creados.fijas.push(f.id)
+// Desde el 26-08-2026 el formulario crea una FICHA de alumno con su inscripción
+// (antes creaba una clase fija): hay que borrarla por ahí o queda en el CRM.
+const alumnos = await (await ctx.request.get(BASE + '/api/alumnos')).json()
+const creadosAlumnos = (alumnos.alumnos ?? []).filter(a => a.nombre.startsWith('PRUEBA')).map(a => a.id)
 
 for (const id of creados.pagos) await ctx.request.delete(`${BASE}/api/pagos-fijos/${id}`)
 for (const id of creados.recordatorios) await ctx.request.delete(`${BASE}/api/recordatorios/${id}`)
 for (const id of creados.fijas) await ctx.request.delete(`${BASE}/api/clases-fijas/${id}`)
-console.log(`\n🧹 borrado lo de prueba: ${creados.pagos.length} pagos, ${creados.recordatorios.length} recordatorios, ${creados.fijas.length} horarios`)
+for (const id of creadosAlumnos) await ctx.request.delete(`${BASE}/api/alumnos/${id}`)
+console.log(`\n🧹 borrado lo de prueba: ${creados.pagos.length} pagos, ${creados.recordatorios.length} recordatorios, ${creados.fijas.length} horarios, ${creadosAlumnos.length} alumnos`)
 
 await browser.close()
 console.log(fail === 0 ? `\n🎉  ${pass} passed, 0 failed\n` : `\n💥  ${pass} passed, ${fail} failed\n`)

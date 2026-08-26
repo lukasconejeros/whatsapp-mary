@@ -17,9 +17,13 @@ import { DIAS, DIA_LABEL, PROFES } from '@/lib/calendario'
 
 export type TipoExtra = 'alumno' | 'pago' | 'recordatorio'
 
-type ClaseFija = {
-  id: number; dia: string; hora: string; horaFin: string | null
-  profe: string; alumnos: string[]; cuposPrueba: number; activa: boolean
+// Un horario de los que ya existen: día, hora, hora de salida y profesora, con la
+// gente que ya está dentro. Sale de las inscripciones (el horario de verdad desde
+// el 26-08-2026), no de las clases fijas viejas: un alumno agregado aquí tiene que
+// aparecer en el CRM y poder avisar que no viene, como todos los demás.
+export type HorarioSala = {
+  clave: string; dia: string; hora: string; horaFin: string | null
+  profe: string | null; alumnos: string[]
 }
 
 const TIPOS_PAGO = [
@@ -38,11 +42,11 @@ const campo: React.CSSProperties = {
 const ayuda: React.CSSProperties = { fontSize: 11.5, color: '#8696A0', marginTop: 6 }
 
 export default function FormularioExtras({
-  tipo, fecha, fijas, onClose, onGuardado,
+  tipo, fecha, horarios, onClose, onGuardado,
 }: {
   tipo: TipoExtra
   fecha: string
-  fijas: ClaseFija[]
+  horarios: HorarioSala[]
   onClose: () => void
   onGuardado: () => void
 }) {
@@ -51,7 +55,7 @@ export default function FormularioExtras({
 
   // ── Alumno que se repite ──────────────────────────────────────────────────
   const [nombre, setNombre] = useState('')
-  const [horarioId, setHorarioId] = useState<string>(String(fijas[0]?.id ?? 'nuevo'))
+  const [horarioId, setHorarioId] = useState<string>(horarios[0]?.clave ?? 'nuevo')
   const [dia, setDia] = useState<string>(DIAS[0])
   const [hora, setHora] = useState('17:30')
   const [horaFin, setHoraFin] = useState('19:30')
@@ -69,7 +73,8 @@ export default function FormularioExtras({
   const [horaRec, setHoraRec] = useState('09:00')
   const [avisar, setAvisar] = useState(true)
 
-  const rango = (f: ClaseFija) => `${DIA_LABEL[f.dia] ?? f.dia} ${f.hora}${f.horaFin ? ` a ${f.horaFin}` : ''} · ${f.profe}`
+  const rango = (h: HorarioSala) =>
+    `${DIA_LABEL[h.dia] ?? h.dia} ${h.hora}${h.horaFin ? ` a ${h.horaFin}` : ''} · ${h.profe ?? 'sin profesora'}`
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
@@ -79,26 +84,28 @@ export default function FormularioExtras({
       let r: Response
       if (tipo === 'alumno') {
         if (!nombre.trim()) throw new Error('Escribe el nombre del alumno.')
-        if (horarioId === 'nuevo') {
-          r = await fetch('/api/clases-fijas', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dia, hora, horaFin, profe, alumnos: [nombre.trim()], cuposPrueba: 0 }),
-          })
-        } else {
-          // Se suma al horario que ya existe sin pisar a los que ya venían.
-          const f = fijas.find(x => x.id === Number(horarioId))
-          if (!f) throw new Error('Ese horario ya no existe, recarga la página.')
-          if (f.alumnos.some(a => a.toLowerCase() === nombre.trim().toLowerCase())) {
+        // Dónde va: en un horario que ya existe o en uno nuevo. Se guarda como
+        // ficha + inscripción (el modelo de verdad), así entra al CRM con su
+        // mensualidad y puede avisar que no viene, igual que el resto.
+        let destino = { dia, hora, horaFin: horaFin || null, profe: profe as string | null }
+        if (horarioId !== 'nuevo') {
+          const h = horarios.find(x => x.clave === horarioId)
+          if (!h) throw new Error('Ese horario ya no existe, recarga la página.')
+          if (h.alumnos.some(a => a.toLowerCase() === nombre.trim().toLowerCase())) {
             throw new Error(`${nombre.trim()} ya está en ese horario.`)
           }
-          r = await fetch(`/api/clases-fijas/${f.id}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              dia: f.dia, hora: f.hora, horaFin: f.horaFin, profe: f.profe,
-              alumnos: [...f.alumnos, nombre.trim()], cuposPrueba: f.cuposPrueba, activa: f.activa,
-            }),
-          })
+          destino = { dia: h.dia, hora: h.hora, horaFin: h.horaFin, profe: h.profe }
         }
+        const alta = await fetch('/api/alumnos', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre: nombre.trim() }),
+        })
+        const altaJson = await alta.json() as { ok: boolean; id?: number; error?: string }
+        if (!altaJson.ok || !altaJson.id) throw new Error(altaJson.error || 'No se pudo crear el alumno.')
+        r = await fetch(`/api/alumnos/${altaJson.id}/inscripciones`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(destino),
+        })
       } else if (tipo === 'pago') {
         if (tipoPago === 'otros' && !descripcionPago.trim()) throw new Error('Escribe de qué es el pago.')
         r = await fetch('/api/pagos-fijos', {
@@ -137,10 +144,10 @@ export default function FormularioExtras({
           <div style={{ marginBottom: 12 }}>
             <label style={label}>¿En qué horario?</label>
             <select value={horarioId} onChange={e => setHorarioId(e.target.value)} style={campo}>
-              {fijas.filter(f => f.activa).map(f => <option key={f.id} value={f.id}>{rango(f)}</option>)}
+              {horarios.map(h => <option key={h.clave} value={h.clave}>{rango(h)}</option>)}
               <option value="nuevo">➕ Crear un horario nuevo</option>
             </select>
-            <p style={ayuda}>El alumno queda en ese horario y aparece TODAS las semanas, sin volver a escribirlo.</p>
+            <p style={ayuda}>El alumno queda en ese horario y aparece TODAS las semanas, sin volver a escribirlo. También entra a la pestaña Alumnos, donde se le pone la mensualidad.</p>
           </div>
           {horarioId === 'nuevo' && (
             <>

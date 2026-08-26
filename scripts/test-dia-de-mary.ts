@@ -8,7 +8,7 @@ import "./env-loader.js";
 import {
   addClaseFija, deleteClaseFija, addClase, deleteClase,
   addRecordatorio, deleteRecordatorio, addPagoFijo, deletePagoFijo,
-  listClientes,
+  listClientes, addAlumno, addInscripcion, deleteAlumno, avisarAusencia,
 } from "../src/lib/db.js";
 import { armarDia } from "../src/lib/dia-de-mary.js";
 import { diaFromFecha } from "../src/lib/calendario.js";
@@ -20,7 +20,7 @@ const F = "2099-01-05";      // el día con cosas
 const VACIO = "2099-01-08";  // un día sin nada
 const DIA = diaFromFecha(F);
 
-const creados = { fijas: [] as number[], clases: [] as number[], recs: [] as number[], pagos: [] as number[] };
+const creados = { fijas: [] as number[], clases: [] as number[], recs: [] as number[], pagos: [] as number[], alumnos: [] as number[] };
 
 try {
   // Un cliente REAL de la base para probar que los ids se traducen a nombre.
@@ -61,6 +61,32 @@ try {
   check("un alumno en dos clases no se repite", dia2.alumnos.filter((a) => a === "Mateo PRUEBA").length === 1, JSON.stringify(dia2.alumnos));
   check("pero la clase sí aparece", dia2.items.length === base.items.length + 6);
 
+  // ── El horario de verdad: alumnos con inscripción (26-08-2026) ──────────────
+  // Desde que el horario de Mary vive en 'inscripciones', el resumen de las 10:00 y
+  // el pase de lista de las 21:00 tienen que salir de ahí. Y a quien avisó que no
+  // viene NO se le pregunta: saldría "faltó" todas las semanas del mes.
+  console.log("\nLos alumnos inscritos (el horario nuevo)");
+  const inA = addAlumno({ nombre: "ZZPrueba Ana" });
+  creados.alumnos.push(inA);
+  addInscripcion({ alumnoId: inA, dia: DIA, hora: "17:30", horaFin: "19:30", profe: "Mary" });
+  const inB = addAlumno({ nombre: "ZZPrueba Bea" });
+  creados.alumnos.push(inB);
+  addInscripcion({ alumnoId: inB, dia: DIA, hora: "17:30", horaFin: "18:30", profe: "Mary" });
+
+  const conInscritas = armarDia(F);
+  check("las inscripciones aparecen en el día", conInscritas.items.some((i) => i.tipo === "clase" && i.texto.includes("ZZPrueba Ana")), JSON.stringify(conInscritas.items));
+  check("y se les pasa lista a las dos", conInscritas.alumnos.includes("ZZPrueba Ana") && conInscritas.alumnos.includes("ZZPrueba Bea"));
+
+  avisarAusencia({ alumnoId: inA, tipo: "dia", fecha: F, motivo: "al médico" });
+  const conAviso = armarDia(F);
+  check("a quien avisó ese día NO se le pasa lista", !conAviso.alumnos.includes("ZZPrueba Ana"), JSON.stringify(conAviso.alumnos));
+  check("pero a la otra sí", conAviso.alumnos.includes("ZZPrueba Bea"));
+  check("y la clase sigue apareciendo, con el aviso a la vista", conAviso.items.some((i) => i.texto.includes("ZZPrueba Ana") && i.texto.includes("no viene")), JSON.stringify(conAviso.items.filter((i) => i.tipo === "clase")));
+
+  avisarAusencia({ alumnoId: inB, tipo: "mes", mes: F.slice(0, 7) });
+  const sinNadie = armarDia(F);
+  check("la que no viene en todo el mes tampoco entra al pase de lista", !sinNadie.alumnos.includes("ZZPrueba Bea"), JSON.stringify(sinNadie.alumnos));
+
   console.log("\nUn día sin nada");
   const nada = armarDia(VACIO);
   check("no trae nada de la prueba", nada.items.every((i) => !i.texto.includes("PRUEBA")), JSON.stringify(nada.items));
@@ -70,6 +96,8 @@ try {
   for (const id of creados.clases) deleteClase(id);
   for (const id of creados.recs) deleteRecordatorio(id);
   for (const id of creados.pagos) deletePagoFijo(id);
+  // deleteAlumno se lleva también sus inscripciones y sus avisos.
+  for (const id of creados.alumnos) deleteAlumno(id);
   const limpio = armarDia(F);
   check("limpieza: no queda nada de prueba", limpio.items.every((i) => !i.texto.includes("PRUEBA")), JSON.stringify(limpio.items));
 }

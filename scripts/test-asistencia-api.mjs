@@ -67,16 +67,27 @@ try {
   ok(cuantos > 0, `los alumnos salen con su puntito (${cuantos} en pantalla)`)
 
   if (cuantos > 0) {
+    // Desde el 26-08-2026 el chip ya NO cicla con cada toque: abre un menú con los
+    // cuatro estados escritos (vino, faltó, avisó que no viene, sin marcar). Ciclar
+    // obligaba a adivinar cuál venía después, y "no viene" no cabía en el ciclo.
     const primero = chips.first()
     const antes = await primero.getAttribute('title')
     await primero.click()
-    await page.waitForTimeout(600)
-    const despues = await primero.getAttribute('title')
-    ok(antes !== despues, `tocarlo lo cambia (${antes} → ${despues})`)
-    // Se deja como estaba: dos toques más y vuelve a "sin marcar".
-    await primero.click(); await page.waitForTimeout(300)
-    await primero.click(); await page.waitForTimeout(600)
-    ok((await primero.getAttribute('title')) === antes, 'y tocando de nuevo vuelve a como estaba')
+    await page.waitForTimeout(300)
+    ok(await page.locator('[data-menu-alumno]').isVisible(), 'tocar a un alumno abre su menú')
+
+    await page.getByRole('button', { name: 'Vino', exact: false }).first().click()
+    await page.waitForTimeout(700)
+    ok((await primero.getAttribute('title'))?.startsWith('Vino'), 'marcarlo como que vino queda a la vista',
+      String(await primero.getAttribute('title')))
+
+    // Se deja como estaba: el menú también sirve para desmarcar.
+    await primero.click()
+    await page.waitForTimeout(300)
+    await page.getByRole('button', { name: 'Dejarlo sin marcar' }).click()
+    await page.waitForTimeout(700)
+    ok((await primero.getAttribute('title')) === antes, 'y se puede dejar sin marcar otra vez',
+      `${antes} → ${await primero.getAttribute('title')}`)
   }
 } finally {
   await ctx.request.post(`${BASE}/api/asistencia`, { data: { fecha: F, alumno: ALUMNO, estado: null } })

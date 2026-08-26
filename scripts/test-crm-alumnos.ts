@@ -15,7 +15,7 @@ import "./env-loader.js";
 import { fichasDelMes } from "../src/lib/crm-alumnos.js";
 import {
   addAlumno, addInscripcion, deleteAlumno, listAlumnos,
-  marcarAsistencia, borrarAsistencia,
+  marcarAsistencia, borrarAsistencia, avisarAusencia,
 } from "../src/lib/db.js";
 
 let pass = 0, fail = 0;
@@ -79,6 +79,27 @@ check("Bea, que no faltó, sale con la lista vacía", f.find((x) => x.nombre ===
 const dado = addAlumno({ nombre: `${T}Dado`, activo: false });
 addInscripcion({ alumnoId: dado, dia: "Lunes", hora: "17:30", horaFin: "18:30", profe: "Mary" });
 check("el alumno dado de baja no sale en el CRM", !mias("2026-08").some((x) => x.nombre === `${T}Dado`));
+
+// 6) EL BOTÓN "NO VIENE" (Lukas, 26-08-2026). Dos cosas distintas:
+//    · un día suelto  → sigue en el CRM, con su día avisado y su clase recuperativa.
+//    · el mes entero  → "que se salga del CRM solo ese mes", y en septiembre vuelve.
+avisarAusencia({ alumnoId: ana, tipo: "dia", fecha: "2026-08-17", motivo: "viaje" });
+avisarAusencia({ alumnoId: bea, tipo: "mes", mes: "2026-08", motivo: "operación" });
+f = mias("2026-08");
+const anaAgo = f.find((x) => x.nombre === `${T}Ana`)!;
+const beaAgo = f.find((x) => x.nombre === `${T}Bea`)!;
+check("el día avisado sale aparte de las faltas del pase de lista", JSON.stringify(anaAgo.avisadas) === '["2026-08-17"]', JSON.stringify(anaAgo.avisadas));
+check("sus 2 faltas siguen intactas", anaAgo.faltas.length === 2, JSON.stringify(anaAgo.faltas));
+check("y las recuperativas suman faltas + días avisados", anaAgo.recuperativas === 3, String(anaAgo.recuperativas));
+check("Ana NO se sale del CRM por faltar un día", anaAgo.noVieneEsteMes === false);
+check("Bea sí queda marcada como que no viene este mes", beaAgo.noVieneEsteMes === true);
+check("y trae el motivo y el id para poder deshacerlo", beaAgo.motivoMes === "operación" && !!beaAgo.ausenciaMesId);
+check("Bea sigue en la lista (para devolverla con un toque), no desaparece", !!beaAgo);
+const sept = fichasDelMes("2026-09");
+check("en septiembre Bea vuelve a venir", sept.find((x) => x.nombre === `${T}Bea`)?.noVieneEsteMes === false);
+check("y el día avisado de agosto no se cuela en septiembre", sept.find((x) => x.nombre === `${T}Ana`)?.avisadas.length === 0);
+const julio2 = fichasDelMes("2026-07").find((x) => x.nombre === `${T}Bea`)!;
+check("ni el mes avisado se cuela en julio", julio2.noVieneEsteMes === false);
 
 // Limpieza (también la asistencia de prueba, que va por nombre y no se borra sola).
 for (const d of ["2026-08-03", "2026-08-05", "2026-08-10", "2026-07-28"]) borrarAsistencia(d, `${T}Ana`);

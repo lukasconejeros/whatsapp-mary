@@ -65,6 +65,8 @@
     "test:alumnos": "tsx scripts/test-alumnos.ts",
     "test:horario": "tsx scripts/test-horario-arteluk.ts",
     "test:crm": "tsx scripts/test-crm-alumnos.ts",
+    "test:ausencias": "tsx scripts/test-ausencias.ts",
+    "test:ausencias-api": "node scripts/test-ausencias-api.mjs",
     "test:alumnos-api": "node scripts/test-alumnos-api.mjs",
     "test:pagos-recordatorios": "tsx scripts/test-pagos-recordatorios.ts",
     "test:cache-prompt": "tsx scripts/test-cache-prompt.ts",
