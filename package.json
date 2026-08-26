@@ -62,6 +62,8 @@
     "test:botones": "node scripts/test-botones-tactiles.mjs",
     "test:calendario": "node scripts/test-calendario-pc.mjs",
     "test:clases-fijas": "tsx scripts/test-clases-fijas.ts",
+    "test:alumnos": "tsx scripts/test-alumnos.ts",
+    "test:horario": "tsx scripts/test-horario-arteluk.ts",
     "test:pagos-recordatorios": "tsx scripts/test-pagos-recordatorios.ts",
     "test:cache-prompt": "tsx scripts/test-cache-prompt.ts",
     "medir:cache": "tsx scripts/medir-cache-prompt.ts",

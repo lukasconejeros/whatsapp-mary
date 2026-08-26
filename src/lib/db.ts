@@ -230,6 +230,50 @@ CREATE TABLE IF NOT EXISTS clases_fijas (
 );
 CREATE INDEX IF NOT EXISTS idx_clases_fijas_dia ON clases_fijas(dia, hora);
 
+-- Los ALUMNOS de la academia, uno por ficha (Lukas, 26-08-2026, con las 9 fotos del
+-- Excel de su mamá delante). Antes vivían como texto suelto dentro de
+-- clases_fijas.alumnos; ahora cada uno tiene ficha propia porque él pidió un CRM por
+-- alumno con su mensualidad ("la mensualidad va en el CRM", $45.000 a $120.000).
+-- 'activo' en 0 = ya no viene, pero NO se borra: se perdería su asistencia y sus pagos.
+-- 'revisar' guarda las dudas de la planilla que hay que confirmar con Mary antes de
+-- darlas por buenas ('posible-duplicado', 'falta-dia', 'falta-profe'), y la pantalla
+-- las muestra en vez de inventarse la respuesta.
+CREATE TABLE IF NOT EXISTS alumnos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+  apoderado TEXT,                              -- quien paga y contesta el WhatsApp
+  telefono TEXT,                               -- del apoderado, '+569…'
+  cliente_id INTEGER,                          -- clientes.id cuando ya está en la libreta
+  mensualidad INTEGER NOT NULL DEFAULT 0,      -- 0 = todavía no se sabe
+  notas TEXT,
+  revisar TEXT,                                -- duda pendiente con Mary, NULL = todo claro
+  activo INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_alumnos_nombre ON alumnos(nombre);
+
+-- DÓNDE va cada alumno: una fila por día en el que viene, y vale para TODAS las
+-- semanas (igual que clases_fijas). Un alumno de dos días = dos inscripciones, una
+-- sola ficha (Mateo está lunes y martes en la planilla).
+-- 🔑 'hora_fin' es SUYA, no de la sala: el jueves Barbara se queda hasta las 19:30 y
+-- los otros cuatro se van a las 18:30 estando en la misma clase. Ese es justo el
+-- motivo de esta tabla: el modelo viejo obligaba a partir el día en clases falsas.
+-- 'dia' NULL = la foto del Excel que llegó sin encabezado: se carga igual para no
+-- perder a las alumnas, pero no se cuela en ningún día del calendario hasta que
+-- Mary diga cuál es.
+CREATE TABLE IF NOT EXISTS inscripciones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alumno_id INTEGER NOT NULL,
+  dia TEXT,                                    -- 'Lunes'…'Sabado' (sin tilde) | NULL = por confirmar
+  hora TEXT NOT NULL,                          -- '17:30', su hora de entrada
+  hora_fin TEXT,                               -- '18:30', SU hora de salida
+  profe TEXT,                                  -- 'Mary' | 'Paula' | NULL = por confirmar
+  activa INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_inscripciones_dia ON inscripciones(dia, hora);
+CREATE INDEX IF NOT EXISTS idx_inscripciones_alumno ON inscripciones(alumno_id);
+
 -- Los PAGOS que vuelven CADA MES (arriendo, sueldos, suscripción y "otros", que
 -- lleva descripción obligatoria). Lukas dijo "todas las semanas" pero al
 -- preguntarle eligió mensual, que es como se pagan de verdad (10-08-2026).
@@ -1502,6 +1546,133 @@ export function updateClaseFija(id: number, d: ClaseFijaInput): void {
 
 export function deleteClaseFija(id: number): void {
   ctx().db.prepare("DELETE FROM clases_fijas WHERE id=?").run(id);
+}
+
+// ── Alumnos e inscripciones (el horario de verdad de Mary) ────────────────────
+// La ficha de cada alumno + en qué día y a qué hora viene. Ver el comentario de las
+// dos tablas en el SCHEMA: cada alumno tiene SU hora de salida dentro de la sala.
+
+export interface Alumno {
+  id: number; nombre: string; apoderado: string | null; telefono: string | null;
+  clienteId: number | null; mensualidad: number; notas: string | null;
+  revisar: string | null; activo: boolean;
+}
+export interface AlumnoInput {
+  nombre: string; apoderado?: string | null; telefono?: string | null;
+  clienteId?: number | null; mensualidad?: number; notas?: string | null;
+  revisar?: string | null; activo?: boolean;
+}
+interface AlumnoRow {
+  id: number; nombre: string; apoderado: string | null; telefono: string | null;
+  cliente_id: number | null; mensualidad: number; notas: string | null;
+  revisar: string | null; activo: number;
+}
+function parseAlumno(r: AlumnoRow): Alumno {
+  return {
+    id: r.id, nombre: r.nombre, apoderado: r.apoderado, telefono: r.telefono,
+    clienteId: r.cliente_id, mensualidad: r.mensualidad, notas: r.notas,
+    revisar: r.revisar, activo: r.activo === 1,
+  };
+}
+
+export interface Inscripcion {
+  id: number; alumnoId: number; dia: string | null; hora: string;
+  horaFin: string | null; profe: string | null; activa: boolean;
+}
+export interface InscripcionInput {
+  alumnoId: number; dia?: string | null; hora: string; horaFin?: string | null;
+  profe?: string | null; activa?: boolean;
+}
+/** Una inscripción con los datos del alumno pegados: lo que necesita el calendario. */
+export interface EnClase extends Inscripcion {
+  nombre: string; mensualidad: number;
+}
+interface InscripcionRow {
+  id: number; alumno_id: number; dia: string | null; hora: string;
+  hora_fin: string | null; profe: string | null; activa: number;
+}
+function parseInscripcion(r: InscripcionRow): Inscripcion {
+  return {
+    id: r.id, alumnoId: r.alumno_id, dia: r.dia, hora: r.hora,
+    horaFin: r.hora_fin, profe: r.profe, activa: r.activa === 1,
+  };
+}
+
+/** Todos los alumnos, activos y dados de baja: es la lista de administración (el CRM). */
+export function listAlumnos(): Alumno[] {
+  const rows = ctx().db
+    .prepare("SELECT * FROM alumnos ORDER BY nombre COLLATE NOCASE ASC, id ASC")
+    .all() as AlumnoRow[];
+  return rows.map(parseAlumno);
+}
+
+export function getAlumno(id: number): Alumno | null {
+  const r = ctx().db.prepare("SELECT * FROM alumnos WHERE id=?").get(id) as AlumnoRow | undefined;
+  return r ? parseAlumno(r) : null;
+}
+
+export function addAlumno(d: AlumnoInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO alumnos (nombre, apoderado, telefono, cliente_id, mensualidad, notas, revisar, activo) VALUES (?,?,?,?,?,?,?,?)")
+    .run(d.nombre, d.apoderado ?? null, d.telefono ?? null, d.clienteId ?? null,
+         d.mensualidad ?? 0, d.notas ?? null, d.revisar ?? null, d.activo === false ? 0 : 1);
+  return r.lastInsertRowid as number;
+}
+
+export function updateAlumno(id: number, d: AlumnoInput): void {
+  ctx().db
+    .prepare("UPDATE alumnos SET nombre=?, apoderado=?, telefono=?, cliente_id=?, mensualidad=?, notas=?, revisar=?, activo=? WHERE id=?")
+    .run(d.nombre, d.apoderado ?? null, d.telefono ?? null, d.clienteId ?? null,
+         d.mensualidad ?? 0, d.notas ?? null, d.revisar ?? null, d.activo === false ? 0 : 1, id);
+}
+
+/** Borra al alumno Y sus inscripciones: si no, quedan huérfanas colgando del calendario. */
+export function deleteAlumno(id: number): void {
+  const db = ctx().db;
+  db.prepare("DELETE FROM inscripciones WHERE alumno_id=?").run(id);
+  db.prepare("DELETE FROM alumnos WHERE id=?").run(id);
+}
+
+/** Las inscripciones de un alumno (todas, activas y dadas de baja) o las de todos. */
+export function listInscripciones(alumnoId?: number): Inscripcion[] {
+  const rows = alumnoId === undefined
+    ? ctx().db.prepare("SELECT * FROM inscripciones ORDER BY hora ASC, id ASC").all() as InscripcionRow[]
+    : ctx().db.prepare("SELECT * FROM inscripciones WHERE alumno_id=? ORDER BY hora ASC, id ASC").all(alumnoId) as InscripcionRow[];
+  return rows.map(parseInscripcion);
+}
+
+/**
+ * Quién viene una fecha concreta (YYYY-MM-DD), ordenado por hora de entrada, que es
+ * como Mary lee su planilla. Solo alumnos activos e inscripciones activas, y nunca
+ * las que están sin día asignado.
+ */
+export function inscripcionesDeFecha(fecha: string): EnClase[] {
+  // Mediodía para que el cambio de horario de verano no corra el día.
+  const dia = DIAS_SEMANA_DB[new Date(`${fecha}T12:00:00`).getDay()];
+  const rows = ctx().db
+    .prepare(`SELECT i.*, a.nombre AS nombre, a.mensualidad AS mensualidad
+              FROM inscripciones i JOIN alumnos a ON a.id = i.alumno_id
+              WHERE i.dia = ? AND i.activa = 1 AND a.activo = 1
+              ORDER BY i.hora ASC, a.nombre COLLATE NOCASE ASC`)
+    .all(dia) as (InscripcionRow & { nombre: string; mensualidad: number })[];
+  return rows.map((r) => ({ ...parseInscripcion(r), nombre: r.nombre, mensualidad: r.mensualidad }));
+}
+
+export function addInscripcion(d: InscripcionInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO inscripciones (alumno_id, dia, hora, hora_fin, profe, activa) VALUES (?,?,?,?,?,?)")
+    .run(d.alumnoId, d.dia ?? null, d.hora, d.horaFin ?? null, d.profe ?? null, d.activa === false ? 0 : 1);
+  return r.lastInsertRowid as number;
+}
+
+export function updateInscripcion(id: number, d: InscripcionInput): void {
+  ctx().db
+    .prepare("UPDATE inscripciones SET alumno_id=?, dia=?, hora=?, hora_fin=?, profe=?, activa=? WHERE id=?")
+    .run(d.alumnoId, d.dia ?? null, d.hora, d.horaFin ?? null, d.profe ?? null, d.activa === false ? 0 : 1, id);
+}
+
+export function deleteInscripcion(id: number): void {
+  ctx().db.prepare("DELETE FROM inscripciones WHERE id=?").run(id);
 }
 
 // ── Pagos que vuelven cada mes ────────────────────────────────────────────────

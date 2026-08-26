@@ -11,4 +11,13 @@ export async function register() {
   } catch (e) {
     console.error("[seed] no se pudieron cargar los contactos:", e);
   }
+  // El horario de la academia (26-08-2026): las 9 fotos del Excel de Mary. Solo la
+  // primera vez, con la tabla vacía — después manda lo que ella tenga en la app.
+  try {
+    const { seedHorarioSiVacio } = await import("./lib/horario-arteluk");
+    const h = seedHorarioSiVacio();
+    if (h.alumnos > 0) console.log(`[seed] horario Arteluk: ${h.alumnos} alumnos, ${h.inscripciones} inscripciones`);
+  } catch (e) {
+    console.error("[seed] no se pudo cargar el horario:", e);
+  }
 }
