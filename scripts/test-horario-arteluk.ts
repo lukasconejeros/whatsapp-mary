@@ -50,16 +50,23 @@ check("'amapola' queda como Amapola", !!buscar("Amapola"));
 // Las dos profesoras.
 check("el jueves de Paula está rotulado con su nombre", buscar("Agustina")?.inscripciones[0].profe === "Paula", String(buscar("Agustina")?.inscripciones[0].profe));
 check("la primera tabla de cada día es Mary", buscar("Matilda")?.inscripciones[0].profe === "Mary", String(buscar("Matilda")?.inscripciones[0].profe));
-check("el bloque de las 16:00 del lunes queda SIN profe (no se inventa)", buscar("Amparo")?.inscripciones[0].profe === null, String(buscar("Amparo")?.inscripciones[0].profe));
+// El bloque de las 16:00 del lunes lo hace PAULA (Lukas lo preguntó y respondió el 26-08-2026).
+check("el bloque de las 16:00 del lunes es de Paula", buscar("Amparo")?.inscripciones[0].profe === "Paula", String(buscar("Amparo")?.inscripciones[0].profe));
+check("y ya no lleva la marca de la profesora", !(buscar("Alison")?.revisar ?? "").includes("profesora"), String(buscar("Alison")?.revisar));
 
-// La foto sin encabezado: se cargan, pero sin día y marcadas.
+// La foto sin encabezado era del JUEVES (Lukas, 26-08-2026). La profesora sigue sin saberse,
+// así que se cargan en su día pero marcadas: no se inventa quién les hace la clase.
 for (const n of ["Paulina", "Violeta", "Grace"]) {
-  check(`${n} se carga sin día y marcada`, buscar(n)?.inscripciones[0].dia === null && !!buscar(n)?.revisar, `${buscar(n)?.inscripciones[0].dia} / ${buscar(n)?.revisar}`);
+  check(`${n} viene el jueves y sigue marcada por la profesora`,
+    buscar(n)?.inscripciones[0].dia === "Jueves" && buscar(n)?.inscripciones[0].profe === null && !!buscar(n)?.revisar,
+    `${buscar(n)?.inscripciones[0].dia} / ${buscar(n)?.inscripciones[0].profe} / ${buscar(n)?.revisar}`);
 }
 
 // Diego Torres: dos tablas a la misma hora = imposible, es duplicado de planilla.
 check("Diego Torres tiene UNA sola inscripción el sábado", buscar("Diego Torres")?.inscripciones.length === 1, String(buscar("Diego Torres")?.inscripciones.length));
-check("y queda marcado para que Mary lo confirme", !!buscar("Diego Torres")?.revisar);
+// Ya no hace falta preguntarlo: Lukas confirmó el 26-08 que el sábado es con Mary.
+check("y es con Mary, ya confirmado", buscar("Diego Torres")?.inscripciones[0].profe === "Mary", String(buscar("Diego Torres")?.inscripciones[0].profe));
+check("y ya no queda marcado", !buscar("Diego Torres")?.revisar, String(buscar("Diego Torres")?.revisar));
 
 // El apoderado sale de la libreta que ya existe, y SOLO cuando la coincidencia es segura.
 check("Antonia Pontigo trae a su apoderada y su teléfono", buscar("Antonia Pontigo")?.telefono === "+56976242369" && buscar("Antonia Pontigo")?.apoderado === "Veronica Arteche", `${buscar("Antonia Pontigo")?.apoderado}/${buscar("Antonia Pontigo")?.telefono}`);
@@ -89,10 +96,10 @@ const porDia = (d: string) => inscripciones.filter((i) => i.dia === d).length;
 check("lunes 9", porDia("Lunes") === 9, String(porDia("Lunes")));
 check("martes 3", porDia("Martes") === 3, String(porDia("Martes")));
 check("miércoles 6", porDia("Miercoles") === 6, String(porDia("Miercoles")));
-check("jueves 9 (5 de Mary + 4 de Paula)", porDia("Jueves") === 9, String(porDia("Jueves")));
+check("jueves 12 (5 de Mary + 4 de Paula + las 3 de la foto sin encabezado)", porDia("Jueves") === 12, String(porDia("Jueves")));
 check("viernes 6", porDia("Viernes") === 6, String(porDia("Viernes")));
 check("sábado 7 (sin el Diego Torres repetido)", porDia("Sabado") === 7, String(porDia("Sabado")));
-check("las 3 sin día no se cuelan en ninguno", inscripciones.filter((i) => i.dia === null).length === 3, String(inscripciones.filter((i) => i.dia === null).length));
+check("ya no queda nadie sin día", inscripciones.filter((i) => i.dia === null).length === 0, String(inscripciones.filter((i) => i.dia === null).length));
 
 // ── Parte 2: la carga en la base, que es lo que verá Mary ────────────────────
 // Ojo: siembra en la base LOCAL de pruebas. Al final se borra solo lo que sembró.
@@ -121,7 +128,7 @@ check("en la base hay 41 alumnos nuevos, ni uno más", listAlumnos().length === 
 
 // El calendario de verdad: un jueves cualquiera trae a los 9, cada uno con SU salida.
 const jueves = inscripcionesDeFecha("2026-08-27");
-check("el jueves salen los 9 alumnos", jueves.length === 9, String(jueves.length));
+check("el jueves salen los 12 alumnos", jueves.length === 12, String(jueves.length));
 check("ordenados por hora de entrada", jueves[0].hora <= jueves[jueves.length - 1].hora, JSON.stringify(jueves.map((i) => i.hora)));
 check("Barbara hasta las 19:30 y Francisca hasta las 18:30, el mismo día",
   jueves.find((i) => i.nombre === "Barbara")?.horaFin === "19:30" && jueves.find((i) => i.nombre === "Francisca")?.horaFin === "18:30",

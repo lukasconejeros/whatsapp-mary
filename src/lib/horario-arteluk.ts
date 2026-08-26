@@ -39,8 +39,9 @@ export interface FilaPlanilla {
 }
 
 const SIN_LIBRETA = "no está en la libreta de apoderados: falta su teléfono";
-const SIN_ENCABEZADO = "esta foto llegó sin encabezado: falta el día y la profesora";
-const SIN_PROFE = "falta la profesora del bloque de las 16:00 del lunes";
+// La foto 7 llegó sin encabezado. Lukas lo preguntó y respondió el 26-08-2026:
+// es el JUEVES. La profesora de ese bloque sigue sin saberse.
+const SIN_PROFE_FOTO7 = "Lukas confirmó que vienen el jueves; falta saber qué profesora hace este bloque";
 
 export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   // ── LUNES (fotos 1 y 2) ────────────────────────────────────────────────────
@@ -50,9 +51,9 @@ export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   { alumno: "Ignacia", dia: "Lunes", hora: "17:30", horaFin: "19:30", profe: "Mary", revisar: "hay dos en la libreta: Maria Ignacia Perez Ferron y Maria Ignacia Tauler Lira" },
   { alumno: "Julieta Bratz", dia: "Lunes", hora: "18:30", horaFin: "19:30", profe: "Paula", contacto: "Julieta Bratz" },
   { alumno: "Noah", dia: "Lunes", hora: "18:30", horaFin: "19:30", profe: "Paula", contacto: "Noah Campos Arteaga" },
-  { alumno: "Alison", dia: "Lunes", hora: "16:00", horaFin: "17:00", profe: null, contacto: "Allison Ferrada Olivares", revisar: SIN_PROFE },
-  { alumno: "Amelia", dia: "Lunes", hora: "16:00", horaFin: "17:00", profe: null, revisar: `${SIN_PROFE}. ¿es la Amelia Sepúlveda de Judith Higueras? ¿y es la misma que Amelia Brellenthin del jueves?` },
-  { alumno: "Amparo", dia: "Lunes", hora: "16:00", horaFin: "17:00", profe: null, revisar: `${SIN_PROFE}. ¿Amparo Sepúlveda (Judith Higueras) o Amparo Coronado (Genoveva Montero)?` },
+  { alumno: "Alison", dia: "Lunes", hora: "16:00", horaFin: "17:00", profe: "Paula", contacto: "Allison Ferrada Olivares" },
+  { alumno: "Amelia", dia: "Lunes", hora: "16:00", horaFin: "17:00", profe: "Paula", revisar: "¿es la Amelia Sepúlveda de Judith Higueras?" },
+  { alumno: "Amparo", dia: "Lunes", hora: "16:00", horaFin: "17:00", profe: "Paula", revisar: "¿Amparo Sepúlveda (Judith Higueras) o Amparo Coronado (Genoveva Montero)?" },
 
   // ── MARTES (foto 3) ────────────────────────────────────────────────────────
   { alumno: "Mateo", dia: "Martes", hora: "17:30", horaFin: "19:30", profe: "Mary", mensualidad: 45000 },
@@ -80,10 +81,10 @@ export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   { alumno: "amapola", dia: "Jueves", hora: "16:00", horaFin: "18:00", profe: "Paula", mensualidad: 120000, contacto: "Amapola" },
   { alumno: "Amelia Brellenthin", dia: "Jueves", hora: "17:00", horaFin: "18:00", profe: "Paula", mensualidad: 60000, revisar: `${SIN_LIBRETA}. ¿es la misma Amelia que viene el lunes a las 16:00?` },
 
-  // ── FOTO 7 · SIN ENCABEZADO: no se sabe qué día es ─────────────────────────
-  { alumno: "PAULINA", dia: null, hora: "18:30", horaFin: "19:30", profe: null, revisar: `${SIN_ENCABEZADO}. Además ${SIN_LIBRETA}` },
-  { alumno: "Violeta", dia: null, hora: "18:30", horaFin: "19:30", profe: null, contacto: "Violeta Sanhueza", revisar: SIN_ENCABEZADO },
-  { alumno: "GRACE", dia: null, hora: "18:30", horaFin: "19:30", profe: null, revisar: `${SIN_ENCABEZADO}. Además ${SIN_LIBRETA}` },
+  // ── FOTO 7 · llegó sin encabezado; Lukas confirmó el 26-08 que es el JUEVES ─
+  { alumno: "PAULINA", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: null, revisar: `${SIN_PROFE_FOTO7}. Además ${SIN_LIBRETA}` },
+  { alumno: "Violeta", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: null, contacto: "Violeta Sanhueza", revisar: SIN_PROFE_FOTO7 },
+  { alumno: "GRACE", dia: "Jueves", hora: "18:30", horaFin: "19:30", profe: null, revisar: `${SIN_PROFE_FOTO7}. Además ${SIN_LIBRETA}` },
 
   // ── VIERNES (foto 8) ───────────────────────────────────────────────────────
   { alumno: "Florencia Aliaga", dia: "Viernes", hora: "17:30", horaFin: "19:30", profe: "Mary", mensualidad: 120000, revisar: `${SIN_LIBRETA} (la Florencia de la libreta es Florencia Mohr, otro apellido)` },
@@ -96,11 +97,13 @@ export const PLANILLA_AGOSTO_2026: FilaPlanilla[] = [
   // ── SÁBADO (foto 9), el único día de mañana ────────────────────────────────
   { alumno: "Antonella", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Mary", mensualidad: 120000, contacto: "Antonella Garces Barría" },
   { alumno: "Elisa Bade", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Mary", mensualidad: 70000, revisar: `${SIN_LIBRETA}. ¿es la misma que la Elisa del viernes?` },
-  { alumno: "Diego Torres", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Mary", mensualidad: 60000, contacto: "Diego Torres", revisar: "la planilla lo pone en las DOS tablas del sábado a la misma hora, y no puede estar con las dos profesoras a la vez: se cargó una sola vez" },
+  { alumno: "Diego Torres", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Mary", mensualidad: 60000, contacto: "Diego Torres" },
   { alumno: "Julieta", dia: "Sabado", hora: "11:00", horaFin: "12:00", profe: "Mary", mensualidad: 60000, revisar: "hay cuatro Julieta en la libreta: Bratz, Monsalve, Rivas y Mena" },
   { alumno: "Valentina", dia: "Sabado", hora: "11:00", horaFin: "12:00", profe: "Mary", mensualidad: 60000, revisar: "¿la Valentina de Zunia Peña y Lillo, o la Valentina Roa que viene el miércoles?" },
   { alumno: "Elena Jerez", dia: "Sabado", hora: "11:00", horaFin: "13:00", profe: "Paula", mensualidad: 100000, contacto: "Elena Jerez Ahrens" },
   { alumno: "Sofía Llancaleo", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Paula", mensualidad: 60000, revisar: `${SIN_LIBRETA}. ¿es la misma que la Sofía del miércoles?` },
+  // Repetido en la planilla, en la tabla de Paula. Lukas lo preguntó y confirmó el
+  // 26-08-2026: el sábado es con Mary, así que esta fila NO se carga.
   { alumno: "Diego Torres", dia: "Sabado", hora: "12:00", horaFin: "13:00", profe: "Paula", mensualidad: 60000, duplicada: true },
 ];
 
