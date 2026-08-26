@@ -656,3 +656,28 @@ miembro suelto aparece semanas después, en producción y delante del cliente.
 quedan tuteando a propósito: ella no es la apoderada. `src/lib/openrouter.ts` también tutea, pero
 es código muerto: no lo importa nadie (verificado con grep en `src/` y `scripts/`).
 
+
+---
+
+## 26-08-2026 · Acierto: la planilla mandó sobre el modelo, y lo dudoso se marcó en vez de resolverse
+
+**Qué pasó.** Al cargar el horario real de Mary (9 fotos del Excel: 6 días, 2 profesoras, 44 filas)
+apareció algo que el modelo de la app no aguantaba: **dentro de la misma sala cada alumno tiene su
+propia hora de salida** — el jueves Barbara se queda hasta las 19:30 y los otros cuatro se van a las
+18:30. Con `clases_fijas` (un bloque = una hora = una lista de nombres) había que partir cada día en
+dos o tres "clases" que no existen. Se cambió el modelo (`alumnos` + `inscripciones` con `hora_fin`
+por alumno) en vez de deformar los datos para que cupieran.
+
+**Lo segundo, que es la lección de verdad.** La planilla venía con seis ambigüedades: una foto sin
+encabezado (no se sabe qué día es), un bloque sin profesora, un alumno repetido en las dos tablas del
+sábado a la misma hora, y seis nombres que pueden ser una persona o dos (Amelia / Amelia
+Brellenthin, Julieta Bratz / Julieta…). La tentación era resolverlas por parecido de nombre. **Son
+menores**: pegarle el teléfono equivocado a una ficha es escribirle al apoderado de otro niño. Se
+cargaron igual (no se pierde a nadie) pero **marcadas en `revisar`**: 23 de las 41 fichas salen en
+amarillo en la pantalla hasta que Mary las confirme, y el apoderado solo se pegó donde la
+coincidencia era exacta y única — 21 de 41.
+
+**La regla.** Cuando el dato de entrada es ambiguo, la respuesta no es adivinar ni descartar: es
+cargar y marcar, con la duda escrita en la ficha para que la persona que sabe la resuelva en un
+toque. Y el número de dudas se muestra arriba (`23 por confirmar con Mary`), porque una marca que
+nadie ve es una marca que nadie resuelve.
