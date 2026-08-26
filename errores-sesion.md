@@ -681,3 +681,26 @@ coincidencia era exacta y única — 21 de 41.
 cargar y marcar, con la duda escrita en la ficha para que la persona que sabe la resuelva en un
 toque. Y el número de dudas se muestra arriba (`23 por confirmar con Mary`), porque una marca que
 nadie ve es una marca que nadie resuelve.
+
+---
+
+## 26-08-2026 · Error: un test que borraba alumnos que él no había sembrado
+
+**Qué pasó.** Al terminar el botón "no viene" se corrió la batería y `test:horario` daba
+**52 pasaron, 5 fallaron**… y al correrlo solo, 57/57. La intermitencia tenía causa: el test siembra
+los 41 alumnos de la planilla, comprueba que la carga los crea, y al final **borra por NOMBRE todos
+los alumnos del plan**. Si la base ya los tenía cargados (por ejemplo porque se arrancó la app
+antes, que los siembra sola), la carga no creaba a nadie ⇒ 5 checks en rojo, y encima **el test
+borraba a los 41 alumnos que no había sembrado él**.
+
+**Por qué importa aunque sea "solo un test".** Es el mismo error del 04-08 con los tests de voz: un
+test es código con alcance. Si esa base hubiera sido la de Mary, la limpieza le habría borrado el
+horario completo.
+
+**El arreglo.** Antes de sembrar, el test mira si el horario ya está cargado (`yaCargado`); si lo
+está, **se salta enteras las partes 2 y 3** y lo dice en pantalla ("la base ya tiene el horario
+cargado"). Así nunca borra lo que no creó, y un 42/42 honesto reemplaza a un 52/5 que asustaba sin
+que nada estuviera roto.
+
+**La regla.** Un test que siembra en una base compartida tiene que poder responder dos preguntas
+antes de limpiar: ¿esto lo creé yo?, ¿y si ya estaba? Si no puede, no borra: se salta.

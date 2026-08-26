@@ -96,6 +96,18 @@ check("las 3 sin día no se cuelan en ninguno", inscripciones.filter((i) => i.di
 
 // ── Parte 2: la carga en la base, que es lo que verá Mary ────────────────────
 // Ojo: siembra en la base LOCAL de pruebas. Al final se borra solo lo que sembró.
+//
+// 🔒 Y si el horario YA estaba cargado (por ejemplo porque se arrancó la app antes),
+// las partes 2 y 3 se saltan enteras: si no, la limpieza por nombre borraría a
+// alumnos de verdad que este test no sembró. Un test también tiene alcance
+// (Lukas, 04-08-2026: "antes de tocar los tests o los datos, mirar a quién más le pegan").
+const nombresPlan = new Set(plan.map((a) => a.nombre));
+const yaCargado = listAlumnos().some((a) => nombresPlan.has(a.nombre));
+
+if (yaCargado) {
+  console.log("\n  ⚠️  Las partes 2 y 3 se saltan: la base ya tiene el horario cargado.");
+  console.log("      (para probarlas, corre el test con la tabla de alumnos vacía)\n");
+} else {
 const antes = listAlumnos().length;
 const r1 = seedHorarioArteluk();
 check("la primera carga crea los 41 alumnos", r1.alumnos === 41, String(r1.alumnos));
@@ -118,7 +130,6 @@ const domingo = inscripcionesDeFecha("2026-08-30");
 check("el domingo no hay clases", domingo.length === 0, String(domingo.length));
 
 // Limpieza: se borra SOLO lo que sembró este test, por nombre de la planilla.
-const nombresPlan = new Set(plan.map((a) => a.nombre));
 for (const a of listAlumnos()) if (nombresPlan.has(a.nombre)) deleteAlumno(a.id);
 check("el test deja la base como estaba", listAlumnos().length === antes, String(listAlumnos().length));
 check("y sin inscripciones huérfanas", listInscripciones().length === 0, String(listInscripciones().length));
@@ -138,6 +149,7 @@ if (listAlumnos().length === 0) {
   check("la base vuelve a quedar como estaba", listAlumnos().length === antes, String(listAlumnos().length));
 } else {
   console.log("  ⚠️  la parte 3 se saltó: la base ya tenía alumnos antes del test");
+}
 }
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} pasaron, ${fail} fallaron\n`);
