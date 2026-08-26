@@ -10,7 +10,7 @@
 // El nombre del ícono se resuelve en AppNav; aquí no entra React para que el test
 // pueda importar esta lista tal cual.
 
-export type NombreIcono = "chats" | "finanzas" | "calendario" | "bot" | "entrenar" | "conexion";
+export type NombreIcono = "chats" | "finanzas" | "calendario" | "alumnos" | "bot" | "entrenar" | "conexion";
 
 export interface ItemMenu {
   href: string;
@@ -30,6 +30,9 @@ export const MENU: ItemMenu[] = [
   { href: "/inbox",         label: "Chats",       icono: "chats"      },
   { href: "/finanzas",      label: "Finanzas",    icono: "finanzas"   },
   { href: "/calendario",    label: "Calendario",  icono: "calendario" },
+  // El CRM de alumnos va pegado al Calendario: Lukas lo pidió "en correlación" con él
+  // (26-08-2026), y es donde Mary va a mirar quién viene y quién pagó.
+  { href: "/alumnos",       label: "Alumnos",     icono: "alumnos"    },
   { href: "/ensayo",        label: "Bot",         icono: "bot"        },
   { href: "/configuracion", label: "Entrenar IA", icono: "entrenar", labelCorto: "Entrenar" },
   { href: "/conexion",      label: "Conexión",    icono: "conexion"   },

@@ -24,7 +24,7 @@ const MINIMO = 44 // px, mínimo táctil de iOS
 // MOTOR=webkit usa el motor de Safari, que es el del iPhone de verdad.
 const MOTOR = process.env.MOTOR === 'webkit' ? webkit : chromium
 
-const RUTAS = (process.env.RUTAS || '/inbox,/finanzas,/calendario,/asistente,/ensayo,/conexion,/contactos,/metricas,/configuracion').split(',')
+const RUTAS = (process.env.RUTAS || '/inbox,/finanzas,/calendario,/alumnos,/asistente,/ensayo,/conexion,/contactos,/metricas,/configuracion').split(',')
 
 const browser = await MOTOR.launch()
 const ctx = await browser.newContext({ ...devices['iPhone 13'] })

@@ -14,12 +14,20 @@ const entrenar = MENU.find(i => i.href === "/configuracion");
 check("se llama 'Entrenar IA'", entrenar?.label === "Entrenar IA", String(entrenar?.label));
 check("va justo después de Bot", hrefs.indexOf("/configuracion") === hrefs.indexOf("/ensayo") + 1, hrefs.join(","));
 
+// ── Alumnos: el CRM que pidió Lukas el 26-08-2026 ────────────────────────────
+// "un CRM aparte, pestaña propia a la izquierda, una tarjeta por alumno (…) en
+// correlación con el calendario" ⇒ va pegado al Calendario, no al final.
+check("Alumnos está en el menú", hrefs.includes("/alumnos"), hrefs.join(","));
+const alumnos = MENU.find(i => i.href === "/alumnos");
+check("se llama 'Alumnos'", alumnos?.label === "Alumnos", String(alumnos?.label));
+check("va justo después de Calendario", hrefs.indexOf("/alumnos") === hrefs.indexOf("/calendario") + 1, hrefs.join(","));
+
 // ── La familia completa: ningún botón de antes se pierde ni cambia de orden ───
 const deAntes = ["/inbox", "/finanzas", "/calendario", "/ensayo", "/conexion"];
 for (const h of deAntes) check(`sigue estando ${h}`, hrefs.includes(h));
 check("el orden de los de antes no cambió", JSON.stringify(hrefs.filter(h => deAntes.includes(h))) === JSON.stringify(deAntes), hrefs.join(","));
 check("Conexión sigue siendo el último", hrefs[hrefs.length - 1] === "/conexion", hrefs.join(","));
-check("son 6 botones, sin repetidos", MENU.length === 6 && new Set(hrefs).size === 6, String(MENU.length));
+check("son 7 botones, sin repetidos", MENU.length === 7 && new Set(hrefs).size === 7, String(MENU.length));
 
 // ── Que quepan en la barra de abajo del teléfono ──────────────────────────────
 for (const i of MENU) check(`'${i.label}' es corto para la barra del teléfono`, i.label.length <= 11, String(i.label.length));
