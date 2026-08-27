@@ -704,3 +704,34 @@ que nada estuviera roto.
 
 **La regla.** Un test que siembra en una base compartida tiene que poder responder dos preguntas
 antes de limpiar: ¿esto lo creé yo?, ¿y si ya estaba? Si no puede, no borra: se salta.
+
+---
+
+## 26-08-2026 · El `git push` que se cuelga sin decir nada (no es la red)
+
+**Qué pasó.** Lukas dijo *"subelo"*. El primer `git push origin main` se colgó y lo mató el
+timeout de 2 minutos **sin escribir ni una línea de salida**. El segundo, con
+`GIT_TERMINAL_PROMPT=0` y `timeout 90`, salió con código 124: otro timeout seco.
+`git ls-remote origin main` seguía respondiendo al instante y seguía en `933dfd8`, así que
+la red estaba perfecta y el push simplemente no avanzaba.
+
+**La causa.** El **Credential Manager de Windows abre una ventana** para pedir las credenciales
+de GitHub. Esa ventana no se ve desde aquí y el proceso se queda esperando para siempre.
+La prueba está en el log del intento que sí funcionó:
+
+```
+fatal: User cancelled dialog.
+To https://github.com/lukasconejeros/whatsapp-mary.git
+   933dfd8..e83acb8  main -> main
+```
+
+Es decir: la ventana se descartó, git cayó al helper `store` (`~/.git-credentials`) y subió.
+
+**El arreglo.** Lanzar el push **en segundo plano y sin timeout**, escribiendo la salida a un
+archivo. Nunca reintentarlo en primer plano con timeout: se vuelve a colgar igual y encima
+no deja rastro de por qué.
+
+**La regla.** Un `git push` que se cuelga **sin salida** en este PC no es la red — es el diálogo
+de credenciales. Comprobarlo con `git ls-remote` (si responde, la red está bien) y relanzar en
+segundo plano. Y el push **no está hecho hasta verlo con `git ls-remote origin main`**:
+`git log origin/main..main` miente sin un `fetch` previo.
