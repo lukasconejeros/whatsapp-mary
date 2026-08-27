@@ -6,6 +6,7 @@ import { normalizeChilePhone } from "./phone";
 // porque el calendario del navegador también lo necesita.
 import type { Ausencia, TipoAusencia } from "./dia-clases.js";
 import type { FilaMensualidad } from "./mensualidades.js";
+import { repartirMonto } from "./pago-alumno.js";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
@@ -1373,10 +1374,21 @@ export function listBorradoresPendientes(): ComprobantePendiente[] {
  * Aprueba el borrador y recién ahí crea el ingreso, con la foto adjunta.
  * Devuelve el id del ingreso, o null si el borrador no existe o ya fue descartado.
  * Es idempotente: un doble toque en el botón devuelve el mismo ingreso, no dos.
+ *
+ * 🔑 EL ENGANCHE (paso 4 del CRM): si Mary eligió a qué alumno era el pago
+ * (`alumnoIds`), además se le marca la mensualidad de ese mes. Sin `alumnoIds` se
+ * comporta exactamente como antes — solo el ingreso —, porque un pago cargado al
+ * alumno equivocado le inventa una deuda a una familia y le regala un mes a otra.
  */
 export function aprobarBorradorComprobante(
   id: number,
-  d: { monto?: number; fecha?: string; apoderado?: string; tipo?: string; detalle?: string } = {}
+  d: {
+    monto?: number; fecha?: string; apoderado?: string; tipo?: string; detalle?: string;
+    /** A quién se le carga el pago. Varios = la transferencia paga a los hermanos. */
+    alumnoIds?: number[];
+    /** El mes que se marca ('YYYY-MM'). Por defecto, el de la fecha del pago. */
+    mes?: string;
+  } = {}
 ): number | null {
   const c = ctx();
   const b = getBorradorComprobante(id);
@@ -1388,6 +1400,9 @@ export function aprobarBorradorComprobante(
     | { name: string | null }
     | undefined;
 
+  const fecha = d.fecha ?? b.fecha;
+  const monto = Math.round(d.monto ?? b.monto);
+
   const tx = c.db.transaction(() => {
     const r = c.db
       .prepare(
@@ -1395,9 +1410,9 @@ export function aprobarBorradorComprobante(
          VALUES (?,?,?,?,?,?,?)`
       )
       .run(
-        d.fecha ?? b.fecha,
+        fecha,
         d.apoderado ?? b.nombre ?? conv?.name ?? null,
-        Math.round(d.monto ?? b.monto),
+        monto,
         d.tipo ?? null,
         d.detalle ?? null,
         b.media,
@@ -1405,6 +1420,26 @@ export function aprobarBorradorComprobante(
       );
     const ingresoId = r.lastInsertRowid as number;
     c.db.prepare("UPDATE comprobantes SET estado='aprobado', ingreso_id=? WHERE id=?").run(ingresoId, id);
+
+    // El enganche con el CRM: la mensualidad de quien Mary haya elegido.
+    const alumnoIds = (d.alumnoIds ?? []).filter((x) => Number.isFinite(x));
+    const mes = d.mes ?? (/^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha.slice(0, 7) : null);
+    if (alumnoIds.length > 0 && mes) {
+      const fichas = alumnoIds
+        .map((aid) => c.db.prepare("SELECT id, mensualidad FROM alumnos WHERE id=?").get(aid) as
+          | { id: number; mensualidad: number } | undefined)
+        .filter((x): x is { id: number; mensualidad: number } => x !== undefined);
+      const partes = repartirMonto(monto, fichas.map((f) => f.mensualidad));
+      fichas.forEach((f, i) => {
+        // Se SUMA a lo que ya llevaba pagado ese mes: dos abonos de 30.000 son 60.000,
+        // no 30.000 dos veces.
+        const previo = getMensualidad(f.id, mes)?.pagado ?? 0;
+        marcarPago({
+          alumnoId: f.id, mes, pagado: previo + partes[i],
+          fecha, comprobanteId: id, ingresoId,
+        });
+      });
+    }
     return ingresoId;
   });
   return tx();

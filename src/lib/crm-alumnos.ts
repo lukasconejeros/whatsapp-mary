@@ -11,8 +11,10 @@
 import {
   listAlumnos, listInscripciones, asistenciaRango,
   ausenciasDeMes, ausenciasDiaDeMes, listMensualidadesDeMes, type Inscripcion,
+  getBorradorComprobante, getConversationById,
 } from "./db";
 import { estadoDelMes, type PagoDelMes } from "./mensualidades";
+import { emparejarPago, type AlumnoParaPago, type CandidatoPago } from "./pago-alumno";
 import { todaySantiago } from "./fechas";
 
 export interface FichaAlumno {
@@ -122,4 +124,69 @@ export function fichasDelMes(mes: string, hoy: string = todaySantiago()): FichaA
       || (dx?.hora ?? "").localeCompare(dy?.hora ?? "")
       || x.nombre.localeCompare(y.nombre, "es");
   });
+}
+
+// ── El enganche: de quién es la transferencia que llegó ───────────────────────
+
+export interface PropuestaComprobante {
+  comprobanteId: number;
+  /** Lo que el modelo leyó en la foto (Mary lo puede corregir antes de aprobar). */
+  monto: number;
+  titular: string | null;
+  fecha: string;
+  /** El teléfono del chat de donde salió la foto: la señal más fuerte. */
+  telefono: string | null;
+  /** El mes que se propone marcar, o null si la fecha no sirve. */
+  mes: string | null;
+  candidatos: CandidatoPago[];
+  elegido: CandidatoPago | null;
+}
+
+/**
+ * A quién se le propone cargar ese comprobante, con los datos de verdad: el teléfono
+ * del chat, quién ya pagó ese mes y quién avisó que no viene.
+ *
+ * Devuelve null si el comprobante ya no está. NO marca nada: esto es la propuesta que
+ * Mary ve antes de apretar Aprobar.
+ */
+export function propuestaDeComprobante(comprobanteId: number): PropuestaComprobante | null {
+  const b = getBorradorComprobante(comprobanteId);
+  if (!b) return null;
+
+  const conv = getConversationById(b.conversation_id);
+  const mes = /^\d{4}-\d{2}-\d{2}$/.test(b.fecha) ? b.fecha.slice(0, 7) : null;
+
+  // Quién ya pagó y quién no viene, SOLO del mes al que iría este pago.
+  const pagos = mes ? new Map(listMensualidadesDeMes(mes).map((m) => [m.alumno_id, m])) : new Map();
+  const fuera = mes ? new Set(ausenciasDeMes(mes).map((x) => x.alumnoId)) : new Set<number>();
+
+  const alumnos: AlumnoParaPago[] = listAlumnos().map((a) => {
+    const noViene = fuera.has(a.id);
+    const pago = estadoDelMes({
+      mes: mes ?? "", hoy: b.fecha, mensualidadBase: a.mensualidad,
+      fila: pagos.get(a.id) ?? null, noVieneEsteMes: noViene,
+    });
+    return {
+      id: a.id, nombre: a.nombre, apoderado: a.apoderado, telefono: a.telefono,
+      mensualidad: a.mensualidad, activo: a.activo,
+      yaPagoElMes: pago.estado === "pagado",
+      noVieneEsteMes: noViene,
+    };
+  });
+
+  const r = emparejarPago({
+    telefono: conv?.phone ?? null, monto: b.monto, nombreTitular: b.nombre,
+    fecha: b.fecha, alumnos,
+  });
+
+  return {
+    comprobanteId,
+    monto: b.monto,
+    titular: b.nombre,
+    fecha: b.fecha,
+    telefono: conv?.phone ?? null,
+    mes: r.mes,
+    candidatos: r.candidatos,
+    elegido: r.elegido,
+  };
 }

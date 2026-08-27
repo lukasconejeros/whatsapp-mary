@@ -67,6 +67,8 @@
     "test:crm": "tsx scripts/test-crm-alumnos.ts",
     "test:ausencias": "tsx scripts/test-ausencias.ts",
     "test:mensualidades": "tsx scripts/test-mensualidades.ts",
+    "test:pago-alumno": "tsx scripts/test-pago-alumno.ts",
+    "test:pago-comprobante": "tsx scripts/test-pago-comprobante.ts",
     "test:pago-api": "node scripts/test-pago-api.mjs",
     "test:ausencias-api": "node scripts/test-ausencias-api.mjs",
     "test:alumnos-api": "node scripts/test-alumnos-api.mjs",
