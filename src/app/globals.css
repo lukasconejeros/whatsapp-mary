@@ -182,9 +182,15 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
 .comp-campos { display: flex; align-items: center; gap: 8px; }
 .comp-acciones { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .comp-aprobar, .comp-descartar { min-height: 34px; }
+/* "¿De quién es este pago?" ocupa su propia línea entera: es la pregunta que hay
+   que leer entera antes de apretar, no un campo más apretujado al lado. */
+.comp-enganche { flex-basis: 100%; border-top: 1px dashed #FDE68A; padding-top: 8px; }
 
 @media (max-width: 767px) {
-  .comp-card { display: grid; grid-template-columns: 76px 1fr; grid-template-areas: "foto quien" "campos campos" "acciones acciones"; gap: 10px; }
+  .comp-card { display: grid; grid-template-columns: 76px 1fr; grid-template-areas: "foto quien" "campos campos" "enganche enganche" "acciones acciones"; gap: 10px; }
+  .comp-enganche { grid-area: enganche; }
+  .comp-enganche select { min-height: 44px; }
+  .comp-enganche input[type="month"] { min-height: 44px; }
   .comp-card > .comp-fotoslot { grid-area: foto; }
   .comp-foto { width: 76px !important; height: 76px !important; }
   .comp-quien { grid-area: quien; min-width: 0; align-self: center; }

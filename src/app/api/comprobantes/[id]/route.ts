@@ -9,6 +9,8 @@ interface Ctx { params: Promise<{ id: string }> }
 interface Body {
   accion?: "aprobar" | "descartar";
   monto?: number; fecha?: string; apoderado?: string; tipo?: string; detalle?: string;
+  /** El enganche del paso 4: a qué alumno (o hermanos) es este pago, y de qué mes. */
+  alumnoIds?: unknown; mes?: unknown;
 }
 
 // Los dos botones de la bandeja. El ingreso nace SOLO al aprobar, con lo que Mary
@@ -33,8 +35,28 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   // Un monto corregido a mano solo se acepta si es un número usable; si viene
   // basura, se queda el que leyó el modelo en vez de guardar un ingreso en cero.
   const monto = typeof b.monto === "number" && b.monto > 0 ? Math.round(b.monto) : undefined;
+
+  // El enganche con el CRM. Aquí NO vale "ante la duda, lo más probable": un id o un
+  // mes que no se entienden se rechazan, porque marcar el mes del alumno equivocado
+  // le inventa una deuda a una familia y le regala un pago a otra.
+  let alumnoIds: number[] | undefined;
+  if (b.alumnoIds !== undefined) {
+    if (!Array.isArray(b.alumnoIds) || !b.alumnoIds.every((x) => Number.isInteger(x) && (x as number) > 0)) {
+      return NextResponse.json({ ok: false, error: "alumnoIds debe ser una lista de ids" }, { status: 400 });
+    }
+    alumnoIds = (b.alumnoIds as number[]).length > 0 ? (b.alumnoIds as number[]) : undefined;
+  }
+  let mes: string | undefined;
+  if (b.mes !== undefined && b.mes !== null && b.mes !== "") {
+    if (typeof b.mes !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(b.mes)) {
+      return NextResponse.json({ ok: false, error: "mes debe ser YYYY-MM" }, { status: 400 });
+    }
+    mes = b.mes;
+  }
+
   const ingresoId = aprobarBorradorComprobante(id, {
     monto, fecha: b.fecha, apoderado: b.apoderado, tipo: b.tipo, detalle: b.detalle,
+    alumnoIds, mes,
   });
   if (ingresoId === null) {
     return NextResponse.json({ ok: false, error: "ese comprobante ya fue descartado" }, { status: 409 });

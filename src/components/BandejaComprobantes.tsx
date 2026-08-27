@@ -8,6 +8,12 @@ import { INGRESO_TIPOS, formatCLP } from '@/lib/finanzas'
 // NO entran solas a Ingresos. Mary mira la foto, corrige si hace falta y aprueba de un
 // toque. Decisión de Lukas (05-08-2026): nada automático.
 
+// Un alumno posible para este pago. 'alumnoIds' trae más de uno cuando la
+// transferencia paga a los hermanos de una vez.
+type Candidato = { alumnoIds: number[]; etiqueta: string; razon: string; avisos: string[] }
+type Propuesta = { mes: string | null; candidatos: Candidato[]; elegido: Candidato | null } | null
+type AlumnoLista = { id: number; nombre: string; mensualidad: number }
+
 type Pendiente = {
   id: number
   media: string | null
@@ -19,23 +25,36 @@ type Pendiente = {
   de_meta: number
   contacto: string | null
   telefono: string
+  propuesta: Propuesta
 }
 
 export default function BandejaComprobantes({ onCambio }: { onCambio: () => void }) {
   const [items, setItems] = useState<Pendiente[]>([])
-  const [edits, setEdits] = useState<Record<number, { monto: string; tipo: string }>>({})
+  const [alumnos, setAlumnos] = useState<AlumnoLista[]>([])
+  const [edits, setEdits] = useState<Record<number, { monto: string; tipo: string; quien: string; mes: string }>>({})
   const [ocupado, setOcupado] = useState<number | null>(null)
   const [foto, setFoto] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       const d = await fetch('/api/comprobantes').then(r => r.json())
-      if (d.ok) setItems(d.comprobantes)
+      if (d.ok) { setItems(d.comprobantes); setAlumnos(d.alumnos ?? []) }
     } catch { /* si no hay internet, la bandeja simplemente no aparece */ }
   }, [])
   useEffect(() => { load() }, [load])
 
-  const campo = (c: Pendiente) => edits[c.id] ?? { monto: String(c.monto), tipo: '' }
+  const campo = (c: Pendiente) => edits[c.id] ?? {
+    monto: String(c.monto),
+    tipo: '',
+    // Viene preseleccionado el que propone la app, para que sea UN toque. Vacío
+    // cuando hay dudas: ahí elige Mary, que es la regla desde el primer día.
+    quien: c.propuesta?.elegido?.alumnoIds.join(',') ?? '',
+    mes: c.propuesta?.mes ?? '',
+  }
+
+  /** El candidato que está elegido ahora mismo en el desplegable, para su explicación. */
+  const candidatoDe = (c: Pendiente, quien: string): Candidato | null =>
+    c.propuesta?.candidatos.find(x => x.alumnoIds.join(',') === quien) ?? null
 
   async function accion(c: Pendiente, accion: 'aprobar' | 'descartar') {
     if (ocupado !== null) return // evita el doble toque
@@ -49,7 +68,13 @@ export default function BandejaComprobantes({ onCambio }: { onCambio: () => void
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(accion === 'aprobar'
-          ? { accion, monto, tipo: e.tipo || undefined, detalle: c.nombre || c.contacto || undefined }
+          ? {
+              accion, monto, tipo: e.tipo || undefined,
+              detalle: c.nombre || c.contacto || undefined,
+              // A quién se le marca la mensualidad. Sin nadie elegido, solo el ingreso.
+              alumnoIds: e.quien ? e.quien.split(',').map(Number) : undefined,
+              mes: e.quien && e.mes ? e.mes : undefined,
+            }
           : { accion }),
       }).then(x => x.json())
       if (r.ok) { setItems(p => p.filter(x => x.id !== c.id)); onCambio() }
@@ -74,7 +99,7 @@ export default function BandejaComprobantes({ onCambio }: { onCambio: () => void
           const e = campo(c)
           const trabajando = ocupado === c.id
           return (
-            <div key={c.id} className="comp-card" style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: 12, padding: 10 }}>
+            <div key={c.id} data-comp-id={c.id} className="comp-card" style={{ background: '#fff', border: '1px solid #FDE68A', borderRadius: 12, padding: 10 }}>
               {/* Foto del comprobante */}
               {c.media ? (
                 <button className="comp-fotoslot" onClick={() => setFoto(c.media)} title="Ver la foto completa"
@@ -109,6 +134,58 @@ export default function BandejaComprobantes({ onCambio }: { onCambio: () => void
                   <option value="">— categoría —</option>
                   {INGRESO_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
+              </div>
+
+              {/* ¿De quién es este pago? El enganche con la ficha del alumno */}
+              <div className="comp-enganche">
+                <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#054D44' }}>¿De quién es este pago?</span>
+                  <select aria-label="¿De quién es este pago?" value={e.quien}
+                    onChange={ev => setEdits(p => ({ ...p, [c.id]: { ...e, quien: ev.target.value } }))}
+                    style={{ flex: 1, minWidth: 170, padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13, background: '#fff', color: '#054D44' }}>
+                    <option value="">— de nadie, solo anotar el ingreso —</option>
+                    {(c.propuesta?.candidatos.length ?? 0) > 0 && (
+                      <optgroup label="Lo que propone la app">
+                        {c.propuesta!.candidatos.map(x => (
+                          <option key={x.alumnoIds.join(',')} value={x.alumnoIds.join(',')}>{x.etiqueta}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Todos los alumnos">
+                      {alumnos.map(a => <option key={a.id} value={String(a.id)}>{a.nombre}</option>)}
+                    </optgroup>
+                  </select>
+                  {e.quien && (
+                    <input type="month" aria-label="Mes que se marca pagado" value={e.mes}
+                      onChange={ev => setEdits(p => ({ ...p, [c.id]: { ...e, mes: ev.target.value } }))}
+                      style={{ padding: '7px 9px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13, color: '#054D44' }} />
+                  )}
+                </div>
+                {(() => {
+                  const cand = candidatoDe(c, e.quien)
+                  if (!e.quien) {
+                    // Con candidatos pero sin preseleccionado hay una duda de verdad
+                    // (dos hermanos, o el que ya pagó): se le pide que elija, en vez de
+                    // dejar el campo mudo y que el pago se pierda sin dueño.
+                    const n = c.propuesta?.candidatos.length ?? 0
+                    return n > 0 ? (
+                      <p style={{ fontSize: 11, color: '#B45309', marginTop: 4 }}>
+                        Hay {n === 1 ? '1 alumno posible' : `${n} alumnos posibles`}: ábrelo y elige de quién es,
+                        o déjalo así y solo se anota el ingreso.
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: 11, color: '#8696A0', marginTop: 4 }}>
+                        No se pudo saber de quién es. Elige el alumno en la lista, o déjalo así y solo se anota el ingreso.
+                      </p>
+                    )
+                  }
+                  return (
+                    <p style={{ fontSize: 11, color: cand?.avisos.length ? '#B45309' : '#8696A0', marginTop: 4 }}>
+                      {cand ? cand.razon : 'lo elegiste tú a mano'}
+                      {cand?.avisos.length ? ` · ⚠ ${cand.avisos.join(' · ')}` : ''}
+                    </p>
+                  )
+                })()}
               </div>
 
               {/* Los dos botones */}

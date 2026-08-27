@@ -70,6 +70,7 @@
     "test:pago-alumno": "tsx scripts/test-pago-alumno.ts",
     "test:pago-comprobante": "tsx scripts/test-pago-comprobante.ts",
     "test:pago-api": "node scripts/test-pago-api.mjs",
+    "test:enganche-api": "node scripts/test-enganche-api.mjs",
     "test:ausencias-api": "node scripts/test-ausencias-api.mjs",
     "test:alumnos-api": "node scripts/test-alumnos-api.mjs",
     "test:pagos-recordatorios": "tsx scripts/test-pagos-recordatorios.ts",

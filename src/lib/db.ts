@@ -6,7 +6,7 @@ import { normalizeChilePhone } from "./phone";
 // porque el calendario del navegador también lo necesita.
 import type { Ausencia, TipoAusencia } from "./dia-clases.js";
 import type { FilaMensualidad } from "./mensualidades.js";
-import { repartirMonto } from "./pago-alumno.js";
+import { repartirMonto } from "./pago-alumno";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
