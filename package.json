@@ -76,6 +76,7 @@
     "test:ausencias-api": "node scripts/test-ausencias-api.mjs",
     "test:alumnos-api": "node scripts/test-alumnos-api.mjs",
     "test:tarjeta-dia-api": "node scripts/test-tarjeta-dia-api.mjs",
+    "test:calendario-iphone": "node scripts/test-calendario-iphone.mjs",
     "test:pagos-recordatorios": "tsx scripts/test-pagos-recordatorios.ts",
     "test:cache-prompt": "tsx scripts/test-cache-prompt.ts",
     "medir:cache": "tsx scripts/medir-cache-prompt.ts",

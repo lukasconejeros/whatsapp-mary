@@ -34,7 +34,10 @@ function getSpeechRecognition(): (new () => SpeechRec) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
+// En el computador cabe el nombre corto; en el teléfono va la inicial sola, como
+// el Calendario del iPhone que pidió copiar Lukas (27-08-2026): L M M J V S D.
 const DOW_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const DOW_INICIAL = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 const TITULO_TIPO: Record<string, string> = {
   clase: 'clase', alumno: 'alumno', pago: 'pago', recordatorio: 'recordatorio',
 }
@@ -475,7 +478,9 @@ export default function CalendarioPage() {
           <span style={{ fontSize: 13, fontWeight: 600, color: '#054D44' }}>Calendario</span>
           <div className="flex items-center gap-1">
             <button onClick={() => goMonth(-1)} title="Mes anterior" style={{ display: 'flex', border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#008069' }}><ChevronLeft size={15} /></button>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#054D44', minWidth: 130, textAlign: 'center' }}>{monthName}</span>
+            {/* En el teléfono este nombre sobra: abajo está el mes grande del iPhone y
+                se veía dos veces ("Agosto de 2026" y "Agosto"). Acá quedan las flechas. */}
+            <span className="cal-mes-barra" style={{ fontSize: 13, fontWeight: 700, color: '#054D44', minWidth: 130, textAlign: 'center' }}>{monthName}</span>
             <button onClick={() => goMonth(1)} title="Mes siguiente" style={{ display: 'flex', border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#008069' }}><ChevronRight size={15} /></button>
             <button onClick={irHoy} style={{ marginLeft: 4, border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', color: '#667781', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>Hoy</button>
           </div>
@@ -500,13 +505,28 @@ export default function CalendarioPage() {
           <div className="cal-main">
             {/* Grilla del mes */}
             <section className="cal-grid">
-              <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
+              {/* El mes, grande y en negrita arriba de todo: es lo primero que se lee en
+                  el Calendario del iPhone. En el computador estorba (ya está en la barra
+                  de arriba, junto a las flechas), así que solo sale en el teléfono. */}
+              <h2 className="cal-mes-titulo" data-mes-titulo
+                style={{ fontSize: 32, fontWeight: 800, color: '#1F2937', lineHeight: 1.1, margin: '2px 0 10px', letterSpacing: '-0.5px', padding: '0 12px' }}>
+                {capital(new Date(cursor.y, cursor.m, 1).toLocaleDateString('es-CL', { month: 'long' }))}
+                {/* El año en chico al lado, como el iPhone: al pasar de diciembre a enero
+                    hay que poder ver en qué año se quedó uno. */}
+                <span style={{ fontSize: 17, fontWeight: 600, color: '#9AA7AD', marginLeft: 8 }}>{cursor.y}</span>
+              </h2>
+              <div className="cal-caja" style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
                 {/* minmax(0,1fr) y no 1fr: una columna `1fr` no puede encoger por debajo de su
                     contenido, así que un título largo ensanchaba su día y aplastaba a los demás
                     (Lukas, 09-08: "el calendario se ve mal en el computador"). */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid #E7F1EC' }}>
-                  {DOW_LABELS.map(d => (
-                    <div key={d} style={{ padding: '8px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#667781' }}>{d}</div>
+                  {DOW_LABELS.map((d, i) => (
+                    // Sábado y domingo en gris claro, como en el iPhone: de un vistazo se
+                    // ve dónde termina la semana de trabajo (Mary igual hace clases el sábado).
+                    <div key={d} data-dow={i} style={{ padding: '8px 6px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: i >= 5 ? '#B0BEC5' : '#667781' }}>
+                      <span className="cal-dow-largo">{d}</span>
+                      <span className="cal-dow-corto">{DOW_INICIAL[i]}</span>
+                    </div>
                   ))}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
@@ -518,6 +538,11 @@ export default function CalendarioPage() {
                     const evs = eventosDe(f)
                     // Primero las clases de todas las semanas y después las sueltas,
                     // que es el orden en que Mary piensa el día.
+                    // Cada clase se escribe de DOS maneras: `label` con los nombres, que es
+                    // lo que cabe en el computador, y `corto` para el teléfono, donde la
+                    // celda mide unos 55 px y cualquier nombre sale cortado en "Alis…".
+                    // Ahí va cuánta gente viene y con qué profesora (Lukas eligió eso el
+                    // 27-08-2026); los nombres quedan a un toque, en el detalle del día.
                     const chips = [
                       // Las salas del horario: los que vienen, y aparte cuántos avisaron
                       // que no. Así de un vistazo se ve si un día quedó a medias.
@@ -526,40 +551,58 @@ export default function CalendarioPage() {
                         const fuera = s.alumnos.length - vienen.length
                         const label = [vienen.join(', ') || 'nadie', fuera ? `${fuera} no ${fuera === 1 ? 'viene' : 'vienen'}` : '']
                           .filter(Boolean).join(' · ')
-                        return { key: `s${f}-${s.profe ?? 'sp'}`, pc: profeColor(s.profe ?? ''), hora: s.hora, label, fija: true }
+                        // En el teléfono NO cabe el nombre de la profesora ("5 Pa…"), y además
+                        // sobra: cada una tiene su color y su leyenda arriba. Va el número de
+                        // alumnos, que es lo que no se puede saber mirando el color.
+                        return { key: `s${f}-${s.profe ?? 'sp'}`, pc: profeColor(s.profe ?? ''), hora: s.hora, label,
+                          corto: String(vienen.length), fija: true }
                       }),
-                      ...fijasDe(f).map(x => ({ key: `f${x.id}`, pc: profeColor(x.profe), hora: x.hora, label: x.alumnos.join(', ') || x.profe, fija: true })),
-                      ...evs.map(x => ({ key: `c${x.id}`, pc: profeColor(x.profe), hora: x.hora ?? '', label: x.nota || (x.alumnos.length ? x.alumnos.map(etiquetaAlumno).join(', ') : x.profe), fija: false })),
+                      ...fijasDe(f).map(x => ({ key: `f${x.id}`, pc: profeColor(x.profe), hora: x.hora, label: x.alumnos.join(', ') || x.profe,
+                        corto: String(x.alumnos.length), fija: true })),
+                      // Una clase suelta o un recado no tiene "cuántos vienen" que valga:
+                      // ahí va la hora sin los minutos, con una "h" pegada ("19h") para que
+                      // no se confunda con el número de alumnos de las salas ("19" alumnos
+                      // no existe, pero de un vistazo se leía igual).
+                      ...evs.map(x => ({ key: `c${x.id}`, pc: profeColor(x.profe), hora: x.hora ?? '', label: x.nota || (x.alumnos.length ? x.alumnos.map(etiquetaAlumno).join(', ') : x.profe),
+                        corto: x.hora ? `${Number(x.hora.slice(0, 2))}h` : '·', fija: false })),
                     ]
                     return (
-                      <button key={i} onClick={() => setSel(f)} className="cal-cell" data-fecha={f}
+                      <button key={i} onClick={() => setSel(f)} className="cal-cell" data-fecha={f} data-fuera-mes={inMonth ? '0' : '1'}
                         style={{ position: 'relative', minHeight: 92, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 3,
                           padding: '5px 5px 6px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                          border: 'none', borderRight: (i % 7 !== 6) ? '1px solid #E7F1EC' : 'none', borderBottom: (i < cells.length - 7) ? '1px solid #E7F1EC' : 'none',
-                          background: isSel ? '#E7F1EC' : inMonth ? '#fff' : '#F6FBF8',
+                          // Solo línea abajo: el iPhone separa las SEMANAS, no los días entre sí.
+                          border: 'none', borderBottom: (i < cells.length - 7) ? '1px solid #E7F1EC' : 'none',
+                          background: isSel ? '#E7F1EC' : inMonth ? '#fff' : '#FAFCFB',
                           boxShadow: isSel && !isHoy ? 'inset 0 0 0 1.5px #F9A8D4' : 'none' }}>
-                        <span style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, borderRadius: 999, padding: '0 4px',
-                          fontSize: 11, fontWeight: isHoy ? 800 : 600,
-                          background: isHoy ? '#00A884' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#374151' : '#9AA7AD' }}>{cell.getDate()}</span>
-                        {/* Etiquetas completas (PC) */}
+                        {/* Hoy: número blanco dentro de un círculo lleno (en el iPhone es rojo;
+                            acá va el verde de la casa). El círculo es redondo de verdad —
+                            ancho y alto iguales— si no, con dos cifras sale ovalado. */}
+                        <span data-num {...(isHoy ? { 'data-hoy-num': true } : {})}
+                          style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 999,
+                            fontSize: 13, fontWeight: isHoy ? 800 : 600,
+                            background: isHoy ? '#00A884' : 'transparent', color: isHoy ? '#fff' : inMonth ? '#1F2937' : '#B0BEC5' }}>{cell.getDate()}</span>
+                        {/* Las etiquetas, ESCRITAS dentro de la celda — en el teléfono también
+                            (antes ahí solo había puntitos de color y no se leía nada, que es
+                            justo lo que Lukas pidió cambiar el 27-08-2026). Cada una es una
+                            píldora con fondo suave y su puntito de color a la izquierda, como
+                            en el Calendario del iPhone. El texto largo se corta con puntos. */}
                         <div className="cal-ev-full" style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
                           {chips.slice(0, 3).map(ch => (
-                            <span key={ch.key} title={`${ch.hora} ${ch.label}`.trim()}
-                              style={{ display: 'block', fontSize: 10, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                                background: ch.pc.bg, color: '#3f2a35', borderLeft: `3px ${ch.fija ? 'double' : 'solid'} ${ch.pc.color}`, borderRadius: 5, padding: '2px 5px' }}>
-                              {ch.hora ? <b style={{ color: ch.pc.color }}>{ch.hora}</b> : null} {ch.label}
+                            <span key={ch.key} data-ev title={`${ch.hora} ${ch.label}`.trim()}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, lineHeight: 1.35, minWidth: 0,
+                                background: ch.pc.bg, color: '#3f2a35', borderRadius: 999, padding: '2px 6px' }}>
+                              <span data-ev-punto style={{ width: 6, height: 6, borderRadius: '50%', background: ch.pc.color, flexShrink: 0 }} />
+                              {/* La hora solo en el computador: en el teléfono la celda es angosta y
+                                  "16:00" se comía el renglón entero dejando los nombres en "…".
+                                  Lo que Mary necesita leer de un vistazo es QUIÉN viene; la hora
+                                  exacta está un toque más allá, en el detalle del día. */}
+                              {ch.hora ? <b className="cal-ev-hora" style={{ color: ch.pc.color, flexShrink: 0 }}>{ch.hora}</b> : null}
+                              <span className="cal-ev-largo" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{ch.label}</span>
+                              <span className="cal-ev-corto" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, fontWeight: 600 }}>{ch.corto}</span>
                             </span>
                           ))}
                           {chips.length > 3 && <span style={{ fontSize: 10, color: '#667781', paddingLeft: 3 }}>+{chips.length - 3} más</span>}
                         </div>
-                        {/* Puntos de color (teléfono): mantiene todas las celdas de la misma altura */}
-                        {chips.length > 0 && (
-                          <div className="cal-ev-dots">
-                            {chips.slice(0, 6).map(ch => (
-                              <span key={ch.key} style={{ width: 6, height: 6, borderRadius: '50%', background: ch.pc.color, display: 'inline-block' }} />
-                            ))}
-                          </div>
-                        )}
                       </button>
                     )
                   })}

@@ -170,13 +170,35 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .cal-detail { width: 100%; position: static; }
 }
 
-/* Puntos de color por evento (solo teléfono): mantienen las celdas del mes de
-   igual altura para que la grilla no se vea desalineada/asimétrica. */
+/* El mes de la vista de teléfono va calcado del Calendario del iPhone (Lukas,
+   27-08-2026: "quiero que sea igual a la foto que te envié"). Antes acá la celda
+   se aplastaba a 58 px y las clases se escondían detrás de unos puntos de color:
+   Mary tenía que tocar día por día para saber quién venía. Ahora la celda es
+   alta y las etiquetas se leen dentro, igual que en el computador. */
 .cal-ev-dots { display: none; }
+.cal-mes-titulo { display: none; }          /* en el PC el mes ya está en la barra de arriba */
+.cal-dow-corto { display: none; }           /* en el PC caben "Lun, Mar…" */
+.cal-ev-corto { display: none; }            /* en el PC caben los nombres de los alumnos */
 @media (max-width: 767px) {
-  .cal-cell { min-height: 0 !important; height: 58px !important; padding: 4px !important; overflow: hidden; }
-  .cal-cell .cal-ev-full { display: none !important; }
-  .cal-cell .cal-ev-dots { display: flex; flex-wrap: wrap; gap: 3px; padding-left: 2px; }
+  .cal-mes-titulo { display: block; }
+  .cal-mes-barra { display: none; }  /* el mes ya va grande abajo; se veía dos veces */
+  .cal-ev-hora { display: none; }    /* la hora se comía el renglón y tapaba los nombres */
+  /* En el teléfono, "cuántos vienen y con quién" en vez de un nombre cortado en "Alis…". */
+  .cal-ev-largo { display: none; }
+  .cal-ev-corto { display: inline; }
+  /* La celda mide ~55 px: la píldora va apretada (menos relleno, menos hueco y letra
+     un punto más chica) o "5 Paula" se sigue cortando aunque el texto sea corto. */
+  .cal-cell [data-ev] { padding: 2px 4px !important; gap: 3px !important; font-size: 9.5px !important; }
+  .cal-cell [data-ev-punto] { width: 5px !important; height: 5px !important; }
+  .cal-dow-largo { display: none; }
+  .cal-dow-corto { display: inline; }
+  /* Celda alta y con aire, para que quepan las etiquetas escritas. */
+  .cal-cell { min-height: 96px !important; padding: 5px 4px 6px !important; overflow: hidden; }
+  /* La caja pierde el marco y las esquinas: en el teléfono el calendario ocupa
+     todo el ancho, sin tarjeta alrededor, como en el iPhone. */
+  .cal-caja { border-left: none !important; border-right: none !important; border-radius: 0 !important; box-shadow: none !important; }
+  .cal-main { padding: 12px 0 !important; }
+  .cal-detail { padding: 0 12px; }
 }
 
 /* ── Finanzas en el teléfono (Mary no usa computador) ────────────────────── */
