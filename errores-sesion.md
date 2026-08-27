@@ -777,3 +777,40 @@ paths del índice y se rehizo el commit solo con lo del día.
 **La regla.** En este repo, `git add -A` está prohibido: se agregan los archivos a mano o se mira
 `git show --stat` antes de cualquier push. Un `git status` con archivos sin trackear que uno no
 puso ahí es una alarma, no ruido de fondo.
+
+---
+
+## 27-08-2026 · Un import con `.js` en `db.ts` tumbó el build entero de Next
+
+**Qué pasó.** Al enganchar el comprobante con el alumno, `src/lib/db.ts` necesitó una
+función de verdad (no un tipo) de `pago-alumno.ts`. Se escribió como los vecinos,
+`from "./pago-alumno.js"`, y `npm run build` murió con `module-not-found` en `db.ts:9`.
+Los tests con `tsx` pasaban igual: solo se cayó el build.
+
+**Por qué.** Los otros imports con `.js` de ese archivo son `import type` — desaparecen al
+compilar, así que nadie los resuelve. Un import de valor sí lo resuelve el bundler de
+Next, y ahí `./pago-alumno.js` no existe. La forma correcta en `src/` es sin extensión
+(`from "./pago-alumno"`), como el `./phone` de la línea 4. En `scripts/`, en cambio, el
+`.js` SÍ hace falta: los corre Node como ESM.
+
+**La regla.** Copiar el import del vecino no basta: hay que mirar si el vecino importa un
+TIPO o un VALOR. Y un `npm run build` limpio es parte de terminar, porque los tests con
+`tsx` no lo cazan.
+
+---
+
+## 27-08-2026 · Un test de pantalla que apretaba el botón de OTRA tarjeta
+
+**Qué pasó.** `test:enganche-api` fallaba en 3 casos con el enganche ya funcionando. La
+prueba tomaba `.comp-card` **primero** de la bandeja, y en la base local había un
+comprobante de humo del 05-08 que quedó ahí de otra prueba: el selector que miraba y el
+botón Aprobar que apretaba eran de un comprobante ajeno.
+
+**El arreglo.** Cada tarjeta lleva `data-comp-id` y la prueba apunta a la suya. Un
+`.first()` en una lista que otros también llenan no es un localizador, es una lotería.
+
+**Y un falso fallo dentro del mismo test.** Después seguía rojo "nadie preseleccionado":
+resulta que la alumna del caso YA había quedado pagada dos pasos antes en la misma
+corrida, y el sistema —bien— no propone a quien ya pagó. El test reutilizaba estado suyo.
+Ahora esa parte usa una casa nueva y, de paso, quedó como caso propio: **a quien ya pagó
+no se le preselecciona otro pago del mismo mes**.
