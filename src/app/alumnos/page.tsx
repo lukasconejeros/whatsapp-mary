@@ -33,7 +33,6 @@ type Pago = {
   monto: number; pagado: number; falta: number; fecha: string | null
   comprobanteId: number | null; ingresoId: number | null; nota: string | null
 }
-type ResumenPagos = { cobrado: number; porCobrar: number; deben: number; alDia: number; noCobra: number; sinMonto: number }
 
 // Cómo se ve cada estado en la tarjeta. 'no_cobra' y 'sin_monto' no pintan nada:
 // ya se dicen solos en otra parte de la tarjeta y repetirlos ensucia.
@@ -73,14 +72,13 @@ export default function AlumnosPage() {
   const [filtroDia, setFiltroDia] = useState('Todos')
   const [abierta, setAbierta] = useState<Ficha | null>(null)
   const [nueva, setNueva] = useState(false)
-  const [pagos, setPagos] = useState<ResumenPagos | null>(null)
 
   const load = useCallback(async (m: string) => {
     setLoading(true)
     try {
       const r = await fetch(`/api/alumnos?mes=${m}`, { cache: 'no-store' })
-      const d = await r.json() as { ok: boolean; alumnos?: Ficha[]; pagos?: ResumenPagos }
-      if (d.ok && d.alumnos) { setFichas(d.alumnos); setPagos(d.pagos ?? null) }
+      const d = await r.json() as { ok: boolean; alumnos?: Ficha[] }
+      if (d.ok && d.alumnos) setFichas(d.alumnos)
     } catch { /* se queda con lo que había */ }
     setLoading(false)
   }, [])
@@ -112,11 +110,9 @@ export default function AlumnosPage() {
   const sueltos = activos.filter(f => f.inscripciones.length === 0)
   if (sueltos.length) grupos.push({ dia: 'Todavía sin horario', fichas: sueltos })
 
-  const porConfirmar = fichas.filter(f => f.revisar).length
-  const sinTelefono = fichas.filter(f => !f.telefono).length
-  const conFaltas = fichas.filter(f => f.faltas.length > 0).length
+  // Arriba va UN solo número: cuántos alumnos hay este mes. Lo demás (faltas, teléfono,
+  // pagos, mensualidad) vive dentro de cada tarjeta, que es donde Mary lo necesita.
   const vienenEsteMes = fichas.filter(f => !f.noVieneEsteMes).length
-  const fueraEsteMes = fichas.filter(f => f.noVieneEsteMes).length
 
   // "Sí viene": borra el aviso del mes y el alumno vuelve al listado.
   async function siViene(ausenciaId: number) {
@@ -157,24 +153,10 @@ export default function AlumnosPage() {
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '16px 20px 40px' }}>
 
-          {/* El resumen del mes: lo primero que Mary tiene que ver */}
+          {/* Un solo número arriba: cuántos alumnos hay. Nada más. */}
           <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', marginBottom: 14 }}>
             <Resumen n={vienenEsteMes} label={`alumnos en ${mesLargo(mes).split(' ')[0].toLowerCase()}`} color="#00A884" />
-            <Resumen n={conFaltas} label={`con faltas en ${mesLargo(mes).split(' ')[0].toLowerCase()}`} color="#EF4444" />
-            <Resumen n={porConfirmar} label="por confirmar con Mary" color="#D97706" />
-            <Resumen n={sinTelefono} label="sin teléfono del apoderado" color="#8696A0" />
-            {fueraEsteMes > 0 && <Resumen n={fueraEsteMes} label={fueraEsteMes === 1 ? 'no viene este mes' : 'no vienen este mes'} color="#667781" />}
           </div>
-
-          {/* La plata del mes: cuánto entró y cuánto falta por cobrar */}
-          {pagos && (
-            <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
-              <Resumen n={pesos(pagos.cobrado)} label={`cobrado en ${mesLargo(mes).split(' ')[0].toLowerCase()}`} color="#00A884" />
-              <Resumen n={pesos(pagos.porCobrar)} label="por cobrar" color={pagos.porCobrar > 0 ? '#B45309' : '#8696A0'} />
-              <Resumen n={pagos.deben} label={pagos.deben === 1 ? 'todavía no paga' : 'todavía no pagan'} color={pagos.deben > 0 ? '#B91C1C' : '#8696A0'} />
-              {pagos.sinMonto > 0 && <Resumen n={pagos.sinMonto} label="sin mensualidad cargada" color="#8696A0" />}
-            </div>
-          )}
 
           {/* Filtro por día: el mismo orden del calendario */}
           <div className="flex items-center gap-1.5" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
