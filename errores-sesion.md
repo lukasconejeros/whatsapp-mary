@@ -878,3 +878,19 @@ cabecera del propio archivo lo dejaba escrito. Se repitió igual.
 
 **La regla.** Los archivos de memoria (`SIGUIENTE.md`, `MEMORY.md`, `project_*.md`) NO se editan
 con scripts. Se editan a mano con la herramienta de edición, que no trunca el archivo si falla.
+
+---
+
+## 27-08-2026 · El push que se cuelga: la solución es `GIT_TERMINAL_PROMPT=0`
+
+**Qué pasó.** `git push` se quedó colgado tres veces seguidas sin escribir nada (el Credential
+Manager de Windows abre una ventana que nadie ve). Lanzarlo en segundo plano a veces empuja
+igual y a veces no: esta vez no, y quedó trabado hasta agotar la espera.
+
+**El arreglo, probado.** `GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git push origin main`
+subió al primer intento. Escupe `fatal: Cannot prompt because user interactivity has been
+disabled` y **empuja igual** — ese texto es ruido, hay que mirar la línea siguiente
+(`95422dd..f33aea6 main -> main`) y confirmar con `git ls-remote origin main`.
+
+**La regla.** En este PC el push va siempre con esas dos variables delante. Y `git log
+origin/main..HEAD` miente sin un `fetch` previo: la verdad es `git ls-remote`.
