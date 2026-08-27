@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import { DIA_LABEL, DIAS, PROFE_NOMBRES, profeColor } from '@/lib/calendario'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2, Check, Phone, AlertTriangle, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, Check, Phone, AlertTriangle, Search, Pencil } from 'lucide-react'
 
 type Inscripcion = { id: number; alumnoId: number; dia: string | null; hora: string; horaFin: string | null; profe: string | null; activa: boolean }
 type Ficha = {
@@ -217,7 +217,21 @@ export default function AlumnosPage() {
         </div>
       </div>
 
-      {abierta && <Editor ficha={abierta} mes={mes} onCerrar={() => setAbierta(null)} onGuardado={() => { setAbierta(null); load(mes) }} guardar={guardar} />}
+      {/* Dos maneras de terminar, y no son la misma:
+          · onGuardado  cierra la ficha (el botón Guardar de abajo, dar de baja…),
+          · onRefrescar deja la ficha ABIERTA y solo vuelve a leer los datos.
+          Lo segundo es para corregir los días de clase: si al arreglar una hora se
+          cerrara todo, Mary tendría que volver a abrir la ficha por cada día. */}
+      {abierta && (
+        <Editor
+          ficha={fichas.find(f => f.id === abierta.id) ?? abierta}
+          mes={mes}
+          onCerrar={() => setAbierta(null)}
+          onGuardado={() => { setAbierta(null); load(mes) }}
+          onRefrescar={() => load(mes)}
+          guardar={guardar}
+        />
+      )}
       {nueva && <Alta onCerrar={() => setNueva(false)} onCreado={() => { setNueva(false); load(mes) }} />}
     </div>
   )
@@ -239,52 +253,31 @@ function Tarjeta({ f, onClick }: { f: Ficha; onClick: () => void }) {
   return (
     <button data-alumno={f.id} onClick={onClick}
       style={{ textAlign: 'left', border: '1px solid #D3E7DE', borderRadius: 14, background: '#fff', padding: 0, cursor: 'pointer', fontFamily: 'inherit', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
-      <div style={{ padding: '12px 14px 10px' }}>
+      {/* TARJETA COMPACTA (Lukas, 27-08-2026): "fuera el horario y la plata de la
+          tarjeta". El horario y la mensualidad no se pierden — se ven, y ahora se
+          editan, al abrir la ficha. Aquí se queda solo lo que Mary necesita de un
+          vistazo recorriendo el listado: quién es, si falta algo por hacer con él,
+          y el aviso amarillo si la planilla dejó una duda. */}
+      <div style={{ padding: '11px 13px' }}>
         <p style={{ fontSize: 15, fontWeight: 700, color: '#054D44', lineHeight: 1.2 }}>{f.nombre}</p>
 
-        {/* Sus días, cada uno con SU hora de salida y el color de su profesora */}
-        <div className="flex" style={{ gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
-          {f.inscripciones.map(i => {
-            const c = profeColor(i.profe ?? '')
-            return (
-              <span key={i.id} style={{ fontSize: 11, fontWeight: 600, color: c.color, background: c.bg, border: `1px solid ${c.bd}`, borderRadius: 999, padding: '3px 8px' }}>
-                {i.dia ? DIA_CORTO[i.dia] : '¿?'} {i.hora}{i.horaFin ? `–${i.horaFin}` : ''}{i.profe ? ` · ${i.profe}` : ''}
-              </span>
-            )
-          })}
-          {f.inscripciones.length === 0 && <span style={{ fontSize: 11, color: '#8696A0' }}>sin horario todavía</span>}
-        </div>
-
-        <div className="flex items-center" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: f.mensualidad ? '#054D44' : '#8696A0' }}>
-            {f.mensualidad ? pesos(f.mensualidad) : 'mensualidad por definir'}
-          </span>
-          {f.faltas.length > 0
-            ? <span style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', background: '#FEE2E2', borderRadius: 999, padding: '3px 8px' }}>
-                faltó {f.faltas.length === 1 ? 'el' : 'los días'} {f.faltas.map(diaDelMes).join(', ')}
-              </span>
-            : f.vino > 0 && f.avisadas.length === 0 && <span style={{ fontSize: 11, fontWeight: 600, color: '#047857', background: '#ECFDF5', borderRadius: 999, padding: '3px 8px' }}>sin faltas</span>}
-          {f.avisadas.length > 0 && (
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#667781', background: '#F3F4F6', borderRadius: 999, padding: '3px 8px' }}>
-              avisó que no viene {f.avisadas.length === 1 ? 'el' : 'los días'} {f.avisadas.map(diaDelMes).join(', ')}
+        <div className="flex items-center" style={{ gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
+          {f.faltas.length > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', background: '#FEE2E2', borderRadius: 999, padding: '2px 8px' }}>
+              {f.faltas.length === 1 ? '1 falta' : `${f.faltas.length} faltas`}
             </span>
           )}
           {f.recuperativas > 0 && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FEF3C7', borderRadius: 999, padding: '3px 8px' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', background: '#FEF3C7', borderRadius: 999, padding: '2px 8px' }}>
               {f.recuperativas === 1 ? '1 recuperativa' : `${f.recuperativas} recuperativas`}
             </span>
           )}
-          {PAGO_CHIP[f.pago.estado] && (
-            <span data-pago={f.pago.estado} style={{ fontSize: 11, fontWeight: 700, color: PAGO_CHIP[f.pago.estado].color, background: PAGO_CHIP[f.pago.estado].bg, borderRadius: 999, padding: '3px 8px' }}>
-              {PAGO_CHIP[f.pago.estado].texto(f.pago)}
+          {!f.telefono && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#667781', background: '#F3F4F6', borderRadius: 999, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Phone size={10} style={{ color: '#C7D3D0' }} /> sin teléfono
             </span>
           )}
         </div>
-
-        <p style={{ fontSize: 11, color: '#667781', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Phone size={11} style={{ color: f.telefono ? '#00A884' : '#C7D3D0' }} />
-          {f.apoderado ? `${f.apoderado}${f.telefono ? ` · ${f.telefono}` : ' · sin teléfono'}` : 'sin apoderado en la libreta'}
-        </p>
       </div>
 
       {f.revisar && (
@@ -297,8 +290,9 @@ function Tarjeta({ f, onClick }: { f: Ficha; onClick: () => void }) {
   )
 }
 
-function Editor({ ficha, mes, onCerrar, onGuardado, guardar }: {
+function Editor({ ficha, mes, onCerrar, onGuardado, onRefrescar, guardar }: {
   ficha: Ficha; mes: string; onCerrar: () => void; onGuardado: () => void
+  onRefrescar: () => void
   guardar: (id: number, cambios: Partial<Ficha>) => Promise<void>
 }) {
   const [nombre, setNombre] = useState(ficha.nombre)
@@ -360,7 +354,7 @@ function Editor({ ficha, mes, onCerrar, onGuardado, guardar }: {
   async function borrarDia(id: number) {
     if (!confirm('¿Sacarle este día de clase?')) return
     await fetch(`/api/inscripciones/${id}`, { method: 'DELETE' })
-    onGuardado()
+    onRefrescar()   // la ficha se queda abierta: casi siempre viene otro día detrás
   }
 
   return (
@@ -390,14 +384,9 @@ function Editor({ ficha, mes, onCerrar, onGuardado, guardar }: {
 
           <p style={etiqueta}>Días de clase</p>
           {ficha.inscripciones.map(i => (
-            <div key={i.id} className="flex items-center" style={{ gap: 8, padding: '7px 0', borderBottom: '1px solid #F2F7F5' }}>
-              <span style={{ fontSize: 12, color: '#054D44', flex: 1 }}>
-                {i.dia ? DIA_LABEL[i.dia] : 'día por confirmar'} · {i.hora}{i.horaFin ? ` a ${i.horaFin}` : ''}{i.profe ? ` · ${i.profe}` : ' · sin profesora'}
-              </span>
-              <button onClick={() => borrarDia(i.id)} title="Sacar este día" style={{ ...btnIcono, border: 'none', color: '#EF4444' }}><Trash2 size={14} /></button>
-            </div>
+            <DiaEditable key={i.id} i={i} onBorrar={() => borrarDia(i.id)} onListo={onRefrescar} />
           ))}
-          <NuevoDia alumnoId={ficha.id} onListo={onGuardado} />
+          <NuevoDia alumnoId={ficha.id} onListo={onRefrescar} />
 
           {(ficha.faltas.length > 0 || ficha.avisadas.length > 0) && (
             <>
@@ -464,6 +453,80 @@ function Editor({ ficha, mes, onCerrar, onGuardado, guardar }: {
             {guardando ? 'Guardando…' : 'Guardar'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Un día de clase que se puede TOCAR PARA CAMBIARLO (Lukas, 27-08-2026).
+//
+// Hasta hoy un día solo se podía borrar y volver a crear: para corregir "las 17:30
+// eran las 17:00" había que acordarse del resto de la fila y escribirla de nuevo.
+// Ahora se toca, se corrige lo que esté malo y se guarda; el borrar sigue donde
+// estaba, porque sacarle un día a alguien es otra cosa distinta a corregirlo.
+//
+// Guarda contra PATCH /api/inscripciones/[id], que ya existía y ya validaba el día,
+// el formato de la hora y que la salida vaya después de la entrada. Si la API dice
+// que no, el error se muestra aquí y NO se cierra el formulario: si no, Mary creería
+// que guardó.
+function DiaEditable({ i, onBorrar, onListo }: { i: Inscripcion; onBorrar: () => void; onListo: () => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const [dia, setDia] = useState<string>(i.dia ?? 'Lunes')
+  const [hora, setHora] = useState(i.hora)
+  const [horaFin, setHoraFin] = useState(i.horaFin ?? '')
+  const [profe, setProfe] = useState<string>(i.profe ?? '')
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  async function guardarDia() {
+    setError(''); setGuardando(true)
+    const r = await fetch(`/api/inscripciones/${i.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dia, hora, horaFin: horaFin.trim() || null, profe: profe.trim() || null }),
+    })
+    const d = await r.json() as { ok: boolean; error?: string }
+    setGuardando(false)
+    if (!d.ok) { setError(d.error ?? 'No se pudo guardar'); return }
+    setAbierto(false)
+    onListo()
+  }
+
+  // Cerrado: la línea de siempre, pero ahora se puede tocar para corregirla.
+  if (!abierto) {
+    return (
+      <div className="flex items-center" style={{ gap: 8, padding: '7px 0', borderBottom: '1px solid #F2F7F5' }}>
+        <button data-dia={i.id} onClick={() => setAbierto(true)}
+          style={{ flex: 1, textAlign: 'left', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: '#054D44' }}>
+          {i.dia ? DIA_LABEL[i.dia] : 'día por confirmar'} · {i.hora}{i.horaFin ? ` a ${i.horaFin}` : ''}{i.profe ? ` · ${i.profe}` : ' · sin profesora'}
+        </button>
+        <button onClick={() => setAbierto(true)} title="Cambiar este día" style={{ ...btnIcono, border: 'none', color: '#00A884' }}><Pencil size={14} /></button>
+        <button onClick={onBorrar} title="Sacar este día" style={{ ...btnIcono, border: 'none', color: '#EF4444' }}><Trash2 size={14} /></button>
+      </div>
+    )
+  }
+
+  return (
+    <div data-dia-editando={i.id} style={{ border: '1px solid #D3E7DE', borderRadius: 10, padding: 12, marginBottom: 9 }}>
+      <div className="flex" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <select value={dia} onChange={e => setDia(e.target.value)} style={input}>
+          {DIAS.map(d => <option key={d} value={d}>{DIA_LABEL[d]}</option>)}
+        </select>
+        <input value={hora} onChange={e => setHora(e.target.value)} placeholder="17:30" style={{ ...input, width: 80 }} />
+        <input value={horaFin} onChange={e => setHoraFin(e.target.value)} placeholder="19:30" style={{ ...input, width: 80 }} />
+        <select value={profe} onChange={e => setProfe(e.target.value)} style={input}>
+          {/* La opción vacía existe porque hay bloques sin profesora sabida (los del
+              horario de Mary que quedaron marcados) y no se le inventa una. */}
+          <option value="">sin profesora</option>
+          {PROFE_NOMBRES.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </div>
+      {error && <p style={{ fontSize: 11, color: '#B91C1C', marginTop: 7 }}>{error}</p>}
+      <div className="flex" style={{ gap: 7, marginTop: 9 }}>
+        <button onClick={guardarDia} disabled={guardando}
+          style={{ ...btnTexto, background: '#00A884', color: '#fff', borderColor: '#00A884', opacity: guardando ? 0.6 : 1 }}>
+          {guardando ? 'Guardando…' : 'Guardar el día'}
+        </button>
+        <button onClick={() => { setAbierto(false); setError('') }} style={btnTexto}>Cancelar</button>
       </div>
     </div>
   )

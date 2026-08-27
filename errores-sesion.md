@@ -814,3 +814,24 @@ resulta que la alumna del caso YA había quedado pagada dos pasos antes en la mi
 corrida, y el sistema —bien— no propone a quien ya pagó. El test reutilizaba estado suyo.
 Ahora esa parte usa una casa nueva y, de paso, quedó como caso propio: **a quien ya pagó
 no se le preselecciona otro pago del mismo mes**.
+
+---
+
+## 27-08-2026 · Guardar una hora de clase CERRABA la ficha entera
+
+**Qué pasó.** Al hacer el día de clase editable, guardar la hora nueva funcionaba —el dato
+quedaba bien en la base— pero la prueba de pantalla se caía buscando el día que acababa de
+tocar. No era el test: al guardar, la ficha se cerraba de golpe y volvía al listado.
+
+**Por qué.** El Editor tenía UNA sola salida, `onGuardado`, y esa salida hace dos cosas
+juntas: `setAbierta(null)` (cierra) y `load(mes)` (relee). Está bien para el botón Guardar
+de abajo, que efectivamente termina. Pero para corregir un día no: casi siempre viene otro
+día detrás, y Mary tendría que reabrir la ficha por cada hora que arregla.
+
+**El arreglo.** Dos salidas distintas: `onGuardado` cierra, `onRefrescar` solo relee y deja
+la ficha abierta. La ficha se redibuja con `fichas.find(f => f.id === abierta.id)` para que
+muestre el dato nuevo sin cerrarse. Se aplicó a los TRES que tocan días —editar, borrar y
+agregar—, no solo al que fallaba: son la misma familia y el resto tenía el mismo defecto.
+
+**La regla.** "Guardar" y "terminar" no son lo mismo. Cuando una pantalla deja repetir la
+misma acción varias veces seguidas, guardar tiene que dejar al usuario donde estaba.
