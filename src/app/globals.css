@@ -117,6 +117,12 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .app-sidebar .app-footer,
   .app-sidebar .app-spacer { display: none !important; }
 
+  /* El QR es cosa del computador (Lukas, 27-08-2026: "que en el telefono no
+     aparezca lo del qr eso solo nos sirve para el computador"). La pantalla
+     /conexion sigue viva y el botón sigue en el computador: aquí solo se
+     esconde el acceso en la barra de abajo, que a Mary únicamente le estorba. */
+  .app-sidebar .app-navitems a.app-nav-conexion { display: none !important; }
+
   .app-sidebar .app-navitems {
     flex-direction: row !important;
     justify-content: space-around;

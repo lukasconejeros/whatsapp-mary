@@ -62,10 +62,14 @@ export default function AppNav() {
         {items.map(({ href, Icon, label, labelCorto }) => {
           const active = path.startsWith(href)
           const isConexion = href === '/conexion'
+          // La clase por botón deja esconder UNO solo desde el CSS sin tocar a los
+          // hermanos. Hoy la usa 'app-nav-conexion': el QR es cosa del computador
+          // (Lukas, 27-08-2026), en el teléfono ese botón solo estorba.
+          const claseBoton = href === '/conexion' ? 'app-nav-conexion' : `app-nav-${href.slice(1)}`
           const dotColor = connected === null ? null : connected ? '#22C55E' : '#F59E0B'
           return (
             <Link key={href} href={href}
-              className="flex items-center gap-2.5 transition-colors"
+              className={`flex items-center gap-2.5 transition-colors ${claseBoton}`}
               style={{ padding: '8px 12px', fontSize: 13, fontWeight: active ? 600 : 450, borderRadius: 10,
                 color: active ? '#008069' : '#6B5563',
                 background: active ? '#E7F1EC' : 'transparent',
