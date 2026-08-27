@@ -835,3 +835,46 @@ agregar—, no solo al que fallaba: son la misma familia y el resto tenía el mi
 
 **La regla.** "Guardar" y "terminar" no son lo mismo. Cuando una pantalla deja repetir la
 misma acción varias veces seguidas, guardar tiene que dejar al usuario donde estaba.
+
+---
+
+## 27-08-2026 · El test miraba UNA etiqueta y dio por bueno un mes entero cortado
+
+**Qué pasó.** Al calcar el calendario del iPhone, la prueba salió 26/26 verde y la pantalla
+estaba mal: TODAS las etiquetas del mes decían "16:…" y no se leía ni un nombre. Se arregló,
+volvió a salir verde (31/31) y seguía mal: ahora decían "Alis…", "Ant…". Lo cazó mirar la
+captura a ojo, dos veces seguidas, no el test.
+
+**Por qué.** La comprobación era `la etiqueta trae texto escrito`, y la hacía sobre
+`[data-ev]` **.first()**. Esa primera etiqueta cabía; las otras 73 no. Un test que mide una
+muestra de uno no mide nada cuando el defecto depende del largo del contenido: el mes tiene
+nombres de 4 letras y de 20, y solo fallan los largos.
+
+**El arreglo.** Medir TODAS con `evaluateAll` y comparar `scrollWidth` contra `clientWidth`
+de cada una: si alguna sobra, falla. Y no basta con buscar el carácter "…" —el navegador lo
+dibuja pero no lo mete en el texto—, hay que medir el ancho real.
+
+**La regla.** Cuando lo que se prueba depende del TAMAÑO del contenido (que quepa, que no se
+corte, que no se solape), el test tiene que recorrer todos los casos de la pantalla, no el
+primero. Y una batería verde no reemplaza mirar la captura: acá la vista se salvó dos veces
+por ojo y ninguna por el test.
+
+---
+
+## 27-08-2026 · Un script de Python dejó `SIGUIENTE.md` en CERO bytes (tercera vez)
+
+**Qué pasó.** Guardando el traspaso de la sesión, un script abrió el archivo de memoria en
+modo escritura y reventó al codificar (`UnicodeEncodeError: surrogates not allowed`) por unos
+caracteres corruptos que ya venían de antes en el archivo. Python trunca el archivo al abrirlo
+en `'w'`, ANTES de escribir: el error dejó 0 bytes. El respaldo más nuevo era de 7 días antes.
+
+**Cómo se recuperó.** El backup del 20-08 (`SIGUIENTE.md.bak-antes-16h55`, 44 frentes) fusionado
+con el fragmento más completo hallado en los `.jsonl` del historial de conversaciones (27-08
+12:06, 18 frentes), comparando por nombre de frente para no duplicar. Quedaron 50 frentes.
+Puede faltar algún frente del 21 al 26 que no estuviera en ninguna de las dos fuentes.
+
+**Por qué importa.** Ya había pasado el 19-08 y el 20-08, **con la misma causa exacta**, y la
+cabecera del propio archivo lo dejaba escrito. Se repitió igual.
+
+**La regla.** Los archivos de memoria (`SIGUIENTE.md`, `MEMORY.md`, `project_*.md`) NO se editan
+con scripts. Se editan a mano con la herramienta de edición, que no trunca el archivo si falla.
