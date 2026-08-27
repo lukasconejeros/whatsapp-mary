@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addAlumno } from "@/lib/db";
 import { fichasDelMes } from "@/lib/crm-alumnos";
+import { resumenDelMes } from "@/lib/mensualidades";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,8 @@ export async function GET(req: NextRequest) {
   if (!MES.test(mes)) {
     return NextResponse.json({ ok: false, error: "mes debe ser YYYY-MM" }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, mes, alumnos: fichasDelMes(mes) });
+  const alumnos = fichasDelMes(mes);
+  return NextResponse.json({ ok: true, mes, alumnos, pagos: resumenDelMes(alumnos) });
 }
 
 export async function POST(req: NextRequest) {

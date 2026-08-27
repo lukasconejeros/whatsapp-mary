@@ -735,3 +735,45 @@ no deja rastro de por qué.
 de credenciales. Comprobarlo con `git ls-remote` (si responde, la red está bien) y relanzar en
 segundo plano. Y el push **no está hecho hasta verlo con `git ls-remote origin main`**:
 `git log origin/main..main` miente sin un `fetch` previo.
+
+---
+
+## 26-08-2026 · Un test que se quedó con la cuenta vieja (`test:alumnos-api`)
+
+**Qué pasó.** Al terminar el paso 4 (las mensualidades), la batería de pantalla dio `20 bien, 1 mal`:
+`❌ están cargados los alumnos del horario 37`. La aserción pedía `>= 40`.
+
+**No lo rompió el cambio del día.** El número quedó viejo tres commits antes, en `e83acb8`: al unir
+a las alumnas que la planilla tenía dos veces con el nombre a medias (Julieta = Julieta Bratz,
+Valentina = Valentina Roa, Sofía = Sofía Llancaleo, elisa = Elisa Bade) las fichas bajaron de **41 a
+37**, con las mismas 43 inscripciones. Ese commit tocó el dato y no el test que lo contaba.
+
+**La regla.** Cuando un cambio mueve un TOTAL (cuántos alumnos, cuántas filas, cuántos días),
+hay que buscar quién más cuenta ese total antes de cerrar — `grep` del número en `scripts/`. Un
+test con la cuenta vieja no avisa cuando el cambio está mal: avisa cuando el cambio está bien, que
+es la forma más cara de enterarse.
+
+**El acierto del mismo día.** El paso 4 se hizo con el test primero y se le vio fallar
+(`ERR_MODULE_NOT_FOUND: mensualidades.js`) antes de escribir una línea de `src/`. Los 31 casos de
+`test:mensualidades` incluyen el que de verdad importaba: **a quien avisó que no viene ese mes no se
+le inventa una deuda**. Sin ese test, el CRM habría sacado a esas familias como morosas.
+
+---
+
+## 26-08-2026 · `git add -A` casi sube datos reales de familias a un repo PÚBLICO
+
+**Qué pasó.** Al cerrar el paso 4 se hizo `git add -A` y el commit se llevó, además del código,
+`RESCATE-DATOS-2026-08-12/` (conversaciones, mensajes, ingresos y comprobantes de verdad, más
+`mary-rescatada.db`, 688 KB) y una copia suelta de la base de producción. Estaban sin trackear en
+la carpeta desde el rescate del borrado del 12-08. **`whatsapp-mary` es un repo público.**
+
+**Se cazó a tiempo** revisando `git show --stat` ANTES de subir: el commit era local, así que se
+deshizo con `git reset --soft HEAD~1` (nunca `--hard`, que se lleva el trabajo), se sacaron esos
+paths del índice y se rehizo el commit solo con lo del día.
+
+**El arreglo permanente.** `.gitignore` ahora ignora `RESCATE-DATOS-2026-08-12/`, `*.db` y
+`*mary-prod*`.
+
+**La regla.** En este repo, `git add -A` está prohibido: se agregan los archivos a mano o se mira
+`git show --stat` antes de cualquier push. Un `git status` con archivos sin trackear que uno no
+puso ahí es una alarma, no ruido de fondo.

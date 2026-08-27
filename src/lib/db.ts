@@ -5,6 +5,7 @@ import { normalizeChilePhone } from "./phone";
 // El tipo de las ausencias vive en dia-clases.ts (módulo puro, sin base de datos)
 // porque el calendario del navegador también lo necesita.
 import type { Ausencia, TipoAusencia } from "./dia-clases.js";
+import type { FilaMensualidad } from "./mensualidades.js";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
@@ -299,6 +300,30 @@ CREATE TABLE IF NOT EXISTS ausencias (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ausencias_dia ON ausencias(alumno_id, fecha) WHERE fecha IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ausencias_mes ON ausencias(alumno_id, mes) WHERE mes IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_ausencias_fecha ON ausencias(fecha);
+
+-- PASO 4 del CRM (Lukas, 26-08-2026): una fila por alumno Y MES con lo que pasó con
+-- su mensualidad. La tabla NO se llena sola para todos: solo existe fila cuando hay
+-- algo que contar (pagó, abonó o Mary le puso otro monto ese mes). Lo demás se
+-- calcula en mensualidades.ts, así un mes sin novedad no ocupa 37 filas vacías.
+-- 'monto' es lo que se le cobró ESE mes: se copia de alumnos.mensualidad al crear la
+-- fila, pero puede ser distinto (un mes con menos clases, un acuerdo puntual).
+-- 'comprobante_id'/'ingreso_id' son el enganche con la foto de la transferencia.
+CREATE TABLE IF NOT EXISTS mensualidades (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alumno_id INTEGER NOT NULL,
+  mes TEXT NOT NULL,                           -- 'YYYY-MM'
+  monto INTEGER NOT NULL DEFAULT 0,            -- lo que se le cobra ese mes
+  pagado INTEGER NOT NULL DEFAULT 0,           -- lo que lleva pagado
+  estado TEXT NOT NULL DEFAULT 'pendiente' CHECK(estado IN ('pendiente','pagado')),
+  fecha TEXT,                                  -- 'YYYY-MM-DD' del pago
+  comprobante_id INTEGER,
+  ingreso_id INTEGER,
+  nota TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+-- Un alumno tiene UNA mensualidad por mes: tocar el botón dos veces corrige, no cobra doble.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mensualidades_alumno_mes ON mensualidades(alumno_id, mes);
+CREATE INDEX IF NOT EXISTS idx_mensualidades_mes ON mensualidades(mes);
 
 -- Los PAGOS que vuelven CADA MES (arriendo, sueldos, suscripción y "otros", que
 -- lleva descripción obligatoria). Lukas dijo "todas las semanas" pero al
@@ -1657,6 +1682,7 @@ export function deleteAlumno(id: number): void {
   const db = ctx().db;
   db.prepare("DELETE FROM inscripciones WHERE alumno_id=?").run(id);
   db.prepare("DELETE FROM ausencias WHERE alumno_id=?").run(id);
+  db.prepare("DELETE FROM mensualidades WHERE alumno_id=?").run(id);
   db.prepare("DELETE FROM alumnos WHERE id=?").run(id);
 }
 
@@ -1805,6 +1831,58 @@ export function ausenciasDiaDeMes(mes: string): Ausencia[] {
     .prepare("SELECT * FROM ausencias WHERE tipo='dia' AND fecha LIKE ? ORDER BY fecha ASC")
     .all(`${mes}-%`) as AusenciaRow[];
   return rows.map(parseAusencia);
+}
+
+// ── Mensualidades de los alumnos (paso 4 del CRM) ─────────────────────────────
+
+export interface MensualidadRow extends FilaMensualidad { id: number; created_at: number }
+
+/** La fila de ese alumno en ese mes, o null si todavía no hay nada que contar. */
+export function getMensualidad(alumnoId: number, mes: string): MensualidadRow | null {
+  return (ctx().db
+    .prepare("SELECT * FROM mensualidades WHERE alumno_id=? AND mes=?")
+    .get(alumnoId, mes) as MensualidadRow | undefined) ?? null;
+}
+
+export function listMensualidadesDeMes(mes: string): MensualidadRow[] {
+  return ctx().db
+    .prepare("SELECT * FROM mensualidades WHERE mes=? ORDER BY alumno_id ASC")
+    .all(mes) as MensualidadRow[];
+}
+
+/**
+ * Deja anotado lo que pagó un alumno en un mes. Es idempotente por (alumno, mes):
+ * un doble toque corrige la misma fila, nunca cobra dos veces.
+ * Si no se dice el monto, se toma el plan del alumno (alumnos.mensualidad).
+ * El estado sale del cruce: pagado solo cuando cubre el monto del mes.
+ */
+export function marcarPago(d: {
+  alumnoId: number; mes: string; pagado: number; monto?: number;
+  fecha?: string | null; comprobanteId?: number | null; ingresoId?: number | null; nota?: string | null;
+}): void {
+  const db = ctx().db;
+  const alumno = db.prepare("SELECT mensualidad FROM alumnos WHERE id=?").get(d.alumnoId) as
+    | { mensualidad: number } | undefined;
+  const previa = getMensualidad(d.alumnoId, d.mes);
+  const monto = Math.max(0, Math.round(d.monto ?? previa?.monto ?? alumno?.mensualidad ?? 0));
+  const pagado = Math.max(0, Math.round(d.pagado));
+  const estado = monto > 0 && pagado >= monto ? "pagado" : "pendiente";
+  db.prepare(
+    `INSERT INTO mensualidades (alumno_id, mes, monto, pagado, estado, fecha, comprobante_id, ingreso_id, nota)
+     VALUES (?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(alumno_id, mes) DO UPDATE SET
+       monto=excluded.monto, pagado=excluded.pagado, estado=excluded.estado,
+       fecha=excluded.fecha,
+       comprobante_id=COALESCE(excluded.comprobante_id, mensualidades.comprobante_id),
+       ingreso_id=COALESCE(excluded.ingreso_id, mensualidades.ingreso_id),
+       nota=COALESCE(excluded.nota, mensualidades.nota)`
+  ).run(d.alumnoId, d.mes, monto, pagado, estado, d.fecha ?? null,
+        d.comprobanteId ?? null, d.ingresoId ?? null, d.nota ?? null);
+}
+
+/** Deshace el pago de ese mes (Mary se equivocó de alumno). */
+export function quitarPago(alumnoId: number, mes: string): void {
+  ctx().db.prepare("DELETE FROM mensualidades WHERE alumno_id=? AND mes=?").run(alumnoId, mes);
 }
 
 // ── Pagos que vuelven cada mes ────────────────────────────────────────────────

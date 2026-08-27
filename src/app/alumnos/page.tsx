@@ -25,6 +25,23 @@ type Ficha = {
   noVieneEsteMes: boolean     // "que se salga del CRM solo ese mes"
   ausenciaMesId: number | null
   motivoMes: string | null
+  // La mensualidad de ESE mes (paso 4). Quien avisó que no viene sale 'no_cobra'.
+  pago: Pago
+}
+type Pago = {
+  estado: 'pagado' | 'parcial' | 'pendiente' | 'atrasado' | 'no_cobra' | 'sin_monto'
+  monto: number; pagado: number; falta: number; fecha: string | null
+  comprobanteId: number | null; ingresoId: number | null; nota: string | null
+}
+type ResumenPagos = { cobrado: number; porCobrar: number; deben: number; alDia: number; noCobra: number; sinMonto: number }
+
+// Cómo se ve cada estado en la tarjeta. 'no_cobra' y 'sin_monto' no pintan nada:
+// ya se dicen solos en otra parte de la tarjeta y repetirlos ensucia.
+const PAGO_CHIP: Record<string, { texto: (p: Pago) => string; color: string; bg: string }> = {
+  pagado:   { texto: p => `pagó ${pesos(p.pagado)}`,                         color: '#047857', bg: '#ECFDF5' },
+  parcial:  { texto: p => `abonó ${pesos(p.pagado)}, falta ${pesos(p.falta)}`, color: '#B45309', bg: '#FEF3C7' },
+  atrasado: { texto: p => `debe ${pesos(p.falta)}`,                          color: '#B91C1C', bg: '#FEE2E2' },
+  pendiente:{ texto: p => `por pagar ${pesos(p.falta)}`,                     color: '#667781', bg: '#F3F4F6' },
 }
 
 const pesos = (n: number) => `$${n.toLocaleString('es-CL')}`
@@ -56,13 +73,14 @@ export default function AlumnosPage() {
   const [filtroDia, setFiltroDia] = useState('Todos')
   const [abierta, setAbierta] = useState<Ficha | null>(null)
   const [nueva, setNueva] = useState(false)
+  const [pagos, setPagos] = useState<ResumenPagos | null>(null)
 
   const load = useCallback(async (m: string) => {
     setLoading(true)
     try {
       const r = await fetch(`/api/alumnos?mes=${m}`, { cache: 'no-store' })
-      const d = await r.json() as { ok: boolean; alumnos?: Ficha[] }
-      if (d.ok && d.alumnos) setFichas(d.alumnos)
+      const d = await r.json() as { ok: boolean; alumnos?: Ficha[]; pagos?: ResumenPagos }
+      if (d.ok && d.alumnos) { setFichas(d.alumnos); setPagos(d.pagos ?? null) }
     } catch { /* se queda con lo que había */ }
     setLoading(false)
   }, [])
@@ -148,6 +166,16 @@ export default function AlumnosPage() {
             {fueraEsteMes > 0 && <Resumen n={fueraEsteMes} label={fueraEsteMes === 1 ? 'no viene este mes' : 'no vienen este mes'} color="#667781" />}
           </div>
 
+          {/* La plata del mes: cuánto entró y cuánto falta por cobrar */}
+          {pagos && (
+            <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
+              <Resumen n={pesos(pagos.cobrado)} label={`cobrado en ${mesLargo(mes).split(' ')[0].toLowerCase()}`} color="#00A884" />
+              <Resumen n={pesos(pagos.porCobrar)} label="por cobrar" color={pagos.porCobrar > 0 ? '#B45309' : '#8696A0'} />
+              <Resumen n={pagos.deben} label={pagos.deben === 1 ? 'todavía no paga' : 'todavía no pagan'} color={pagos.deben > 0 ? '#B91C1C' : '#8696A0'} />
+              {pagos.sinMonto > 0 && <Resumen n={pagos.sinMonto} label="sin mensualidad cargada" color="#8696A0" />}
+            </div>
+          )}
+
           {/* Filtro por día: el mismo orden del calendario */}
           <div className="flex items-center gap-1.5" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
             {['Todos', ...DIAS, SIN_DIA].map(d => {
@@ -207,7 +235,7 @@ export default function AlumnosPage() {
         </div>
       </div>
 
-      {abierta && <Editor ficha={abierta} onCerrar={() => setAbierta(null)} onGuardado={() => { setAbierta(null); load(mes) }} guardar={guardar} />}
+      {abierta && <Editor ficha={abierta} mes={mes} onCerrar={() => setAbierta(null)} onGuardado={() => { setAbierta(null); load(mes) }} guardar={guardar} />}
       {nueva && <Alta onCerrar={() => setNueva(false)} onCreado={() => { setNueva(false); load(mes) }} />}
     </div>
   )
@@ -216,7 +244,7 @@ export default function AlumnosPage() {
 const btnIcono: React.CSSProperties = { display: 'flex', border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#008069' }
 const btnTexto: React.CSSProperties = { border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', color: '#667781', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }
 
-function Resumen({ n, label, color }: { n: number; label: string; color: string }) {
+function Resumen({ n, label, color }: { n: number | string; label: string; color: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, border: '1px solid #D3E7DE', borderRadius: 12, padding: '8px 14px', background: '#fff' }}>
       <span style={{ fontSize: 18, fontWeight: 800, color, lineHeight: 1 }}>{n}</span>
@@ -264,6 +292,11 @@ function Tarjeta({ f, onClick }: { f: Ficha; onClick: () => void }) {
               {f.recuperativas === 1 ? '1 recuperativa' : `${f.recuperativas} recuperativas`}
             </span>
           )}
+          {PAGO_CHIP[f.pago.estado] && (
+            <span data-pago={f.pago.estado} style={{ fontSize: 11, fontWeight: 700, color: PAGO_CHIP[f.pago.estado].color, background: PAGO_CHIP[f.pago.estado].bg, borderRadius: 999, padding: '3px 8px' }}>
+              {PAGO_CHIP[f.pago.estado].texto(f.pago)}
+            </span>
+          )}
         </div>
 
         <p style={{ fontSize: 11, color: '#667781', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -282,8 +315,8 @@ function Tarjeta({ f, onClick }: { f: Ficha; onClick: () => void }) {
   )
 }
 
-function Editor({ ficha, onCerrar, onGuardado, guardar }: {
-  ficha: Ficha; onCerrar: () => void; onGuardado: () => void
+function Editor({ ficha, mes, onCerrar, onGuardado, guardar }: {
+  ficha: Ficha; mes: string; onCerrar: () => void; onGuardado: () => void
   guardar: (id: number, cambios: Partial<Ficha>) => Promise<void>
 }) {
   const [nombre, setNombre] = useState(ficha.nombre)
@@ -292,6 +325,31 @@ function Editor({ ficha, onCerrar, onGuardado, guardar }: {
   const [mensualidad, setMensualidad] = useState(String(ficha.mensualidad || ''))
   const [notas, setNotas] = useState(ficha.notas ?? '')
   const [guardando, setGuardando] = useState(false)
+  // Lo que se va a marcar como pagado: viene puesto con lo que se le cobra ese mes,
+  // así el caso normal (pagó todo) es un solo toque, y sirve igual para un abono.
+  const [cobro, setCobro] = useState(String((ficha.pago.monto || ficha.mensualidad) || ''))
+  const [pagando, setPagando] = useState(false)
+
+  const yaPago = ficha.pago.estado === 'pagado' || ficha.pago.estado === 'parcial'
+
+  async function marcarPagado() {
+    const monto = parseInt(cobro || '0', 10) || 0
+    if (monto <= 0) return
+    setPagando(true)
+    await fetch(`/api/alumnos/${ficha.id}/pago`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mes, pagado: monto, fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) }),
+    })
+    setPagando(false)
+    onGuardado()
+  }
+
+  async function borrarPago() {
+    setPagando(true)
+    await fetch(`/api/alumnos/${ficha.id}/pago?mes=${mes}`, { method: 'DELETE' })
+    setPagando(false)
+    onGuardado()
+  }
 
   async function aceptar() {
     setGuardando(true)
@@ -377,6 +435,35 @@ function Editor({ ficha, onCerrar, onGuardado, guardar }: {
               </p>
             </>
           )}
+          {/* LA MENSUALIDAD DE ESTE MES (paso 4). A quien avisó que no viene no se le
+              cobra: en vez del botón se le dice, para que nadie marque un pago que no toca. */}
+          <p style={etiqueta}>Mensualidad de {mesLargo(mes).toLowerCase()}</p>
+          {ficha.noVieneEsteMes && !yaPago ? (
+            <p style={{ fontSize: 12, color: '#667781' }}>Este mes no se le cobra, avisó que no viene.</p>
+          ) : ficha.mensualidad <= 0 && !yaPago ? (
+            <p style={{ fontSize: 12, color: '#B45309' }}>Primero hay que poner cuánto se le cobra, arriba en Mensualidad.</p>
+          ) : (
+            <div style={{ background: yaPago ? '#ECFDF5' : '#F7FBF9', border: `1px solid ${yaPago ? '#A7F3D0' : '#D3E7DE'}`, borderRadius: 10, padding: 12 }}>
+              {yaPago && (
+                <p style={{ fontSize: 12, color: '#047857', fontWeight: 700, marginBottom: 8 }}>
+                  {ficha.pago.estado === 'pagado' ? 'Pagó' : 'Abonó'} {pesos(ficha.pago.pagado)}
+                  {ficha.pago.fecha ? ` el ${diaDelMes(ficha.pago.fecha)}` : ''}
+                  {ficha.pago.falta > 0 ? ` · faltan ${pesos(ficha.pago.falta)}` : ''}
+                </p>
+              )}
+              <div className="flex items-center" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <input value={cobro} onChange={e => setCobro(e.target.value.replace(/\D/g, ''))}
+                  inputMode="numeric" placeholder="60000"
+                  style={{ width: 110, padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13 }} />
+                <button onClick={marcarPagado} disabled={pagando || !(parseInt(cobro || '0', 10) > 0)}
+                  style={{ ...btnTexto, background: '#00A884', color: '#fff', borderColor: '#00A884', opacity: pagando ? 0.6 : 1 }}>
+                  {pagando ? 'Guardando…' : yaPago ? 'Corregir el pago' : 'Marcar pagado'}
+                </button>
+                {yaPago && <button onClick={borrarPago} disabled={pagando} style={{ ...btnTexto, color: '#B91C1C', borderColor: '#FCA5A5' }}>Quitar</button>}
+              </div>
+            </div>
+          )}
+
           {ficha.noVieneEsteMes && (
             <div style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 10, padding: 12, marginTop: 14 }}>
               <p style={{ fontSize: 12, color: '#667781' }}>

@@ -33,7 +33,10 @@ try {
   const r = await ctx.request.get(`${BASE}/api/alumnos?mes=2026-08`)
   const d = await r.json()
   ok(r.ok() && d.ok && Array.isArray(d.alumnos), 'devuelve las fichas del mes', String(r.status()))
-  ok(d.alumnos.length >= 40, 'están cargados los alumnos del horario', String(d.alumnos.length))
+  // 37, no 41: el 26-08 se unieron las que estaban dos veces en la planilla con el
+  // nombre a medias (Julieta = Julieta Bratz, etc.), y quedaron 37 fichas con 43
+  // inscripciones. El número de arriba se quedó viejo con esa unión.
+  ok(d.alumnos.length >= 35, 'están cargados los alumnos del horario', String(d.alumnos.length))
   const conDias = d.alumnos.find(a => a.inscripciones.length > 0)
   ok(!!conDias && typeof conDias.inscripciones[0].hora === 'string', 'cada ficha trae sus días y horas')
   ok(d.alumnos.every(a => Array.isArray(a.faltas)), 'y las faltas del mes')

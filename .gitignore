@@ -35,3 +35,10 @@ Thumbs.db
 
 # Hoja de claves para copiar/pegar (NO subir)
 ENTORNO-EASYPANEL.local.txt
+
+# Datos REALES que nunca deben subir a un repo público (26-08-2026):
+# el rescate del borrado del 12-08 trae conversaciones, mensajes e ingresos de
+# familias de verdad, y los .db sueltos son copias de producción.
+RESCATE-DATOS-2026-08-12/
+*.db
+*mary-prod*

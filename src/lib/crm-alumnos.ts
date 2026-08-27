@@ -10,8 +10,10 @@
 
 import {
   listAlumnos, listInscripciones, asistenciaRango,
-  ausenciasDeMes, ausenciasDiaDeMes, type Inscripcion,
+  ausenciasDeMes, ausenciasDiaDeMes, listMensualidadesDeMes, type Inscripcion,
 } from "./db";
+import { estadoDelMes, type PagoDelMes } from "./mensualidades";
+import { todaySantiago } from "./fechas";
 
 export interface FichaAlumno {
   id: number;
@@ -36,6 +38,8 @@ export interface FichaAlumno {
   /** El id de ese aviso de mes, para deshacerlo con un toque. */
   ausenciaMesId: number | null;
   motivoMes: string | null;
+  /** Cómo va su mensualidad ESE mes (paso 4). Quien avisó que no viene, no debe nada. */
+  pago: PagoDelMes;
 }
 
 // De lunes a sábado, que es como Mary lee su planilla. Sin día = al final del todo.
@@ -58,7 +62,8 @@ function finDeMes(mes: string): string {
  * cada alumno y su hora, para que se lean igual que el calendario. Solo alumnos
  * activos: los dados de baja no ensucian el mes, pero siguen en la base.
  */
-export function fichasDelMes(mes: string): FichaAlumno[] {
+export function fichasDelMes(mes: string, hoy: string = todaySantiago()): FichaAlumno[] {
+  const pagos = new Map(listMensualidadesDeMes(mes).map((m) => [m.alumno_id, m]));
   const asistencia = asistenciaRango(`${mes}-01`, finDeMes(mes));
   const faltasPorNombre = new Map<string, string[]>();
   const vinoPorNombre = new Map<string, number>();
@@ -103,6 +108,11 @@ export function fichasDelMes(mes: string): FichaAlumno[] {
       noVieneEsteMes: fuera !== null,
       ausenciaMesId: fuera?.id ?? null,
       motivoMes: fuera?.motivo ?? null,
+      pago: estadoDelMes({
+        mes, hoy, mensualidadBase: a.mensualidad,
+        fila: pagos.get(a.id) ?? null,
+        noVieneEsteMes: fuera !== null,
+      }),
     });
   }
 
