@@ -964,3 +964,45 @@ Al insertar los casos nuevos en `scripts/test-saludo.ts` con un script, `io.open
 archivo a 0 bytes** antes de reventar al codificar un emoji fuera del plano básico. Es la **cuarta
 vez** (19-08, 20-08, 27-08 con `SIGUIENTE.md`). Se recuperó con `git checkout` porque estaba
 versionado. **Se escribe a un temporal y se reemplaza al final, nunca directo sobre el destino.**
+
+## 01-09-2026 · "De nuevo el mismo problema de ayer": el veto del saludo solo cazaba la copia calcada
+
+**El reclamo (Lukas, 10:52, con captura).** A las 9:25 de hoy, a la mamá de Víctor (conv 398) le
+llegó la presentación de Mary **dos veces en la misma burbuja** — exactamente lo que se dio por
+arreglado anoche.
+
+**Lo que se midió antes de tocar nada.** Login real en producción y descarga de la conversación:
+el mensaje de las 9:25:19 lleva el saludo del panel y, pegado debajo, *"Hola, qué bueno que se
+comunique conmigo. Un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde
+hace 5 años"*. El mensaje entrante era `"¡Hola! Quiero más información"` **sin la cabecera
+`Enlace:`**: la causa de anoche no es la de hoy.
+
+**La causa, probada corriendo el código de anoche contra el texto real:** `sinRepetirElSaludo()`
+compara el trozo con el saludo ENTERO y exige un parecido de 0,75. Hoy el modelo no copió, se
+**parafraseó**: cambió "Buenos días" por "Hola, qué bueno que se comunique conmigo" y se comió la
+pregunta final. Parecido medido: **0,50**. Pasó limpio. Un arreglo que solo cubre el caso exacto
+que se vio no es un arreglo: es un parche a una captura.
+
+**El arreglo.** Segundo veto, `calcaUnTrozoDelSaludo()`: si una frase repite **seis palabras
+seguidas** del saludo ("un gusto mi nombre es mary"), se va esa frase. Seis es el umbral medido —
+con menos hay falsos positivos de verdad, porque "en la academia Arteluk trabajamos" comparte
+cuatro palabras con el saludo y es una frase legítima.
+
+**El colateral que casi se cuela, y que es la lección.** La primera versión comparaba contra el
+saludo completo y, pasada por los 107 mensajes reales del bot, tocaba un tercer mensaje: la conv
+378 del 30-08, donde el bot escribió *"Cuénteme cuál es su nombre y para quién sería la clase,
+¿cuántos años tiene?"*. Le habría borrado la pregunta nueva. Por eso el veto compara solo contra
+**la presentación**, no contra la pregunta con la que termina el saludo (`laPresentacion()`). Un
+arreglo que cambia un caso que nadie reportó es un error hasta que Lukas diga lo contrario.
+
+**Probado:** `test:saludo` 75/75 (6 casos nuevos, dos de ellos con el texto literal de las conv 398
+y 378), `test:antituteo` 44/44, cerebro 63/63, typecheck y build limpios. Y la prueba que vale
+doble: el filtro pasado por **los 107 mensajes que el bot mandó en producción desde el 01-08** —
+toca 2 (las conv 396 y 398, que son el fallo) y ninguno de los otros 105.
+
+### El error de Python, quinta vez, anotado ayer mismo
+
+Volvió a pasar en este mismo turno: `io.open(P,'w')` sobre `src/lib/mensajes.ts` **truncó el
+archivo** al reventar codificando un emoji del bloque de comentarios. Se recuperó con
+`git checkout`. La regla ya estaba escrita en la entrada de ayer y aun así se repitió: **en los
+scripts de edición no van emojis, y se escribe a un temporal antes de pisar el destino.**
