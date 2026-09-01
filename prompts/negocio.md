@@ -116,7 +116,7 @@ dio uno y a 3 el otro (auditoría del 31-08).
 
 ## Dónde estamos
 
-Picarte 805, Valdivia, segundo piso, al lado del Registro Civil.
+Picarte 804, Valdivia, segundo piso, al lado del Registro Civil.
 
 ## Quiénes hacen las clases
 

@@ -26,7 +26,10 @@ check("acuarela $45.000", p.includes("45.000"));
 check("taller de artes $60.000", p.includes("60.000"));
 check("premium $120.000", p.includes("120.000"));
 check("matrícula $15.000", p.includes("15.000"));
-check("dirección Picarte 805 (Mary la corrigió el 10-08)", p.includes("Picarte 805"));
+// El 31-08 se midió que el bot repartía dos calles: 6 leads con 804 y 3 con 805, porque el
+// número vivía en dos sitios. Lukas confirmó que es el 804 (Mary lo escribió a mano el 30-08).
+check("dirección Picarte 804 (Lukas la confirmó el 31-08)", p.includes("Picarte 804"));
+check("YA NO dice Picarte 805 (el número viejo del ejemplo del prompt)", !p.includes("Picarte 805"));
 check("YA NO dice Picarte 407 (dato viejo, equivocado)", !p.includes("Picarte 407"));
 check("nombra a Mary", p.includes("Mary"));
 

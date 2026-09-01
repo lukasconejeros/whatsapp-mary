@@ -138,7 +138,7 @@ try {
   setOverrides({ ubicacion: "Calle de Prueba 900, oficina 2" });
   const p1 = buildSystemPrompt();
   ok(p1.includes("Calle de Prueba 900, oficina 2"), "el prompt trae la dirección que escribió Mary");
-  ok(!p1.includes("Picarte 805, Valdivia, segundo piso, al lado del Registro Civil.\n"), "el cuerpo viejo de esa sección ya no está");
+  ok(!p1.includes("Picarte 804, Valdivia, segundo piso, al lado del Registro Civil.\n"), "el cuerpo viejo de esa sección ya no está");
   ok(p1.includes("FILTRO DE ENTRADA"), "las reglas del repo siguen enteras");
   ok(p1.includes("1098729145"), "las secciones que no editó siguen igual");
 

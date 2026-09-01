@@ -19,7 +19,7 @@ const GUION = [
   "mmm ya, lo voy a pensar y te aviso",              // el "lo pienso" que hace perder al alumno
   // Las 5 de abajo son preguntas REALES de Mary entrenando el 10-08, con las respuestas
   // que ella misma corrigió. Cada una tenía el dato equivocado en el cerebro viejo.
-  "dónde están ubicados?",                           // decía Picarte 407: es 805
+  "dónde están ubicados?",                           // decía Picarte 407: es 804 (31-08)
   "desde qué edad reciben?",                          // decía "desde los 7": es desde los 5
   "ustedes trabajan arteterapia?",                    // decía que NO: sí hacen
   "cuál es su metodología?",                          // contestaba media frase y volvía a la edad
@@ -100,7 +100,7 @@ async function main() {
 
     // Los datos que Mary corrigió: si vuelven los viejos, un apoderado recibe algo falso.
     if (texto.includes("ubicados")) {
-      r.texto.includes("805") ? bien("da la dirección corregida (Picarte 805)") : mal("no dio Picarte 805");
+      r.texto.includes("804") ? bien("da la dirección corregida (Picarte 804)") : mal("no dio Picarte 804");
       if (r.texto.includes("407")) mal("dio la dirección VIEJA (Picarte 407)");
     }
     if (texto.includes("qué edad")) {
