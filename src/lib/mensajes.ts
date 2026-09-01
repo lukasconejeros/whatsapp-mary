@@ -110,9 +110,45 @@ function seParecen(a: string, b: string): boolean {
   return comunes / new Set([...A, ...B]).size > 0.75;
 }
 
+// EL SEGUNDO VETO (01-09-2026, conv 398 9:25:19). El de arriba mira si el trozo SE PARECE al
+// saludo entero, y eso solo caza la copia calcada. Hoy el modelo se volvió a presentar con otras
+// palabras — "Hola, qué bueno que se comunique conmigo. Un gusto, mi nombre es Mary Quinteros,
+// profesora de la academia Arteluk desde hace 5 años" — y pasó limpio (se parecen 0,50 y hace
+// falta 0,75): a la mamá le llegó la presentación dos veces seguidas, la misma queja del día
+// anterior. Lo que lo delata no es el parecido global sino el TROZO calcado palabra por palabra:
+// seis palabras seguidas del saludo ("un gusto mi nombre es mary") ya son una presentación
+// repetida. Con menos de seis hay falsos positivos de verdad: "en la academia Arteluk
+// trabajamos..." es una frase legítima y comparte cuatro.
+const PALABRAS_CALCADAS = 6;
+
+// Y la pregunta con la que TERMINA el saludo no cuenta para este veto. Si el modelo vuelve a pedir
+// el nombre está siendo redundante, pero puede estar añadiendo algo suyo en la misma frase — conv
+// 378, 30-08: "Cuénteme cuál es su nombre y para quién sería la clase, ¿cuántos años tiene?" — y
+// borrársela entera le quitaría la pregunta nueva. Lo que se veta es que se vuelva a PRESENTAR.
+function laPresentacion(saludo: string): string {
+  const t = (saludo || "").trim();
+  if (!/[?]\s*$/.test(t)) return t;
+  const sinFinal = t.replace(/[?\s]+$/, "");
+  const corte = Math.max(sinFinal.lastIndexOf(","), sinFinal.lastIndexOf("."), sinFinal.lastIndexOf(";"));
+  return corte > 0 ? sinFinal.slice(0, corte) : t;
+}
+
+function calcaUnTrozoDelSaludo(texto: string, saludo: string): boolean {
+  const a = texto.split(" ").filter(Boolean);
+  const b = saludo.split(" ").filter(Boolean);
+  if (a.length < PALABRAS_CALCADAS || b.length < PALABRAS_CALCADAS) return false;
+  const trozos = new Set<string>();
+  for (let i = 0; i + PALABRAS_CALCADAS <= b.length; i++) trozos.add(b.slice(i, i + PALABRAS_CALCADAS).join(" "));
+  for (let i = 0; i + PALABRAS_CALCADAS <= a.length; i++) {
+    if (trozos.has(a.slice(i, i + PALABRAS_CALCADAS).join(" "))) return true;
+  }
+  return false;
+}
+
 /** La respuesta del modelo sin los trozos donde volvió a soltar el saludo. */
 export function sinRepetirElSaludo(saludo: string, cola: string): string {
   const clave = comparable(saludo);
+  const presentacion = comparable(laPresentacion(saludo));
   if (!clave || !cola.trim()) return (cola || "").trim();
   const quedan = cola
     .split(/\n\s*\n/)
@@ -124,7 +160,7 @@ export function sinRepetirElSaludo(saludo: string, cola: string): string {
         .split(/(?<=[.!?¡¿])\s+/)
         .filter((frase) => {
           const f = comparable(frase);
-          return f.length < 25 || !seParecen(f, clave);
+          return f.length < 25 || !(seParecen(f, clave) || calcaUnTrozoDelSaludo(f, presentacion));
         })
         .join(" ")
         .trim();

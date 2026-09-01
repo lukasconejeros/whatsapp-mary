@@ -313,6 +313,66 @@ check(
   sinRepetirElSaludo(saludoHoy, saludoHoy) === ""
 );
 
+// ── EL CASO REAL DEL 01-09-2026, conv 398, 9:25:19 ───────────────────────────
+// Lukas mandó la captura: "de nuevo el mismo problema de ayer". El veto del 31-08 solo cazaba
+// el saludo CALCADO; hoy el modelo se volvió a presentar con OTRAS palabras ("Hola, qué bueno
+// que se comunique conmigo 😊 Un gusto, mi nombre es Mary Quinteros, profesora de la academia
+// Arteluk desde hace 5 años") y pasó limpio: la mamá vio la presentación dos veces seguidas.
+// Lo que lo delata no es el parecido global, sino el trozo calcado palabra por palabra.
+console.log("\n— y tampoco puede volver a presentarse con otras palabras (conv 398, 01-09) —");
+const saludoManana = conSaludoDeHora(suyo, 9);
+const colaReal398 =
+  "Hola, qué bueno que se comunique conmigo 😊 Un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años." +
+  "\n\nMe alegra saber que su hijo tiene 9 años y le interesa el taller de pintura. A esa edad trabajan dibujo y pintura, van aprendiendo diferentes técnicas según su nivel y su ritmo 🎨 Cuénteme su nombre y el de su hijo para poder acompañarlo mejor 💛";
+check(
+  "conv 398 REAL: la presentación repetida se va y queda la respuesta",
+  sinRepetirElSaludo(saludoManana, colaReal398) ===
+    "Me alegra saber que su hijo tiene 9 años y le interesa el taller de pintura. A esa edad trabajan dibujo y pintura, van aprendiendo diferentes técnicas según su nivel y su ritmo 🎨 Cuénteme su nombre y el de su hijo para poder acompañarlo mejor 💛",
+  JSON.stringify(sinRepetirElSaludo(saludoManana, colaReal398))
+);
+check(
+  "la misma repetición pegada en un solo párrafo: se va la frase, no el párrafo entero",
+  sinRepetirElSaludo(
+    saludoManana,
+    "Hola, un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años. A los 9 años trabajan dibujo y pintura 🎨"
+  ) === "A los 9 años trabajan dibujo y pintura 🎨",
+  sinRepetirElSaludo(
+    saludoManana,
+    "Hola, un gusto, mi nombre es Mary Quinteros, profesora de la academia Arteluk desde hace 5 años. A los 9 años trabajan dibujo y pintura 🎨"
+  )
+);
+// Los hermanos que NO se pueden tocar: nombrar la academia o saludar cortito es legítimo.
+check(
+  "nombrar la academia en una respuesta normal NO se toca",
+  sinRepetirElSaludo(saludoManana, "En la academia Arteluk trabajamos en grupos de máximo 6 niños 🎨") ===
+    "En la academia Arteluk trabajamos en grupos de máximo 6 niños 🎨",
+  sinRepetirElSaludo(saludoManana, "En la academia Arteluk trabajamos en grupos de máximo 6 niños 🎨")
+);
+check(
+  "un saludo cortito sin volver a presentarse NO se toca",
+  sinRepetirElSaludo(saludoManana, "Hola, qué bueno que se comunique conmigo 😊 Le cuento los horarios enseguida.") ===
+    "Hola, qué bueno que se comunique conmigo 😊 Le cuento los horarios enseguida.",
+  sinRepetirElSaludo(saludoManana, "Hola, qué bueno que se comunique conmigo 😊 Le cuento los horarios enseguida.")
+);
+check(
+  "conv 378 REAL (30-08): volver a pedir el nombre AÑADIENDO algo suyo NO se toca",
+  sinRepetirElSaludo(
+    saludoManana,
+    "Â¡QuÃ© bueno! Trabajamos con niÃ±os desde los 5 aÃ±os, con grupos distintos segÃºn la edad, incluidos adolescentes. CuÃ©nteme cuÃ¡l es su nombre y para quiÃ©n serÃ­a la clase, Â¿cuÃ¡ntos aÃ±os tiene?"
+  ) ===
+    "Â¡QuÃ© bueno! Trabajamos con niÃ±os desde los 5 aÃ±os, con grupos distintos segÃºn la edad, incluidos adolescentes. CuÃ©nteme cuÃ¡l es su nombre y para quiÃ©n serÃ­a la clase, Â¿cuÃ¡ntos aÃ±os tiene?",
+  sinRepetirElSaludo(
+    saludoManana,
+    "Â¡QuÃ© bueno! Trabajamos con niÃ±os desde los 5 aÃ±os, con grupos distintos segÃºn la edad, incluidos adolescentes. CuÃ©nteme cuÃ¡l es su nombre y para quiÃ©n serÃ­a la clase, Â¿cuÃ¡ntos aÃ±os tiene?"
+  )
+);
+check(
+  "decir su nombre suelto, sin la presentación entera, NO se toca",
+  sinRepetirElSaludo(saludoManana, "Se lo consulto a Mary Quinteros y le confirmo 😊") ===
+    "Se lo consulto a Mary Quinteros y le confirmo 😊",
+  sinRepetirElSaludo(saludoManana, "Se lo consulto a Mary Quinteros y le confirmo 😊")
+);
+
 // Deja la base como estaba (si no había nada guardado, queda el texto de fábrica: es el mismo
 // que usaba antes, así que el bot saluda igual).
 setBienvenida(original);
