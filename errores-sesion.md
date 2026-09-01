@@ -894,3 +894,73 @@ disabled` y **empuja igual** — ese texto es ruido, hay que mirar la línea sig
 
 **La regla.** En este PC el push va siempre con esas dos variables delante. Y `git log
 origin/main..HEAD` miente sin un `fetch` previo: la verdad es `git ls-remote`.
+
+---
+
+## 31-08-2026 · Auditoría de las 40 conversaciones que contestó el bot: 3 fallos, y los 3 estaban "prohibidos" en el prompt
+
+**El encargo.** Lukas mandó una captura de WhatsApp de las 23:25 con un papá al que el bot le había
+mandado **el saludo de Mary dos veces seguidas, en la misma burbuja**, y pidió auditar todas las
+conversaciones porque *"hay cosas que se huelen a IA"*.
+
+**Cómo se midió.** Login real en producción (`POST /api/login`) y descarga de las **396
+conversaciones** con sus mensajes (`GET /api/conversations` + `GET /api/messages/<id>`). El bot
+había contestado en **40 de ellas, 100 mensajes, del 20-08 12:17 al 31-08 23:24**. Ventana entera,
+no una muestra.
+
+### 1 — El saludo duplicado: dos causas encadenadas, ninguna era el modelo "poniéndose creativo"
+
+El mensaje del anuncio **no llegó pelado**. Textual de la conv 396 (31-08 22:50:42):
+
+```
+Enlace:
+
+
+¡Hola! Quiero más información
+```
+
+Ese `Enlace:` que le pega WhatsApp cuando el anuncio lleva un link basta para que `esSoloEntrada()`
+no reconozca la plantilla de Meta ⇒ el bot cree que le preguntaron algo ⇒ manda el saludo de Mary
+**y además** le pide una respuesta al modelo. Y el modelo, con la orden
+`[YA_SALUDASTE: … NO te vuelvas a presentar]` delante, **devolvió el saludo entero otra vez**.
+
+Es la lección #28 de este mismo archivo aplicada al revés: allí se aprendió que ordenarle al modelo
+que copie un texto no garantiza que lo copie; acá se ve que **ordenarle que NO lo repita tampoco
+garantiza que no lo repita**. Los dos arreglos van en el código: se limpia la cabecera antes de
+mirar el mensaje (`sinCabeceraDeWhatsApp`) y se le quita la repetición a la respuesta
+(`sinRepetirElSaludo`). 9 casos nuevos en `test:saludo`, con el mensaje real de la conv 396 dentro.
+
+### 2 — El tuteo: 27 de los 100 mensajes, con la orden en mayúsculas en el prompt
+
+`prompts/negocio.md` dice **"DE USTED, SIEMPRE Y CON TODOS. Nunca tutees a nadie"** desde el 24-08.
+Medido: **27 de los 100 mensajes tutean a una apoderada** — *"Puedes elegir el horario"* (conv 396,
+23:22), *"¿Te gustaría que le guarde un cupo?"* (conv 377), *"Qué hermoso que tu hija ame pintar"*
+(conv 355). El detector `antituteo.ts` existía desde el 24-08, pero su propio comentario decía que
+**NO** miraba lo que improvisa el modelo, *"eso lo manda la orden del prompt"*. La medición dice que
+la orden no manda nada.
+
+**El arreglo:** `deUsted()` reescribe la salida del modelo (lista cerrada de palabras, nunca reglas
+por terminación — "arte" acabaría en "arle" en una academia de arte). Probado **con los 100 mensajes
+reales de producción**: 27 corregidos, 0 tuteos restantes, 0 falsos positivos mirados a ojo. El
+saludo que escribe Mary NO pasa por el corrector: ese sale palabra por palabra.
+
+**La regla que queda:** una orden del prompt no es una garantía, es una preferencia. Lo que no puede
+salir mal se comprueba en el código, aunque el prompt ya lo prohíba.
+
+### 3 — La dirección: el bot tenía dos y las repartía
+
+El bloque "Dónde estamos" del panel (lo escribe Mary) dice **Picarte 804**, y un ejemplo de estilo
+escrito a fuego en `prompts/negocio.md` decía **Picarte 805**. Resultado en las conversaciones
+reales: **6 leads recibieron 804 y 3 recibieron 805** (conv 351, 360 y 387 — la última hoy a las
+10:46). Mary, escribiendo a mano el 30-08 a las 20:56, dice *"estamos ubicados en picarte 804"*.
+
+**El arreglo:** el ejemplo del prompt ya no lleva número, remite al bloque que edita Mary. Un dato
+que el cliente puede cambiar no se escribe en dos sitios: se escribe donde él lo edita, y el resto
+apunta ahí.
+
+### De regalo, el error de siempre con los scripts de Python
+
+Al insertar los casos nuevos en `scripts/test-saludo.ts` con un script, `io.open(P,'w')` **truncó el
+archivo a 0 bytes** antes de reventar al codificar un emoji fuera del plano básico. Es la **cuarta
+vez** (19-08, 20-08, 27-08 con `SIGUIENTE.md`). Se recuperó con `git checkout` porque estaba
+versionado. **Se escribe a un temporal y se reemplaza al final, nunca directo sobre el destino.**
