@@ -88,6 +88,51 @@ export function conSaludoDeHora(texto: string, hora: number = hourSantiago()): s
   return /^\p{Ll}/u.test(resto) ? `${saludo}, ${resto}` : `${saludo}. ${resto}`;
 }
 
+// EL VETO A QUE EL MODELO REPITA EL SALUDO (auditoría del 31-08-2026).
+//
+// Cuando en el primer contacto además preguntan algo, el saludo de Mary sale del código y la IA
+// contesta a continuación, con la orden [YA_SALUDASTE: … NO te vuelvas a presentar]. No basta:
+// en la conv 396 (31-08 22:51) el modelo devolvió el saludo ENTERO otra vez y a la mamá le llegó
+// dos veces seguido en la misma burbuja. Es la lección #28 de la bitácora aplicada al revés: si
+// una orden del prompt no se puede incumplir, se comprueba en el código.
+function comparable(s: string): string {
+  return norm(s).replace(/[^a-z0-9ñ ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function seParecen(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [corto, largo] = a.length <= b.length ? [a, b] : [b, a];
+  if (largo.includes(corto)) return true;
+  const A = new Set(a.split(" ")), B = new Set(b.split(" "));
+  let comunes = 0;
+  for (const w of A) if (B.has(w)) comunes++;
+  return comunes / new Set([...A, ...B]).size > 0.75;
+}
+
+/** La respuesta del modelo sin los trozos donde volvió a soltar el saludo. */
+export function sinRepetirElSaludo(saludo: string, cola: string): string {
+  const clave = comparable(saludo);
+  if (!clave || !cola.trim()) return (cola || "").trim();
+  const quedan = cola
+    .split(/\n\s*\n/)
+    .map((parrafo) => {
+      // Un párrafo entero calcado del saludo se va completo (el caso de la conv 396).
+      if (seParecen(comparable(parrafo), clave)) return "";
+      // Y si solo repitió una frase suelta del saludo, se va esa frase y el resto se queda.
+      return parrafo
+        .split(/(?<=[.!?¡¿])\s+/)
+        .filter((frase) => {
+          const f = comparable(frase);
+          return f.length < 25 || !seParecen(f, clave);
+        })
+        .join(" ")
+        .trim();
+    })
+    .filter((p) => p.trim());
+  return quedan.join("\n\n").trim();
+}
+
 // Quita emojis, tildes y signos para comparar. "Buenos días 👋" y "buenos dias" son lo mismo.
 function norm(s: string): string {
   return String(s ?? "")
@@ -106,12 +151,33 @@ export function esSaludoPuro(mensaje: string): boolean {
   return /^(h?ola+s?|holi+s?|buenas|buenas tardes|buenas noches|buenos dias|buen dia|que tal|hey|saludos|alo)$/.test(t);
 }
 
+// LO QUE WHATSAPP LE PEGA DELANTE AL MENSAJE DEL ANUNCIO (auditoría del 31-08-2026).
+//
+// Cuando el anuncio de Meta lleva un enlace, el mensaje no llega pelado: llega con una cabecera
+// y saltos de línea antes de la plantilla. Textual de producción, conv 396, 31-08 22:50:42:
+//     "Enlace:\n\n\n¡Hola! Quiero más información"
+// Sin quitar ese "Enlace:" el mensaje deja de parecerse a la plantilla, el bot cree que le
+// preguntaron algo y manda su saludo Y ADEMÁS le pide una respuesta al modelo — que repitió el
+// saludo entero, palabra por palabra, en la misma burbuja. Es la captura que mandó Lukas.
+const RE_CABECERA_WA = /^\s*(enlace|link|url|mensaje\s+reenviado|reenviado)\s*:\s*/i;
+
+export function sinCabeceraDeWhatsApp(mensaje: string): string {
+  let t = String(mensaje ?? "");
+  // Puede venir más de una ("Enlace:" y debajo la plantilla), por eso el bucle con tope.
+  for (let i = 0; i < 3; i++) {
+    const limpio = t.replace(RE_CABECERA_WA, "").replace(/^[\s\n]+/, "");
+    if (limpio === t) break;
+    t = limpio;
+  }
+  return t.trim();
+}
+
 // Lo que llega SOLO por abrir la conversación y no pregunta nada: un saludo pelado, o el texto
 // que WhatsApp manda solo al tocar el botón de un anuncio de Meta ("¡Hola! Quiero más información",
 // "¡Hola! Me gustaría conseguir más información sobre esto."). Con esto no hace falta molestar al
 // modelo: el saludo de Mary ya dice todo lo que hay que decir y además pregunta para quién es.
 function esSoloEntrada(mensaje: string): boolean {
-  const t = norm(mensaje).replace(/[!¡?¿.,;:]/g, " ").replace(/\s+/g, " ").trim();
+  const t = norm(sinCabeceraDeWhatsApp(mensaje)).replace(/[!¡?¿.,;:]/g, " ").replace(/\s+/g, " ").trim();
   if (!t) return true;
   return /^(h?ola+s?|holi+s?|buenas|buenas tardes|buenas noches|buenos dias|buen dia|que tal|hey|saludos|alo)?\s*((me\s+)?(gustaria|interesa|interesaria|encantaria)|quiero|quisiera|queria|necesito|busco)?\s*(conseguir|obtener|recibir|tener|saber|pedir|solicitar)?\s*(mas\s+)?(informacion|info|datos)?\s*(sobre\s+esto|al\s+respecto|por\s+favor|porfavor|gracias)?$/.test(t);
 }

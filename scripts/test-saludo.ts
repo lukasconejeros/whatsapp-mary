@@ -14,6 +14,8 @@ import {
   validarBienvenida,
   saludoPorHora,
   conSaludoDeHora,
+  sinCabeceraDeWhatsApp,
+  sinRepetirElSaludo,
 } from "../src/lib/mensajes.js";
 import { generateReply } from "../src/lib/ai.js";
 import { buildSystemPrompt } from "../src/lib/system-prompt.js";
@@ -240,6 +242,75 @@ check(
 check(
   "el «buenas» de más adentro NO se toca",
   conSaludoDeHora("hola, tenemos buenas noticias para usted", 15) === "Buenas tardes, tenemos buenas noticias para usted"
+);
+
+// ── LOS 2 FALLOS QUE CAZÓ LA AUDITORÍA DEL 31-08-2026 ──────────────────────
+//
+// Lukas mandó una captura: a un papá que tocó el anuncio a las 22:50 le llegó el saludo de Mary
+// DOS VECES seguidas en la misma burbuja (conv 396, 31-08 22:51:15). Medido en producción, las
+// dos causas encadenadas:
+//   1. el mensaje del anuncio no llegó pelado, llegó con un "Enlace:" y saltos de línea delante
+//      de la plantilla, así que el filtro no lo reconoció y el bot creyó que le habían preguntado;
+//   2. entonces mandó su saludo Y le pidió respuesta al modelo, que devolvió el saludo entero
+//      otra vez a pesar del [YA_SALUDASTE] del prompt.
+setBienvenida(suyo);
+console.log("\n— el mensaje del anuncio con la cabecera que le pega WhatsApp —");
+check(
+  "«Enlace:» y los saltos se quitan antes de mirar el mensaje",
+  sinCabeceraDeWhatsApp("Enlace:\n\n\n¡Hola! Quiero más información") === "¡Hola! Quiero más información",
+  sinCabeceraDeWhatsApp("Enlace:\n\n\n¡Hola! Quiero más información")
+);
+check(
+  "un mensaje normal no se toca",
+  sinCabeceraDeWhatsApp("hola, ¿cuánto vale la clase?") === "hola, ¿cuánto vale la clase?"
+);
+check(
+  "conv 396 REAL: el anuncio con enlace se contesta con el saludo y NADA MÁS",
+  saludoDeEntrada([msg("user", "Enlace:\n\n\n¡Hola! Quiero más información")]).ademasResponder === false
+);
+check(
+  "y el saludo que sale es el de Mary, letra por letra",
+  saludoDeEntrada([msg("user", "Enlace:\n\n\n¡Hola! Quiero más información")]).texto === conSaludoDeHora(suyo)
+);
+check(
+  "la otra plantilla de Meta con enlace tampoco molesta al modelo",
+  saludoDeEntrada([msg("user", "Enlace:\n\n¡Hola! Me gustaría conseguir más información sobre esto.")]).ademasResponder === false
+);
+// La familia entera sigue igual que antes: quitar la cabecera no puede cambiar los demás casos.
+check(
+  "«hola, ¿cuánto vale?» SIGUE respondiéndolo la IA detrás del saludo",
+  saludoDeEntrada([msg("user", "hola, cuánto vale la clase?")]).ademasResponder === true
+);
+check(
+  "un «hola» pelado sigue saliendo sin IA",
+  saludoDeEntrada([msg("user", "hola")]).ademasResponder === false
+);
+check(
+  "«Enlace:» con una pregunta de verdad detrás SÍ la contesta la IA",
+  saludoDeEntrada([msg("user", "Enlace:\n\n¿desde qué edad reciben niños?")]).ademasResponder === true
+);
+
+console.log("\n— el modelo no puede volver a soltar el saludo —");
+const saludoHoy = conSaludoDeHora(suyo, 22);
+check(
+  "conv 396 REAL: el párrafo repetido se va entero",
+  sinRepetirElSaludo(saludoHoy, saludoHoy + " 😊") === "",
+  JSON.stringify(sinRepetirElSaludo(saludoHoy, saludoHoy + " 😊"))
+);
+check(
+  "si repite el saludo y además contesta, se queda solo la respuesta",
+  sinRepetirElSaludo(saludoHoy, saludoHoy + "\n\nA los 10 años trabajan dibujo y pintura 🎨") ===
+    "A los 10 años trabajan dibujo y pintura 🎨",
+  sinRepetirElSaludo(saludoHoy, saludoHoy + "\n\nA los 10 años trabajan dibujo y pintura 🎨")
+);
+check(
+  "una respuesta normal no se toca",
+  sinRepetirElSaludo(saludoHoy, "A los 8 años trabajan dibujo y pintura, y la clase de prueba son dos horas 🎨") ===
+    "A los 8 años trabajan dibujo y pintura, y la clase de prueba son dos horas 🎨"
+);
+check(
+  "y si el modelo solo repitió el saludo, el bot manda el saludo igual (no se queda mudo)",
+  sinRepetirElSaludo(saludoHoy, saludoHoy) === ""
 );
 
 // Deja la base como estaba (si no había nada guardado, queda el texto de fábrica: es el mismo

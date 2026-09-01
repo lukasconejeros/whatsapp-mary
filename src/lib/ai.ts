@@ -5,7 +5,8 @@ import { buildSystemPrompt } from "./system-prompt.js";
 import { computeState } from "./state-manager.js";
 import { logCostoIA } from "./db.js";
 import { todaySantiago } from "./fechas.js";
-import { saludoDeEntrada } from "./mensajes.js";
+import { saludoDeEntrada, sinRepetirElSaludo } from "./mensajes.js";
+import { deUsted, detectarTuteo } from "./antituteo.js";
 import {
   elegirIA,
   razonamientoDe,
@@ -251,11 +252,29 @@ export async function generateReplyDetallado(input: {
   if (entrada.texto) {
     console.log(`[BOT conv=${input.conversationId}] 👋 saludo del panel + la IA contesta lo que preguntaron`);
     const resto = await responderConElModelo({ ...input, yaSaludado: entrada.texto });
-    const cola = resto.texto.trim();
+    // El veto del 31-08-2026: la orden [YA_SALUDASTE] no impidió que el modelo devolviera el
+    // saludo entero otra vez (conv 396, 22:51 — le llegó dos veces en la misma burbuja).
+    const cola = comoHablaMary(sinRepetirElSaludo(entrada.texto, resto.texto), input.conversationId);
+    if (cola !== resto.texto.trim()) {
+      console.warn(`[BOT conv=${input.conversationId}] ✂️ el modelo repitió el saludo: se le quitó`);
+    }
     return { texto: cola ? `${entrada.texto}\n\n${cola}` : entrada.texto, motivo: null };
   }
 
   return responderConElModelo(input);
+}
+
+// EL CORRECTOR DE USTED (auditoría del 31-08-2026). Se aplica a TODO lo que escribe el modelo y
+// lee un apoderado, y solo a eso: los avisos a Mary, su práctica y el asistente del panel no
+// pasan por acá. Medido antes de ponerlo: 27 de los 100 mensajes que el bot mandó entre el 20 y
+// el 31 de agosto tuteaban, con la orden "DE USTED, SIEMPRE Y CON TODOS" ya escrita en el prompt.
+// El saludo que Mary escribe en "Entrenar IA" NO pasa por el corrector: sale palabra por palabra.
+function comoHablaMary(texto: string, conversationId: number): string {
+  const arreglado = deUsted(texto);
+  if (arreglado !== texto) {
+    console.warn(`[BOT conv=${conversationId}] 🗣️ el modelo tuteó: [${detectarTuteo(texto).join(", ")}] → corregido a usted`);
+  }
+  return arreglado;
 }
 
 // El camino normal: todo lo que contesta el modelo. `yaSaludado` viene con el texto del saludo

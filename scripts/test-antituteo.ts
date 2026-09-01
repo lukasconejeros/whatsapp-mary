@@ -11,7 +11,7 @@
 // el prompt, y se mide mirando conversaciones reales.
 import "./env-loader.js";
 import { readFileSync } from "node:fs";
-import { detectarTuteo } from "../src/lib/antituteo.js";
+import { detectarTuteo, deUsted } from "../src/lib/antituteo.js";
 import { FRASE_ESPERA } from "../src/lib/interes-prueba.js";
 import { FRASE_ESPERA_IA } from "../src/lib/ai.js";
 import { INSTRUCCION_DERIVAR } from "../src/lib/tools/derivar-humano.js";
@@ -105,6 +105,56 @@ check(
   "el ejemplo de cuando le pasa la conversación a Mary",
   detectarTuteo(INSTRUCCION_DERIVAR).length === 0,
   JSON.stringify(detectarTuteo(INSTRUCCION_DERIVAR))
+);
+
+// ── EL CORRECTOR DE SALIDA (auditoría del 31-08-2026) ────────────────────────
+//
+// POR QUÉ SE AÑADE: la orden del prompt NO basta. Medido sobre las 40 conversaciones que el bot
+// contestó entre el 20 y el 31 de agosto: **23 de sus 100 mensajes tutean** a una apoderada
+// ("Puedes elegir el horario", conv 396 23:22; "¿Te gustaría que le guarde un cupo?", conv 377).
+// El detector existía desde el 24-08 pero solo miraba NUESTROS textos fijos, así que no veía
+// nada de esto. Es el mismo patrón que en Anpalex: si el texto no puede salir mal, el veto va en
+// código, no en el prompt.
+console.log("\n— el corrector: lo que escribe el modelo sale de usted —");
+const casosReales: [string, string][] = [
+  // Los de la izquierda son textuales de producción (conv y hora en la auditoría del 31-08).
+  ["Puedes elegir el horario que mejor les acomode 😊", "Puede elegir el horario que mejor les acomode 😊"],
+  ["¿Te gustaría que le guarde un cupo de clase de prueba?", "¿Le gustaría que le guarde un cupo de clase de prueba?"],
+  ["Dame unos minutos y te confirmo disponibilidad", "Deme unos minutos y le confirmo disponibilidad"],
+  ["¿Eres Mary o continúas tú con el cliente?", "¿Es Mary o continúa usted con el cliente?"],
+  ["Qué hermoso que tu hija ame pintar", "Qué hermoso que su hija ame pintar"],
+  ["Cuéntame, estoy para ayudarte 💛", "Cuénteme, estoy para ayudarle 💛"],
+  ["Te paso con una persona del equipo, te escribe enseguida 💛", "Le paso con una persona del equipo, le escribe enseguida 💛"],
+  ["¿Me pasas tu nombre? Así vemos qué horarios te acomodan mejor", "¿Me pasa su nombre? Así vemos qué horarios le acomodan mejor"],
+  ["hola, ¿cómo estai?", "hola, ¿cómo está?"],
+  ["Así te muestro los horarios que le acomodan mejor 🎨", "Así le muestro los horarios que le acomodan mejor 🎨"],
+];
+for (const [antes, despues] of casosReales) {
+  check(`«${antes.slice(0, 42)}…»`, deUsted(antes) === despues, `→ ${deUsted(antes)}`);
+}
+
+console.log("\n— lo que el corrector NO debe tocar —");
+const intactos = [
+  "Le confirmo la hora del martes 😊",
+  "Estamos en Picarte 804, Valdivia, segundo piso, al lado del Registro Civil.",
+  "La clase de prueba es $19.990 e incluye todos los materiales.",
+  "Su hija entra en el grupo de adolescentes, ahí trabajan técnicas más avanzadas.",
+  "Mary le confirma el cupo y le escribe enseguida 💛",
+  "El taller es de 17:30 a 19:30, y el sábado de 11:00 a 13:00.",
+  "Trabajamos con la Metodología Arteluk 🎨 Aprenden técnicas paso a paso.",
+];
+for (const t of intactos) check(`intacto: «${t.slice(0, 44)}…»`, deUsted(t) === t, `→ ${deUsted(t)}`);
+
+check(
+  "un texto ya corregido no cambia si se pasa dos veces",
+  deUsted(deUsted("¿Te gustaría que te confirme tu horario?")) === deUsted("¿Te gustaría que te confirme tu horario?"),
+  deUsted(deUsted("¿Te gustaría que te confirme tu horario?"))
+);
+check("vacío no revienta", deUsted("") === "");
+check(
+  "lo que corrige el corrector ya no lo caza el detector",
+  detectarTuteo(deUsted("¿Tienes tiempo el martes? Te confirmo tu hora y te aviso.")).length === 0,
+  deUsted("¿Tienes tiempo el martes? Te confirmo tu hora y te aviso.")
 );
 
 console.log(`\n${fail === 0 ? "✅" : "❌"} ${pass} ok, ${fail} fallando\n`);
