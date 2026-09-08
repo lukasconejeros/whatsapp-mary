@@ -27,6 +27,7 @@ import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
 import { quiereLaClaseDePrueba, yaSeHabloDeLaClaseDePrueba, apartarParaMary } from "../interes-prueba.js";
+import { partirEnMensajes, retrasosDeEnvio } from "../partir-mensaje.js";
 import { procesarRespuestaPaseLista } from "../avisos-mary-loop.js";
 import { telefonoDelBot } from "../recordatorios-wa-loop.js";
 import pino from "pino";
@@ -425,7 +426,10 @@ export async function handleIncomingMessages(
           const fresh2 = getConversationById(convId);
           if (!fresh2 || fresh2.mode !== "AI") return;
 
-          const history = getRecentHistory(convId, 20);
+          // 26 y no 20 desde que la respuesta sale en 2 o 3 burbujas (08-09-2026): cada turno
+          // del bot ocupa ahora varias filas, y con 20 el historial cubría la mitad de la
+          // conversación que antes — que es como volver a preguntar lo ya preguntado.
+          const history = getRecentHistory(convId, 26);
 
           // Ya dijo que quiere la clase de prueba: el bot no sigue vendiendo. Manda la frase
           // fija, se apaga en este chat y le avisa a Mary (encargo de Lukas, 19-08-2026).
@@ -462,9 +466,23 @@ export async function handleIncomingMessages(
           }
           // La respuesta sale por el OUTBOX (reintentos + socket vigente tras
           // reconexión), no por sock.sendMessage directo. Se registra junto al encolado.
-          insertMessage(convId, "assistant", reply);
-          enqueueOutbox(convId, fresh2.phone, reply);
-          logger.debug({ convId, replyLength: reply.length }, "Respuesta encolada");
+          //
+          // UN MENSAJE = UNA IDEA (encargo de Lukas, 08-09-2026): la respuesta se manda en
+          // hasta 3 burbujas, una por párrafo y con pausa entre ellas, como escribe Mary. Cada
+          // burbuja se guarda como su propio mensaje: lo que ve el panel es lo que le llegó a
+          // la persona. La pausa la pone el outbox (send_after), así sobrevive a un reinicio.
+          const burbujas = partirEnMensajes(reply);
+          if (burbujas.length === 0) {
+            registrarMudo(convId, "respuesta_en_blanco");
+            logger.info({ convId }, "el modelo devolvió solo espacios");
+            return;
+          }
+          const esperas = retrasosDeEnvio(burbujas);
+          burbujas.forEach((burbuja, i) => {
+            insertMessage(convId, "assistant", burbuja);
+            enqueueOutbox(convId, fresh2.phone, burbuja, { enSegundos: esperas[i] });
+          });
+          logger.debug({ convId, burbujas: burbujas.length, replyLength: reply.length }, "Respuesta encolada");
         } catch (err) {
           logger.error({ convId, err }, "Error generando respuesta");
         }

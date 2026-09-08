@@ -54,6 +54,27 @@ async function main() {
   await delay(200);
   check("item bueno posterior se envía (cola no bloqueada)", okCalls >= 1 && getPendingOutbox(50).every((o) => o.id !== bueno));
 
+  // 4) La pausa entre burbujas de una misma respuesta (encargo del 08-09-2026, "un mensaje =
+  //    una idea"): el segundo trozo se encola CON hora y no puede salir antes de esa hora.
+  //    Va por la base y no por un setTimeout suelto para que sobreviva a un reinicio del bot.
+  db.prepare("DELETE FROM outbox WHERE sent = 0").run();
+  const ahora = enqueueOutbox(conv.id, conv.phone, "trozo-1");
+  const luego = enqueueOutbox(conv.id, conv.phone, "trozo-2", { enSegundos: 6 });
+  const pendientesYa = getPendingOutbox(50).map((o) => o.id);
+  check("el primer trozo está listo para salir", pendientesYa.includes(ahora));
+  check("el segundo trozo todavía NO lo toma el outbox", !pendientesYa.includes(luego));
+
+  const enviados: string[] = [];
+  const espiaSock = { sendMessage: async (_j: string, p: { text: string }) => { enviados.push(p.text); } } as unknown as WASocket;
+  startOutboxLoop(espiaSock);
+  await delay(2600);
+  check("a los 2 segundos salió solo el primero", enviados.length === 1 && enviados[0] === "trozo-1", JSON.stringify(enviados));
+  await delay(5000); // pasada la espera de 6 s, ya le toca
+  stopOutboxLoop();
+  await delay(200);
+  check("cumplida la espera, el segundo trozo sale solo", enviados.length === 2 && enviados[1] === "trozo-2", JSON.stringify(enviados));
+  check("y sale en orden, nunca al revés", enviados.join("|") === "trozo-1|trozo-2");
+
   console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
   db.prepare("DELETE FROM conversations WHERE phone = '56990009999'").run();
   db.close();

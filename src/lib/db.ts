@@ -67,6 +67,7 @@ export interface OutboxItem {
   kind: "text" | "image" | "audio"; // image/audio → media es el archivo a enviar
   media: string | null;   // nombre del archivo en data/media (para image/audio)
   sent: number;
+  send_after: number;   // epoch desde el que se puede enviar (0 = ya)
   created_at: number;
 }
 
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS outbox (
   media TEXT,
   sent INTEGER NOT NULL DEFAULT 0,   -- 0=pendiente, 1=enviado, 2=fallido (descartado)
   attempts INTEGER NOT NULL DEFAULT 0,
+  send_after INTEGER NOT NULL DEFAULT 0,  -- epoch desde el que puede salir (0 = ya)
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(sent, created_at);
@@ -591,6 +593,9 @@ function build(): Ctx {
   addColumnaSiFalta(db, "outbox", "kind", "TEXT NOT NULL DEFAULT 'text'");
   addColumnaSiFalta(db, "outbox", "media", "TEXT");
   addColumnaSiFalta(db, "outbox", "attempts", "INTEGER NOT NULL DEFAULT 0");
+  // send_after: epoch a partir del cual se puede enviar (0 = ya). Las burbujas 2 y 3 de una
+  // respuesta lo usan para salir con pausa en vez de en ráfaga.
+  addColumnaSiFalta(db, "outbox", "send_after", "INTEGER NOT NULL DEFAULT 0");
   // mp_id: ID de transacción de MercadoPago (para importar cartolas sin duplicar).
   addColumnaSiFalta(db, "ingresos", "mp_id", "TEXT");
   addColumnaSiFalta(db, "costos", "mp_id", "TEXT");
@@ -655,10 +660,11 @@ function build(): Ctx {
       "UPDATE connection_state SET status = ?, qr_string = ?, phone = ?, updated_at = unixepoch() WHERE id = 1"
     ),
     enqueueOutboxStmt: db.prepare(
-      "INSERT INTO outbox (conversation_id, phone, content, kind, media) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO outbox (conversation_id, phone, content, kind, media, send_after) VALUES (?, ?, ?, ?, ?, ?)"
     ),
     getPendingOutboxStmt: db.prepare(
-      "SELECT * FROM outbox WHERE sent = 0 ORDER BY created_at ASC, id ASC LIMIT ?"
+      // COALESCE por las filas viejas, anteriores a la columna: send_after NULL = sale ya.
+      "SELECT * FROM outbox WHERE sent = 0 AND COALESCE(send_after, 0) <= unixepoch() ORDER BY created_at ASC, id ASC LIMIT ?"
     ),
     markSentStmt: db.prepare("UPDATE outbox SET sent = 1 WHERE id = ?"),
     deleteMsgs: db.prepare("DELETE FROM messages WHERE conversation_id = ?"),
@@ -960,15 +966,21 @@ export function setConnectionState(input: {
   c.upsertConnState.run(status, qr_string, phone);
 }
 
+// `enSegundos` retrasa la salida de ESTE item sin frenar la cola: lo usan las burbujas 2 y 3
+// de una misma respuesta ("un mensaje = una idea", 08-09-2026) para no salir en ráfaga. Va por
+// la base y no por un setTimeout suelto: así la burbuja pendiente sobrevive a un reinicio del
+// bot. Sin `enSegundos` el item sale como toda la vida (send_after = 0).
 export function enqueueOutbox(
   conversationId: number,
   phone: string,
   content: string,
-  opts?: { kind?: "text" | "image" | "audio"; media?: string | null }
+  opts?: { kind?: "text" | "image" | "audio"; media?: string | null; enSegundos?: number }
 ): number {
   const kind = opts?.kind ?? "text";
   const media = opts?.media ?? null;
-  const result = ctx().enqueueOutboxStmt.run(conversationId, phone, content, kind, media);
+  const espera = Math.max(0, Math.round(opts?.enSegundos ?? 0));
+  const sendAfter = espera > 0 ? Math.floor(Date.now() / 1000) + espera : 0;
+  const result = ctx().enqueueOutboxStmt.run(conversationId, phone, content, kind, media, sendAfter);
   return result.lastInsertRowid as number;
 }
 
