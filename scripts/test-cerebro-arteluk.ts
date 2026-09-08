@@ -38,11 +38,13 @@ check("nombra a Mary", p.includes("Mary"));
 // viejos, un apoderado recibe información falsa.
 console.log("\n— Lo que Mary corrigió entrenando (10-08-2026) —");
 check("desde los 5 años, no desde los 7", bajo.includes("desde los 5 años") && bajo.includes('nunca digas que es "desde los 7"'));
-check("SÍ hacen arteterapia (el bot decía que no)", bajo.includes("arteterapia") && bajo.includes("diplomado en arteterapia"));
+// 08-09-2026: arteterapia, diagnosticos y psicologos dejan de contestarse. Decision de Lukas:
+// el bot se apaga en silencio y contesta Mary, que para eso tiene el diplomado.
+check("arteterapia es tema delicado: no lo contesta el bot", bajo.includes("arteterapia o \"¿esto le sirve de terapia?\""));
 check("la clase de prueba sirve para ver nivel y personalidad", bajo.includes("personalidad"));
 check("se puede recuperar una clase dentro del mes", bajo.includes("recuperar una clase"));
 check("cuenta la Metodología Arteluk y la rosa cromática", bajo.includes("rosa cromática"));
-check("monocromáticas para niños impulsivos / TDAH", bajo.includes("monocromáticas"));
+check("un diagnostico (TEA, TDAH) no lo contesta el bot", bajo.includes("tdah") && bajo.includes("te apagas en silencio"));
 check("sala de espera con café y té", bajo.includes("salita de espera"));
 check("no hay becas", bajo.includes("no contamos con becas"));
 check("pagos mensuales, primeros 10 días, solo transferencia", bajo.includes("primeros 10 días") && bajo.includes("transferencia"));
@@ -65,7 +67,9 @@ check("sábado 11:00 a 13:00 (adolescentes)", /sábado 11:00 a 13:00 \(grupo de 
 // miércoles, que también son de niños.
 check("a un niño le da los CUATRO días, no dos", bajo.includes("los cuatro días, lunes, martes, miércoles y jueves"));
 check("grupos de máximo 6 alumnos", bajo.includes("máximo 6 alumnos"));
-check("primero la edad, después los horarios", bajo.includes("nunca antes de saber la edad"));
+// Antes exigia lo contrario ("nunca antes de saber la edad"). Medido el 08-09: Mary da dia u hora
+// en el 63 % de sus primeras respuestas y el bot en el 5 %.
+check("los horarios se dan aunque no sepa la edad", bajo.includes("si todavía no sabes la edad, no se los niegues"));
 check("el cupo lo confirma Mary, no el bot", bajo.includes("ni digas que hay cupo"));
 // La web dice "Oferta Mayo" en agosto: el bot no puede arrastrar una promo vencida.
 check("NO ofrece la oferta de mayo", !bajo.includes("oferta mayo") && !bajo.includes("oferta de mayo"));
@@ -80,7 +84,7 @@ check("dice qué hacer con el 'lo voy a pensar'", bajo.includes("lo voy a pensar
 console.log("\n— Que no se note, y qué hacer si preguntan —");
 check("se identifica como asistente de IA si le preguntan", bajo.includes("asistente de ia"));
 check("prohíbe jurar que es Mary", bajo.includes("nunca jures"));
-check("un solo mensaje por respuesta", bajo.includes("un solo mensaje"));
+check("un mensaje = una idea (hasta 3 burbujas)", bajo.includes("un mensaje = una idea") && bajo.includes("máximo tres ideas"));
 check("sin listas ni viñetas", bajo.includes("viñeta"));
 
 // 10-08 (tarde). Mary volvió a practicar con el bot ya corregido y Lukas cazó dos cosas:
@@ -92,8 +96,8 @@ check("deja la excepción de la hora (17:30)", bajo.includes("llevar dos puntos 
 check("techo duro de 3 o 4 líneas, incluso en el método", bajo.includes("tres o cuatro líneas como máximo"));
 check("los textos de Mary son información, NO libreto para calcar", bajo.includes("no un libreto para\ncopiar y pegar") || bajo.includes("no un libreto para copiar y pegar"));
 check("horarios y datos del banco sí van en líneas", bajo.includes("los horarios y los datos para transferir"));
-check("cuenta que trabajan con una psicóloga", bajo.includes("trabajan con una psicóloga"));
-check("el contacto de la psicóloga lo entrega Mary, no el bot", bajo.includes("el contacto de ella lo entrega mary"));
+check("los psicologos tambien son tema delicado", bajo.includes("psicólogos"));
+check("ante un tema delicado NO escribe ni una palabra", bajo.includes("no escribes ni una palabra"));
 
 console.log("\n— Los límites: no agenda, no inventa —");
 check("prohíbe agendar", bajo.includes("nunca agendes"));
