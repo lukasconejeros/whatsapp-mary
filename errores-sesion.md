@@ -1006,3 +1006,34 @@ Volvió a pasar en este mismo turno: `io.open(P,'w')` sobre `src/lib/mensajes.ts
 archivo** al reventar codificando un emoji del bloque de comentarios. Se recuperó con
 `git checkout`. La regla ya estaba escrita en la entrada de ayer y aun así se repitió: **en los
 scripts de edición no van emojis, y se escribe a un temporal antes de pisar el destino.**
+
+## 08-09-2026 · El manual describía a otra vendedora (los 5 cambios de estilo)
+
+**Lo que se implementó.** Los 6 puntos que decidió Lukas tras la auditoría de estilo Mary vs el
+bot: contestar antes de preguntar, no mandar los datos del banco, callarse en los temas
+delicados, emojis 1-2 por tanda, y un mensaje = una idea (hasta 3 burbujas con pausa).
+
+**La lección de fondo, que vale para cualquier bot que imite a una persona.** El bot cumplía
+bien su manual; el manual estaba mal. Le prohibía exactamente lo que la persona real hace:
+"nada de plata antes de saber para quién es" y "horarios nunca antes de saber la edad" contra
+una Mary que da precio en el 59 % de sus primeras respuestas y día u hora en el 63 %. Antes de
+culpar al modelo hay que medir a la persona a la que imita y comparar reglas contra conducta.
+
+**El error propio, cazado leyendo el manual para cambiarlo:** dos ejemplos del prompt tuteaban
+("¿Te gustaría que le guarde un cupo?"). El modelo copia los ejemplos al pie de la letra — ya
+estaba anotado el 31-08 con la dirección Picarte 804/805 y volvió a pasar con el tuteo. **Un
+ejemplo del prompt no es decoración: es la instrucción más fuerte que hay.**
+
+**Los tests custodiaban las reglas viejas.** `test:cerebro` cayó 57/63 al cambiar el manual, y
+los 6 fallos eran justo las reglas derogadas ("primero la edad, después los horarios", "un solo
+mensaje por respuesta"). No se borran: se reescriben apuntando a la regla nueva, si no el
+candado desaparece. Quedó 63/63.
+
+**Lo que NO se pudo probar, y hay que decirlo.** La prueba contra el modelo real
+(`npm run prueba:estilo`, escrita en esta sesión) no corrió: la clave de Anthropic del equipo da
+401 y la de OpenRouter 402 sin créditos. Las baterías verdes solo prueban que el texto del manual
+dice lo que debe decir, **no que el modelo obedezca**. Se corre en cuanto entre el deploy.
+
+**De regalo, el error de Python otra vez** (sexta): un `\n` dentro de un string de Python se
+convirtió en salto real dentro de un string de TypeScript y dejó el test sin compilar. Se cazó al
+correrlo. Los scripts de edición se corren SIEMPRE contra el test después de tocarlo.
