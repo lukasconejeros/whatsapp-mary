@@ -10,9 +10,11 @@
 //
 //   npx tsx scripts/prueba-estilo-nuevo.ts
 import "./env-loader.js";
-import { generateReply } from "../src/lib/ai.js";
+import { generateReply, generateReplyDetallado } from "../src/lib/ai.js";
 import { setBienvenida, getBienvenida } from "../src/lib/mensajes.js";
 import { partirEnMensajes } from "../src/lib/partir-mensaje.js";
+import { detectarTuteo } from "../src/lib/antituteo.js";
+import { pideDatosParaTransferir } from "../src/lib/interes-prueba.js";
 import { getGastoIA, type Message } from "../src/lib/db.js";
 import { todaySantiago, monthSantiago } from "../src/lib/fechas.js";
 
@@ -48,6 +50,10 @@ async function preguntar(texto: string): Promise<string> {
   const burbujas = partirEnMensajes(r);
   console.log(`  🤖 ${r.replace(/\n/g, "\n     ")}`);
   console.log(`     [${burbujas.length} burbuja(s) · US$${llevo().toFixed(4)}]`);
+  // El tuteo se revisa en TODAS las respuestas: los ejemplos del manual ya metieron dos
+  // ("Te gustaria que le guarde un cupo", "Puedes elegir el horario") y el modelo los copia.
+  const tuteos = detectarTuteo(r);
+  check("trata de usted", tuteos.length === 0, JSON.stringify(tuteos));
   return r;
 }
 
@@ -81,18 +87,29 @@ if (hayPresupuesto()) {
 // ── 3. Los datos del banco NO los manda el bot ───────────────────────────────
 console.log("\n── 3. «me pasas los datos para transferir» ──");
 if (hayPresupuesto()) {
+  // La primera línea de defensa ya no es el modelo: es la regla dura del handler, que manda la
+  // frase fija y llama a Mary sin preguntarle nada a la IA (por eso este caso costaba 2 corridas
+  // distintas antes). Se comprueban las dos: que la regla lo caza, y que si aun así llegara al
+  // modelo (alguien lo pide de una forma rara), tampoco suelta la cuenta.
+  check("la regla dura lo caza antes de gastar en el modelo", pideDatosParaTransferir("perfecto, me pasa los datos para transferir?"));
   const r = await preguntar("perfecto, me pasa los datos para transferir?");
   check("NO manda el RUT de la empresa", !r.includes("78.387.831"));
   check("NO manda el número de cuenta", !r.includes("1098729145"));
   check("NO manda el correo de la cuenta", !r.toLowerCase().includes("arteluk.valdivia@gmail.com"));
-  check("contesta algo corto igual (no la deja muda)", r.trim().length > 0 && r.length < 260, `${r.length} chars`);
 }
 
 // ── 4. El tema delicado se calla y espera a Mary ─────────────────────────────
 console.log("\n── 4. «mi hijo tiene autismo» (antes contestaba media página) ──");
 if (hayPresupuesto()) {
-  const r = await preguntar("mi hijo tiene autismo nivel 1, ustedes trabajan con niños asi?");
-  check("se apaga en silencio (no escribe nada)", r.trim().length === 0, `escribió: "${r.slice(0, 120)}"`);
+  const hist = historialConSaludo();
+  hist.push(msg("user", "mi hijo tiene autismo nivel 1, ustedes trabajan con niños asi?"));
+  console.log("  👤 mi hijo tiene autismo nivel 1, ustedes trabajan con niños asi?");
+  const det = await generateReplyDetallado({ history: hist, conversationId: 900, prueba: true });
+  console.log(`  🤖 "${det.texto}"  [motivo: ${det.motivo}]`);
+  check("se apaga en silencio (no escribe nada)", det.texto.trim().length === 0, `escribió: "${det.texto.slice(0, 120)}"`);
+  // El motivo importa: si queda como "sin_texto_del_modelo", cada tema delicado aparece en el
+  // panel como un fallo del bot, y el vigilante de mudos deja de servir para lo que sirve.
+  check("queda anotado como silencio a propósito, no como fallo", det.motivo === "silencio_deliberado", String(det.motivo));
 }
 
 // ── 5. Cómo quedan las burbujas y los emojis en todo lo anterior ─────────────

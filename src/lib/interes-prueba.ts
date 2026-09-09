@@ -114,3 +114,53 @@ export function apartarParaMary(input: {
     });
   } catch { /* un aviso que falla nunca puede tumbar al bot */ }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PEDIR LA CUENTA PARA TRANSFERIR: eso lo atiende Mary (decisión de Lukas, 08-09-2026).
+//
+// Por qué es una regla dura y no una línea del manual: se probó primero solo en el manual y el
+// modelo se portó distinto en dos corridas seguidas con el MISMO mensaje — una vez contestó la
+// frase y otra se quedó mudo. Lo que no puede fallar no se le pide al modelo. Además así ni
+// siquiera se le manda la pregunta, que es una llamada menos que pagar.
+
+/** Lo único que se le dice a quien pide la cuenta. Sin emoji: va con plata de por medio. */
+export const FRASE_DATOS = "Deme unos minutos y le confirmo los datos";
+
+// Pedir la cuenta, en las formas en que se pide de verdad por WhatsApp.
+const PIDE_LA_CUENTA: RegExp[] = [
+  /\bdatos\s+(bancarios|de\s+la\s+cuenta|de\s+(la\s+)?transferencia|para\s+(la\s+)?transferir|para\s+(el\s+)?(pago|deposito)|para\s+la\s+transferencia)\b/,
+  /\b(pasa|pasas|pasarme|manda|mandas|mandarme|envia|envias|enviar|enviarme)\s+(me\s+)?(los\s+)?datos\b/,
+  /\b(los\s+)?datos\s+(para|de)\s+(transferir|transferencia|depositar|pagar)\b/,
+  /\b(numero|n°|nro|numero)\s+de\s+cuenta\b/,
+  /\b(a\s+que|en\s+que)\s+cuenta\b/,
+  /\bdonde\s+(deposito|transfiero|pago|le\s+deposito|le\s+transfiero|le\s+pago)\b/,
+  /\bcomo\s+(le\s+)?(pago|transfiero|deposito)\b/,
+];
+
+/** ¿Está pidiendo la cuenta para pagar? (no confundir con preguntar cuánto sale). */
+export function pideDatosParaTransferir(texto: string): boolean {
+  const t = sinTildes(texto);
+  return PIDE_LA_CUENTA.some((r) => r.test(t));
+}
+
+/** Igual que `apartarParaMary`, pero con la frase de los datos y su propio aviso. */
+export function apartarPorDatos(input: {
+  conversationId: number;
+  phone: string;
+  texto: string;
+  avisar?: (aviso: { titulo: string; cuerpo: string }) => void;
+  nombre?: string;
+}): void {
+  const { conversationId, phone, texto, avisar, nombre } = input;
+
+  insertMessage(conversationId, "assistant", FRASE_DATOS);
+  enqueueOutbox(conversationId, phone, FRASE_DATOS);
+  setMode(conversationId, "HUMAN");
+
+  try {
+    avisar?.({
+      titulo: `Le pide los datos para pagar: ${nombre || phone}`,
+      cuerpo: texto.length > 80 ? texto.slice(0, 80) + "…" : texto,
+    });
+  } catch { /* un aviso que falla nunca puede tumbar al bot */ }
+}

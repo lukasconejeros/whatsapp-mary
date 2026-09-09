@@ -26,7 +26,7 @@ import { generateReplyDetallado } from "../ai.js";
 import { extractCtwaReferral, classifyCategoria } from "../classify.js";
 import { modoAutomatico, puedeDecidirElSistema } from "../quien-contesta.js";
 import { enviarPush } from "../push.js";
-import { quiereLaClaseDePrueba, yaSeHabloDeLaClaseDePrueba, apartarParaMary } from "../interes-prueba.js";
+import { quiereLaClaseDePrueba, yaSeHabloDeLaClaseDePrueba, apartarParaMary, pideDatosParaTransferir, apartarPorDatos } from "../interes-prueba.js";
 import { partirEnMensajes, retrasosDeEnvio } from "../partir-mensaje.js";
 import { procesarRespuestaPaseLista } from "../avisos-mary-loop.js";
 import { telefonoDelBot } from "../recordatorios-wa-loop.js";
@@ -436,6 +436,25 @@ export async function handleIncomingMessages(
           // Preguntar por la prueba NO cuenta: eso lo contesta el bot (ver interes-prueba.ts).
           // El historial va de la mano: un "me interesa" solo significa que la quiere si el bot
           // o Mary ya le habían hablado de la prueba (24-08-2026, conv 364).
+          // Pide la cuenta para pagar: eso lo atiende Mary, y ni siquiera se le pregunta al
+          // modelo (08-09-2026). Se probó primero solo en el manual y contestó distinto en dos
+          // corridas seguidas con el mismo mensaje: una bien y otra muda. Va antes que el
+          // interés en la prueba porque quien pide la cuenta ya pasó de largo esa etapa.
+          if (pideDatosParaTransferir(text)) {
+            apartarPorDatos({
+              conversationId: convId,
+              phone: fresh2.phone,
+              texto: text,
+              nombre: fresh2.name || fresh2.phone,
+              avisar: ({ titulo, cuerpo }) => {
+                enviarPush({ titulo, cuerpo, url: "/inbox", tag: `datos-${convId}` })
+                  .catch(() => { /* nunca rompe el flujo del bot */ });
+              },
+            });
+            logger.info({ convId, phone }, "🏦 pidió los datos para transferir — bot apagado y Mary avisada");
+            return;
+          }
+
           if (quiereLaClaseDePrueba(text, yaSeHabloDeLaClaseDePrueba(history))) {
             apartarParaMary({
               conversationId: convId,

@@ -874,6 +874,22 @@ export function setMode(conversationId: number, mode: ConversationMode): void {
   ctx().db
     .prepare("UPDATE conversations SET mode = ?, mode_manual = 1 WHERE id = ?")
     .run(mode, conversationId);
+  // Mary entra al chat (desde el panel, desde su teléfono, o porque el bot se apartó): las
+  // burbujas que quedaban ESPERANDO su turno se descartan. Si no, ella contesta y diez segundos
+  // después el bot le habla encima a la clienta (08-09-2026, al partir la respuesta en burbujas).
+  // Solo se descarta lo que estaba en espera: lo que ya podía salir —un recordatorio, un aviso
+  // de Mary, la propia frase con la que el bot se despide— no se toca.
+  if (mode === "HUMAN") cancelarBurbujasEnEspera(conversationId);
+}
+
+/** Descarta los mensajes de esa conversación que todavía no cumplían su hora de salida. */
+export function cancelarBurbujasEnEspera(conversationId: number): number {
+  const r = ctx()
+    .db.prepare(
+      "DELETE FROM outbox WHERE conversation_id = ? AND sent = 0 AND COALESCE(send_after, 0) > unixepoch()"
+    )
+    .run(conversationId);
+  return r.changes;
 }
 
 // Interruptor movido por el SISTEMA al clasificar de dónde viene quien escribe

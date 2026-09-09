@@ -2,7 +2,7 @@ import "./env-loader.js";
 import Database from "better-sqlite3";
 import path from "path";
 import type { WASocket } from "@whiskeysockets/baileys";
-import { getOrCreateConversation, enqueueOutbox, getPendingOutbox } from "../src/lib/db.js";
+import { getOrCreateConversation, enqueueOutbox, getPendingOutbox, setMode, setModeAutomatico } from "../src/lib/db.js";
 import { startOutboxLoop, stopOutboxLoop } from "../src/lib/baileys/outbox.js";
 
 const db = new Database(path.resolve(process.cwd(), "data/messages.db"));
@@ -74,6 +74,22 @@ async function main() {
   await delay(200);
   check("cumplida la espera, el segundo trozo sale solo", enviados.length === 2 && enviados[1] === "trozo-2", JSON.stringify(enviados));
   check("y sale en orden, nunca al revés", enviados.join("|") === "trozo-1|trozo-2");
+
+  // 5) Mary entra al chat mientras el bot tiene burbujas EN ESPERA: esas burbujas no salen.
+  //    Sin esto, ella contesta y 10 segundos después el bot le habla encima a la clienta, que es
+  //    el error que más se nota. Ojo con no pasarse: lo que ya estaba listo para salir (un
+  //    recordatorio, un aviso) NO se toca, solo lo que estaba esperando su turno.
+  db.prepare("DELETE FROM outbox WHERE sent = 0").run();
+  setModeAutomatico(conv.id, "AI");
+  const burbuja1 = enqueueOutbox(conv.id, conv.phone, "burbuja-1");
+  const burbuja2 = enqueueOutbox(conv.id, conv.phone, "burbuja-2", { enSegundos: 8 });
+  const recordatorio = enqueueOutbox(conv.id, conv.phone, "recordatorio-de-clase");
+  setMode(conv.id, "HUMAN"); // Mary escribe desde el panel o desde su teléfono
+  const vivos = db.prepare("SELECT id FROM outbox WHERE sent = 0").all() as { id: number }[];
+  const ids = vivos.map((v) => v.id);
+  check("la burbuja que esperaba su turno se descarta", !ids.includes(burbuja2), JSON.stringify(ids));
+  check("la que ya estaba lista para salir NO se toca", ids.includes(burbuja1));
+  check("un recordatorio de Mary tampoco se toca", ids.includes(recordatorio));
 
   console.log(`\n${fail === 0 ? "🎉" : "⚠️"}  ${pass} passed, ${fail} failed\n`);
   db.prepare("DELETE FROM conversations WHERE phone = '56990009999'").run();

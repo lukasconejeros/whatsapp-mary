@@ -421,6 +421,16 @@ async function conversarConElModelo(
         if (toolCall.function.name === "silenciar" && (result as { ok?: boolean })?.ok !== false) {
           silencio = true;
         }
+        // Derivar CALLADO ante un tema delicado (08-09-2026) cuenta igual que silenciar: si no,
+        // al acabarse los turnos el sistema le manda igual una frase de relleno, y el mudo queda
+        // anotado como "sin_texto_del_modelo", o sea como un fallo del bot cuando fue una orden.
+        if (
+          toolCall.function.name === "derivarHumano" &&
+          (args.silencioso === true || args.silencioso === "true") &&
+          (result as { ok?: boolean })?.ok !== false
+        ) {
+          silencio = true;
+        }
 
         toolResults.push({
           role: "tool",

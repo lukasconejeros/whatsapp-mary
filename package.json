@@ -23,6 +23,8 @@
     "test:feedback": "tsx scripts/test-feedback.ts",
     "test:outbox": "tsx scripts/test-outbox.ts",
     "test:partir": "tsx scripts/test-partir-mensaje.ts",
+    "test:derivar": "tsx scripts/test-derivar-silencioso.ts",
+    "test:datos": "tsx scripts/test-datos-transferencia.ts",
     "test:media-path": "tsx scripts/test-media-path.ts",
     "test:db": "tsx scripts/test-db-integridad.ts",
     "test:push": "tsx scripts/test-push.ts",
