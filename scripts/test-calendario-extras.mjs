@@ -47,9 +47,9 @@ await page.goto(BASE + '/calendario', { waitUntil: 'networkidle' })
 ok(!errores500.length, 'la pantalla del calendario carga sin errores 500')
 
 // ── El selector de tipos ─────────────────────────────────────────────────────
-// Desde el 11-08-2026 son DOS botones separados: «Dictar» y «Formulario»
-// (antes el formulario estaba escondido detras de «Prefiero a mano»).
-await page.getByRole('button', { name: 'Formulario' }).first().click()
+// 08-09-2026: el botón se llama «Añadir» y vive arriba, en la barra del mes.
+// El de «Dictar» se sacó de la pantalla (la voz sigue viva en el código).
+await page.getByRole('button', { name: 'Añadir' }).first().click()
 for (const t of ['clase', 'alumno', 'pago', 'Recordar']) {
   ok(await page.getByRole('button', { name: t, exact: true }).isVisible(), `está la pestaña «${t}»`)
 }
@@ -78,9 +78,9 @@ ok((await page.getByText('todos los meses').count()) > 0, 'se ve que vuelve todo
 
 // ── RECORDATORIO ────────────────────────────────────────────────────────────
 console.log('\nRecordatorio')
-// Desde el 11-08-2026 son DOS botones separados: «Dictar» y «Formulario»
-// (antes el formulario estaba escondido detras de «Prefiero a mano»).
-await page.getByRole('button', { name: 'Formulario' }).first().click()
+// 08-09-2026: el botón se llama «Añadir» y vive arriba, en la barra del mes.
+// El de «Dictar» se sacó de la pantalla (la voz sigue viva en el código).
+await page.getByRole('button', { name: 'Añadir' }).first().click()
 await page.getByRole('button', { name: 'Recordar', exact: true }).click()
 await page.getByPlaceholder('Ej: comprar acuarelas').fill('PRUEBA comprar acuarelas')
 await page.getByRole('button', { name: 'Guardar' }).click()
@@ -99,13 +99,24 @@ ok(
 
 // ── ALUMNO que se repite todas las semanas ──────────────────────────────────
 console.log('\nAlumno que se repite')
-// Desde el 11-08-2026 son DOS botones separados: «Dictar» y «Formulario»
-// (antes el formulario estaba escondido detras de «Prefiero a mano»).
-await page.getByRole('button', { name: 'Formulario' }).first().click()
+// 08-09-2026: el botón se llama «Añadir» y vive arriba, en la barra del mes.
+// El de «Dictar» se sacó de la pantalla (la voz sigue viva en el código).
+await page.getByRole('button', { name: 'Añadir' }).first().click()
 await page.getByRole('button', { name: 'alumno', exact: true }).click()
 await page.getByPlaceholder('Ej: Amelia').fill('PRUEBA Amelia')
-await page.selectOption('select', 'nuevo')
-const opcionesProfe = await page.locator('select').nth(2).locator('option').allTextContents()
+// El «¿En qué horario?» dejó de ser un <select> el 08-09-2026: son botones con el
+// punto de color de la profesora, porque en el iPhone un <option> no se puede pintar.
+// Y van de LUNES a SÁBADO: antes salían por alfabeto ("primero el jueves, después el
+// lunes", Lukas). Se comprueba el orden ANTES de crear el horario nuevo.
+const diasLista = await page.locator('[data-horario][data-dia]').evaluateAll(els => els.map(e => e.getAttribute('data-dia')))
+const ORDEN = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
+const idx = diasLista.map(d => ORDEN.indexOf(d))
+ok(idx.every((v, i) => i === 0 || v >= idx[i - 1]), `los horarios van de lunes a sábado (${[...new Set(diasLista)].join(' → ')})`)
+const coloresHorario = await page.locator('[data-horario][data-dia] span').first().evaluate(e => getComputedStyle(e).backgroundColor)
+ok(/rgb\(0, 168, 132\)|rgb\(139, 92, 246\)|rgb\(156, 163, 175\)/.test(coloresHorario), `cada horario lleva el punto de su profesora (${coloresHorario})`)
+
+await page.locator('[data-horario="nuevo"]').click()
+const opcionesProfe = await page.locator('select').nth(1).locator('option').allTextContents()
 ok(opcionesProfe.includes('Mary') && opcionesProfe.includes('Paula'), `la profe se elige entre Mary y Paula (${opcionesProfe.join(', ')})`)
 // El día del horario nuevo = el día de hoy, para poder verlo en la pantalla al tiro.
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
@@ -113,14 +124,18 @@ const diaHoy = DIAS[hoy.getDay()]
 if (diaHoy === 'Domingo') {
   console.log('  ⏭️  hoy es domingo y el selector solo trae lunes a sábado: se salta la comprobación en pantalla')
 } else {
-  await page.locator('select').nth(1).selectOption(diaHoy)
+  await page.locator('select').nth(0).selectOption(diaHoy)
   await page.getByRole('button', { name: 'Guardar' }).click()
   await page.waitForTimeout(900)
   ok((await page.getByText('PRUEBA Amelia').count()) > 0, 'el alumno aparece en su horario del día')
   // Y entra al CRM: el formulario crea su ficha, no una lista de nombres suelta.
   const enCrm = await (await ctx.request.get(BASE + '/api/alumnos')).json()
   ok((enCrm.alumnos ?? []).some(a => a.nombre === 'PRUEBA Amelia'), 'y queda con ficha propia en la pestaña Alumnos')
-  ok((await page.getByText('todas las semanas').count()) > 0, 'el horario queda marcado como de todas las semanas')
+  // 08-09-2026: la píldora "todas las semanas" se sacó de las salas del horario (Lukas:
+  // "cada bloque se ve muy recargado"). Lo que se comprueba ahora es lo de fondo: que el
+  // alumno quedó DENTRO de una sala del horario, que es lo que se repite cada semana.
+  ok((await page.locator('[data-sala]:has-text("PRUEBA Amelia")').count()) > 0,
+    'el alumno queda dentro de una sala del horario (la que se repite cada semana)')
 }
 
 ok(!errores500.length, `ninguna llamada devolvió 500 (${errores500.join(' · ') || 'ninguna'})`)

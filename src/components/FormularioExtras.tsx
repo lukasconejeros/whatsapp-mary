@@ -13,7 +13,7 @@
 // archivo hace que un arreglo en uno rompa el otro.
 
 import { useState } from 'react'
-import { DIAS, DIA_LABEL, PROFES } from '@/lib/calendario'
+import { DIAS, DIA_LABEL, PROFES, profeColor } from '@/lib/calendario'
 
 export type TipoExtra = 'alumno' | 'pago' | 'recordatorio'
 
@@ -143,10 +143,44 @@ export default function FormularioExtras({
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={label}>¿En qué horario?</label>
-            <select value={horarioId} onChange={e => setHorarioId(e.target.value)} style={campo}>
-              {horarios.map(h => <option key={h.clave} value={h.clave}>{rango(h)}</option>)}
-              <option value="nuevo">➕ Crear un horario nuevo</option>
-            </select>
+            {/* Era un <select> y tenía dos problemas (Lukas, 08-09-2026): los horarios
+                salían en desorden —"primero aparece el jueves, después el lunes"— y en
+                el Safari del iPhone un <option> NO se puede pintar de color, así que no
+                había forma de ver de quién era cada hora. Ahora es una lista de botones
+                agrupada de lunes a sábado, con el punto verde de Mary o morado de Paula
+                y 44 px de alto para tocarla con el dedo. */}
+            <div style={{ marginTop: 6, maxHeight: 260, overflowY: 'auto', border: '1px solid #E7F1EC', borderRadius: 10 }}>
+              {DIAS.filter(d => horarios.some(h => h.dia === d)).map(d => (
+                <div key={d}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#9AA7AD', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '8px 12px 4px', background: '#FAFCFB' }}>
+                    {DIA_LABEL[d] ?? d}
+                  </p>
+                  {horarios.filter(h => h.dia === d).map(h => {
+                    const pc = profeColor(h.profe ?? '')
+                    const sel = horarioId === h.clave
+                    return (
+                      <button type="button" key={h.clave} data-horario={h.clave} data-dia={h.dia} data-profe={h.profe ?? 'sin-profe'} onClick={() => setHorarioId(h.clave)}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, minHeight: 44, padding: '8px 12px',
+                          border: 'none', borderBottom: '1px solid #F3F9F6', cursor: 'pointer', fontFamily: 'inherit',
+                          textAlign: 'left', background: sel ? '#E7F1EC' : '#fff' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: pc.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 14, fontWeight: sel ? 700 : 500, color: '#1F2937' }}>
+                          {h.hora}{h.horaFin ? ` a ${h.horaFin}` : ''}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: pc.color }}>{h.profe ?? 'sin profesora'}</span>
+                        <span style={{ fontSize: 11, color: '#9AA7AD' }}>{h.alumnos.length}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+              <button type="button" data-horario="nuevo" onClick={() => setHorarioId('nuevo')}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, minHeight: 44, padding: '8px 12px',
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', fontSize: 14, fontWeight: 700,
+                  color: '#008069', background: horarioId === 'nuevo' ? '#E7F1EC' : '#fff' }}>
+                ➕ Crear un horario nuevo
+              </button>
+            </div>
             <p style={ayuda}>El alumno queda en ese horario y aparece TODAS las semanas, sin volver a escribirlo. También entra a la pestaña Alumnos, donde se le pone la mensualidad.</p>
           </div>
           {horarioId === 'nuevo' && (
