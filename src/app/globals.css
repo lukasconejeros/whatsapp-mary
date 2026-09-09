@@ -123,6 +123,14 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
      esconde el acceso en la barra de abajo, que a Mary únicamente le estorba. */
   .app-sidebar .app-navitems a.app-nav-conexion { display: none !important; }
 
+  /* Lo mismo con "Bot" (/ensayo) y "Entrenar IA" (/configuracion), 08-09-2026:
+     son las pantallas con las que Lukas entrena y prueba el bot desde el
+     computador; a Mary, en la barra de abajo, solo le quitan espacio a lo que
+     sí usa (Chats, Finanzas, Calendario y Alumnos). Las pantallas siguen vivas
+     y el botón sigue estando en el computador. */
+  .app-sidebar .app-navitems a.app-nav-ensayo,
+  .app-sidebar .app-navitems a.app-nav-configuracion { display: none !important; }
+
   .app-sidebar .app-navitems {
     flex-direction: row !important;
     justify-content: space-around;
@@ -176,6 +184,7 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
    Mary tenía que tocar día por día para saber quién venía. Ahora la celda es
    alta y las etiquetas se leen dentro, igual que en el computador. */
 .cal-ev-dots { display: none; }
+.cal-punto-movil { display: none; }         /* en el PC mandan los nombres escritos */
 .cal-mes-titulo { display: none; }          /* en el PC el mes ya está en la barra de arriba */
 .cal-dow-corto { display: none; }           /* en el PC caben "Lun, Mar…" */
 .cal-ev-corto { display: none; }            /* en el PC caben los nombres de los alumnos */
@@ -192,8 +201,15 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .cal-cell [data-ev-punto] { width: 5px !important; height: 5px !important; }
   .cal-dow-largo { display: none; }
   .cal-dow-corto { display: inline; }
-  /* Celda alta y con aire, para que quepan las etiquetas escritas. */
-  .cal-cell { min-height: 96px !important; padding: 5px 4px 6px !important; overflow: hidden; }
+  /* 08-09-2026: en el teléfono se acabaron las píldoras dentro de la celda ("cada
+     bloque se ve muy recargado"). Queda el número del día y UN punto debajo, que
+     dice con quién hay clase; los nombres están a un toque, en el detalle del día.
+     Al no haber texto dentro, la celda puede volver a ser baja y el mes entero
+     cabe de una sola mirada. */
+  .cal-cell .cal-ev-full { display: none !important; }
+  .cal-punto-movil { display: flex; justify-content: center; width: 100%; margin-top: 2px; }
+  .cal-cell { min-height: 58px !important; padding: 4px 4px 6px !important; overflow: hidden; align-items: center !important; }
+  .cal-cell [data-num] { align-self: center !important; }
   /* La caja pierde el marco y las esquinas: en el teléfono el calendario ocupa
      todo el ancho, sin tarjeta alrededor, como en el iPhone. */
   .cal-caja { border-left: none !important; border-right: none !important; border-radius: 0 !important; box-shadow: none !important; }
