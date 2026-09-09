@@ -1188,3 +1188,42 @@ nuevos (el taller concreto y la clase de prueba bonita). US$0,12, marcado como P
 
 Siguen fallando `test:avisos-envio` (4) y `test:pago-api` (2), **igual que antes de tocar nada**: es
 estado de la base local, ya anotado el 08-09 por la tarde.
+
+## 48 · Un PDF de ejemplos escrito a mano no prueba nada (09-09-2026)
+
+**Qué pedía Lukas:** el PDF de cómo van a salir las conversaciones ahora, *"en todos los casos de
+prueba real validados y probados"*.
+
+**El error de fondo, y es mío del 08-09:** `ARTELUK-CONVERSACIONES-EJEMPLO-2026-09-08.html` traía
+cinco conversaciones **redactadas por mí** con el título "como deberían ser". Se veían perfectas
+porque las escribí yo. Un ejemplo escrito a mano es una maqueta, no una prueba: mide lo que yo creo
+que contesta el bot, no lo que contesta.
+
+**Lo que se hizo:** `scripts/conversaciones-reales.ts` reproduce el camino completo de un mensaje
+igual que `handler.ts` — reglas duras primero (`pideDatosParaTransferir`, `quiereLaClaseDePrueba`),
+después `generateReplyDetallado`, y la respuesta partida con `partirEnMensajes` en las mismas
+burbujas que salen por WhatsApp — arrancando de cero para que el saludo del panel salga tal cual.
+El saludo y los 6 bloques que edita Mary se bajan del panel de **producción** con login, no del
+repo: si no, el PDF mostraría precios y horarios que ella no tiene puestos.
+
+**Resultado medido (09-09, 11:44):** 11 conversaciones, 26 respuestas, **178 de 183 revisiones OK**,
+US$0,24 marcados como PRUEBA en `gasto_ia`. Modelo `claude-haiku-4-5-20251001`.
+
+**Los 4 fallos que solo se ven así, ninguno arreglado todavía:**
+1. **Ofrece «le guardo un cupo»** (2 de 11 conversaciones). Contra la decisión de Lukas del 08-09:
+   horarios generales sí, cupos no — el bot no ve la agenda.
+2. **6 emojis en la tanda de horarios** (uno por día). La regla es máximo 2 por tanda y ninguno en
+   el mensaje que lleva horas.
+3. **Pide el nombre en las 3 tandas** de la conversación de la dirección. Es lo mismo que cazó la
+   auditoría del 01-09 (52 veces en 114 mensajes).
+4. **A una amiga que escribe por otra cosa le llega el saludo comercial.** El saludo del panel sale
+   ANTES de que la IA decida callarse (`generateReplyDetallado` lo manda sin llamar al modelo), así
+   que el filtro de entrada nunca alcanza a actuar en el primer contacto. La IA sí se calló después.
+
+**Trampa propia que cazó la primera corrida:** dos "fallos" eran míos, no del bot — el check miraba
+solo la ÚLTIMA respuesta de la conversación y el dato estaba en una anterior. Un check con la
+ventana equivocada acusa al bot de algo que sí hizo. Se corrigió a mirar toda la conversación.
+
+**Seguridad:** el archivo con la config de producción trae los datos de transferencia y **el repo es
+público** (comprobado hoy: la API de GitHub lo devuelve sin credenciales). Va al `.gitignore`. Ojo
+que `prompts/negocio.md:239` ya tiene el RUT de la empresa versionado desde antes.
