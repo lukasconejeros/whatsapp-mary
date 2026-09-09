@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AppNav from '@/components/AppNav'
 import FormularioExtras, { type TipoExtra, type HorarioSala } from '@/components/FormularioExtras'
-import { DIA_LABEL, PROFES, PROFE_NOMBRES, profeColor, diaFromFecha } from '@/lib/calendario'
+import { DIA_LABEL, DIAS, PROFES, PROFE_NOMBRES, profeColor, diaFromFecha } from '@/lib/calendario'
 import { bloquesDelDia, type Ausencia, type InscripcionConAlumno, type AlumnoEnDia } from '@/lib/dia-clases'
 import { Plus, Trash2, Pencil, X, ChevronLeft, ChevronRight, Mic, Keyboard } from 'lucide-react'
 
@@ -16,6 +16,11 @@ type PagoFijo = { id: number; tipo: string; descripcion: string | null; monto: n
 // Recordatorio puntual de Mary: el aviso va a SU WhatsApp, nunca al apoderado.
 type Recordatorio = { id: number; fecha: string; hora: string | null; texto: string; avisar: boolean; enviadoAt: number | null; hecho: boolean; outboxId?: number | null }
 type ClienteLite = { id: number; nombre: string | null; telefono: string; horario: string[] }
+// Los alumnos del CRM (pestaña Alumnos). Es de donde sale el buscador del formulario
+// desde el 08-09-2026: antes listaba la tabla `clientes`, o sea TODOS los contactos de
+// WhatsApp (mamás preguntando precio incluidas), y Mary tenía que pescar a su alumno
+// entre gente que nunca fue a clases.
+type AlumnoCrm = { id: number; nombre: string; inscripciones: { dia: string; hora: string; profe: string | null }[] }
 // Quién vino y quién faltó. Lo llena el pase de lista de las 21:00 por WhatsApp,
 // y ella lo corrige tocando el puntito (ahí queda con fuente 'panel').
 type AsistenciaRow = { id: number; fecha: string; alumno: string; estado: 'vino' | 'falto'; fuente: string }
@@ -59,6 +64,21 @@ function fechaLarga(f: string): string {
   return capital(d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }))
 }
 
+// El punto único del día en el teléfono. Una sola bolita en vez de la lista de
+// píldoras: verde si ese día solo hay clases de Mary, morado si solo son de Paula,
+// y partida por la mitad si están las dos (Lukas, 08-09-2026). El orden lo manda
+// PROFES, para que el verde caiga siempre a la izquierda.
+function puntoDelDia(chips: { pc: { nombre: string; color: string } }[]): { clave: string; fondo: string } | null {
+  if (chips.length === 0) return null
+  const orden = (n: string) => { const i = PROFES.findIndex(p => p.nombre === n); return i === -1 ? 99 : i }
+  const vistos = new Map<string, string>()
+  for (const c of chips) if (!vistos.has(c.pc.nombre)) vistos.set(c.pc.nombre, c.pc.color)
+  const profes = [...vistos.entries()].sort((a, b) => orden(a[0]) - orden(b[0]))
+  if (profes.length === 1) return { clave: profes[0][0].toLowerCase() || 'sin-profe', fondo: profes[0][1] }
+  const [a, b] = profes
+  return { clave: 'mixto', fondo: `linear-gradient(90deg, ${a[1]} 0 50%, ${b[1]} 50% 100%)` }
+}
+
 export default function CalendarioPage() {
   const hoy = ymd(new Date())
   const [cursor, setCursor] = useState(() => { const t = new Date(); return { y: t.getFullYear(), m: t.getMonth() } })
@@ -67,7 +87,10 @@ export default function CalendarioPage() {
   const [fijas, setFijas] = useState<ClaseFija[]>([])
   const [pagos, setPagos] = useState<PagoFijo[]>([])
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([])
+  // `clientes` sigue vivo solo para PONERLE NOMBRE a las clases viejas, que guardaron
+  // ids de esa tabla. El buscador del formulario ya no lo usa.
   const [clientes, setClientes] = useState<ClienteLite[]>([])
+  const [alumnosCrm, setAlumnosCrm] = useState<AlumnoCrm[]>([])
   const [asistencia, setAsistencia] = useState<AsistenciaRow[]>([])
   // El horario de verdad: cada alumno con su día, su hora de salida y su profesora.
   // Vale para todas las semanas, así que se pide UNA vez y dibuja el mes entero.
@@ -110,7 +133,7 @@ export default function CalendarioPage() {
   const load = useCallback(async (d: string, h: string) => {
     setLoading(true)
     try {
-      const [c, cl, fj, pg, rc, as, ins, au] = await Promise.all([
+      const [c, cl, fj, pg, rc, as, ins, au, al] = await Promise.all([
         fetch(`/api/clases?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch('/api/clientes').then(r => r.json()),
         fetch('/api/clases-fijas').then(r => r.json()),
@@ -119,7 +142,9 @@ export default function CalendarioPage() {
         fetch(`/api/asistencia?desde=${d}&hasta=${h}`).then(r => r.json()),
         fetch('/api/inscripciones').then(r => r.json()),
         fetch(`/api/ausencias?desde=${d}&hasta=${h}`).then(r => r.json()),
+        fetch('/api/alumnos').then(r => r.json()),
       ])
+      if (al.ok) setAlumnosCrm(al.alumnos)
       if (as.ok) setAsistencia(as.asistencia)
       if (c.ok) setClases(c.clases)
       if (cl.ok) setClientes(cl.clientes)
@@ -152,9 +177,11 @@ export default function CalendarioPage() {
   }
   function openEdit(c: Clase) {
     setEditId(c.id); setSearch(''); setTipoForm('clase')
-    const nums = c.alumnos.filter((a): a is number => typeof a === 'number')
-    const extra = c.alumnos.filter((a) => typeof a !== 'number')
-    setForm({ fecha: c.fecha ?? sel, profe: c.profe, hora: c.hora ?? '', alumnos: nums, alumnosExtra: extra, nota: c.nota ?? '' })
+    // Los alumnos se manejan SIEMPRE por nombre (08-09-2026). Una clase vieja guardada
+    // con ids de la tabla `clientes` se traduce acá con el nombre que ya se muestra en
+    // pantalla, así al reeditarla no se pierde a nadie ni cambia lo que Mary ve.
+    const nombres = c.alumnos.map(a => etiquetaAlumno(a))
+    setForm({ fecha: c.fecha ?? sel, profe: c.profe, hora: c.hora ?? '', alumnos: [], alumnosExtra: nombres, nota: c.nota ?? '' })
     setShowForm(true)
   }
   function closeForm() { setShowForm(false); setEditId(null) }
@@ -342,7 +369,12 @@ export default function CalendarioPage() {
       if (ya) ya.alumnos.push(i.nombre)
       else m.set(clave, { clave, dia: i.dia, hora: i.hora, horaFin: i.horaFin, profe: i.profe, alumnos: [i.nombre] })
     }
-    return [...m.values()].sort((a, b) => a.dia.localeCompare(b.dia) || a.hora.localeCompare(b.hora))
+    // De LUNES a SÁBADO, y dentro de cada día de la hora más temprana a la más
+    // tarde. Antes se ordenaba con localeCompare, o sea por ALFABETO: salía
+    // "Jueves" antes que "Lunes" (Lukas, 08-09-2026). El orden bueno es el de
+    // DIAS en src/lib/calendario.ts; un día desconocido se va al final.
+    const orden = (d: string) => { const i = DIAS.indexOf(d as (typeof DIAS)[number]); return i === -1 ? 99 : i }
+    return [...m.values()].sort((a, b) => orden(a.dia) - orden(b.dia) || a.hora.localeCompare(b.hora))
   })()
 
   // El chip de un alumno suelto (clases viejas y eventos puntuales): sin ficha no
@@ -455,17 +487,27 @@ export default function CalendarioPage() {
     } catch { alert('No se pudo guardar. Revisa tu internet.') }
   }
 
-  // Selector de alumnos del modal: primero los que vienen ese día, con búsqueda.
+  // Selector de alumnos del modal: SOLO los del CRM (pestaña Alumnos), primero los que
+  // vienen ese día, con búsqueda. Se guardan por NOMBRE, que es como el calendario ya
+  // pinta a los alumnos sueltos y como la asistencia los reconoce.
   const diaForm = diaFromFecha(form.fecha)
-  const clientesOrdenados = [...clientes]
-    .filter(c => !search.trim() || (c.nombre ?? '').toLowerCase().includes(search.toLowerCase()))
+  const vieneEseDia = (a: AlumnoCrm) => a.inscripciones.some(i => i.dia === diaForm)
+  const alumnosOrdenados = [...alumnosCrm]
+    .filter(a => !search.trim() || a.nombre.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
-      const ad = a.horario.includes(diaForm) ? 0 : 1
-      const bd = b.horario.includes(diaForm) ? 0 : 1
-      return ad - bd || (a.nombre ?? '').localeCompare(b.nombre ?? '')
+      const ad = vieneEseDia(a) ? 0 : 1
+      const bd = vieneEseDia(b) ? 0 : 1
+      return ad - bd || a.nombre.localeCompare(b.nombre)
     })
-  function toggleAlumno(id: number) {
-    setForm(f => ({ ...f, alumnos: f.alumnos.includes(id) ? f.alumnos.filter(x => x !== id) : [...f.alumnos, id] }))
+  const estaElegido = (nombre: string) =>
+    form.alumnosExtra.some(x => String(x).toLowerCase() === nombre.toLowerCase())
+  function toggleAlumno(nombre: string) {
+    setForm(f => ({
+      ...f,
+      alumnosExtra: estaElegido(nombre)
+        ? f.alumnosExtra.filter(x => String(x).toLowerCase() !== nombre.toLowerCase())
+        : [...f.alumnosExtra, nombre],
+    }))
   }
 
   const monthName = capital(new Date(cursor.y, cursor.m, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }))
@@ -483,6 +525,13 @@ export default function CalendarioPage() {
             <span className="cal-mes-barra" style={{ fontSize: 13, fontWeight: 700, color: '#054D44', minWidth: 130, textAlign: 'center' }}>{monthName}</span>
             <button onClick={() => goMonth(1)} title="Mes siguiente" style={{ display: 'flex', border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: 5, cursor: 'pointer', color: '#008069' }}><ChevronRight size={15} /></button>
             <button onClick={irHoy} style={{ marginLeft: 4, border: '1px solid #D3E7DE', background: '#fff', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', color: '#667781', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>Hoy</button>
+            {/* "Añadir" arriba del todo (Lukas, 08-09-2026): en el teléfono el detalle
+                del día queda DEBAJO del mes entero, así que el botón vivía a un scroll
+                de distancia. Acá está siempre a la vista y agenda en el día elegido. */}
+            <button onClick={() => openNew(sel)} title="Añadir una clase o un recado a este día"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 4, minHeight: 36, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
+              <Plus size={15} /> Añadir
+            </button>
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-1.5" style={{ flexWrap: 'wrap' }}>
@@ -603,6 +652,17 @@ export default function CalendarioPage() {
                           ))}
                           {chips.length > 3 && <span style={{ fontSize: 10, color: '#667781', paddingLeft: 3 }}>+{chips.length - 3} más</span>}
                         </div>
+                        {/* EN EL TELÉFONO: un solo punto por día (Lukas, 08-09-2026: "que no
+                            esté lleno de puntos, busca una forma más minimalista, como solo
+                            un punto mitad morado y verde"). Verde entero si ese día solo hay
+                            clases de Mary, morado entero si solo son de Paula, y partido por
+                            la mitad si están las dos. Día sin nada = sin punto. En el
+                            computador no cambia nada: ahí siguen los nombres escritos. */}
+                        {puntoDelDia(chips) && (
+                          <div className="cal-punto-movil" data-punto={puntoDelDia(chips)!.clave}>
+                            <span style={{ width: 9, height: 9, borderRadius: '50%', background: puntoDelDia(chips)!.fondo, display: 'block' }} />
+                          </div>
+                        )}
                       </button>
                     )
                   })}
@@ -614,18 +674,11 @@ export default function CalendarioPage() {
             <aside className="cal-detail">
               <div style={{ background: '#fff', border: '1px solid #D3E7DE', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,128,105,0.06)' }}>
                 <div className="flex items-center gap-2" style={{ padding: '12px 14px', borderBottom: '1px solid #E7F1EC' }}>
+                  {/* El dictado por voz salió de la pantalla (Lukas, 08-09-2026: "en el
+                      calendario sácale el dictar"). La pantalla de voz y su API
+                      /api/clases/voz siguen vivas: volver a ponerlo es un botón.
+                      Y "Formulario" ahora es "Añadir", arriba en la barra del mes. */}
                   <p style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#054D44' }}>{fechaLarga(sel)}</p>
-                  {/* Dos caminos SEPARADOS y a la vista (Lukas, 11-08-2026): antes el único
-                      botón abría el dictado y el formulario quedaba escondido detrás de
-                      «Prefiero a mano», así que parecía que no existía. */}
-                  <button onClick={abrirVoz} title="Dictar por voz"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: '1px solid #00A884', background: '#fff', color: '#008069', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
-                    <Mic size={14} /> Dictar
-                  </button>
-                  <button onClick={() => openNew(sel)} title="Llenar el formulario a mano"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
-                    <Keyboard size={14} /> Formulario
-                  </button>
                 </div>
                 <div style={{ padding: 12, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}>
                   {/* Las salas del horario: una por profesora, con su gente dentro y cada
@@ -635,15 +688,19 @@ export default function CalendarioPage() {
                     const pc = profeColor(s.profe ?? '')
                     const fuera = s.alumnos.length - s.vienen
                     return (
+                      // 08-09-2026: fuera la línea verde de la izquierda y las píldoras de
+                      // adorno ("vienen 4", "todas las semanas"). Queda una sola línea:
+                      // punto de color + hora + profesora, y debajo los alumnos, que es
+                      // lo único que Mary lee de verdad.
                       <div key={`sala-${s.profe ?? 'sp'}`} data-sala={s.profe ?? 'sin-profe'}
-                        style={{ background: '#fff', border: `1px solid ${pc.bd}`, borderLeft: `3px solid ${pc.color}`, borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
-                        <div className="flex items-center gap-2" style={{ marginBottom: 5, flexWrap: 'wrap' }}>
+                        style={{ background: '#fff', border: '1px solid #E7F1EC', borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                        <div className="flex items-center gap-2" style={{ marginBottom: 7, flexWrap: 'wrap' }}>
+                          <span style={{ width: 9, height: 9, borderRadius: '50%', background: pc.color, flexShrink: 0 }} />
                           <span style={{ fontSize: 15, fontWeight: 800, color: '#1F2937' }}>{rangoSala(s.hora, s.horaFin)}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, flex: 1 }}>{s.profe ?? 'sin profesora'}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#667781', background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 999, padding: '2px 8px' }}>
-                            {s.vienen === 1 ? 'viene 1' : `vienen ${s.vienen}`}{fuera ? ` · ${fuera} no` : ''}
-                          </span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#667781', background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 999, padding: '2px 8px' }}>todas las semanas</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#667781', flex: 1 }}>{s.profe ?? 'sin profesora'}</span>
+                          {fuera > 0 && (
+                            <span style={{ fontSize: 11, color: '#9AA7AD' }}>{fuera === 1 ? '1 no viene' : `${fuera} no vienen`}</span>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {s.alumnos.map(a => chipInscrito(sel, a, pc.bd))}
@@ -657,11 +714,12 @@ export default function CalendarioPage() {
                   {!loading && fijasSel.map(f => {
                     const pc = profeColor(f.profe)
                     return (
-                      <div key={`fija-${f.id}`} style={{ background: '#fff', border: `1px dashed ${pc.color}`, borderLeft: `3px double ${pc.color}`, borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
-                        <div className="flex items-center gap-2" style={{ marginBottom: 5, flexWrap: 'wrap' }}>
+                      <div key={`fija-${f.id}`} style={{ background: '#fff', border: '1px solid #E7F1EC', borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                        <div className="flex items-center gap-2" style={{ marginBottom: 7, flexWrap: 'wrap' }}>
+                          <span style={{ width: 9, height: 9, borderRadius: '50%', background: pc.color, flexShrink: 0 }} />
                           <span style={{ fontSize: 15, fontWeight: 800, color: '#1F2937' }}>{rango(f)}</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, flex: 1 }}>{f.profe}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#667781', background: '#F3F9F6', border: '1px solid #D3E7DE', borderRadius: 999, padding: '2px 8px' }}>todas las semanas</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#667781', flex: 1 }}>{f.profe}</span>
+                          <span style={{ fontSize: 11, color: '#9AA7AD' }}>todas las semanas</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {f.alumnos.length === 0 ? <span style={{ fontSize: 11, color: '#9CA3AF' }}>Sin alumnos</span>
@@ -678,11 +736,11 @@ export default function CalendarioPage() {
                   {/* Pagos que vuelven cada mes y recordatorios: van con otro color para que
                       no se confundan con una clase de un vistazo. */}
                   {!loading && pagosSel.map(p => (
-                    <div key={`pago-${p.id}`} style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '3px solid #F59E0B', borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
+                    <div key={`pago-${p.id}`} style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: 12, marginBottom: 8 }}>
                       <div className="flex items-center gap-2">
                         <span style={{ fontSize: 14, fontWeight: 800, color: '#92400E' }}>{pesos(p.monto)}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#B45309', flex: 1 }}>{ETIQUETA_PAGO[p.tipo] ?? p.tipo}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 999, padding: '2px 8px' }}>todos los meses</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#B45309', flex: 1 }}>{ETIQUETA_PAGO[p.tipo] ?? p.tipo}</span>
+                        <span style={{ fontSize: 11, color: '#B45309' }}>todos los meses</span>
                         <button onClick={() => borrarExtra(`/api/pagos-fijos/${p.id}`, '¿Borrar este pago? Deja de aparecer todos los meses.')} title="Borrar"
                           style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#B45309' }}><Trash2 size={13} /></button>
                       </div>
@@ -690,7 +748,7 @@ export default function CalendarioPage() {
                     </div>
                   ))}
                   {!loading && recordatoriosSel.map(r => (
-                    <div key={`rec-${r.id}`} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderLeft: '3px solid #3B82F6', borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
+                    <div key={`rec-${r.id}`} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: 12, marginBottom: 8 }}>
                       <div className="flex items-center gap-2">
                         <span style={{ fontSize: 14, fontWeight: 800, color: '#1E3A8A' }}>{r.hora ?? '—'}</span>
                         <span style={{ fontSize: 12, color: '#1E40AF', flex: 1, textDecoration: r.hecho ? 'line-through' : 'none' }}>{r.texto}</span>
@@ -713,14 +771,15 @@ export default function CalendarioPage() {
                     </div>
                   ))}
                   {loading ? <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '24px 0' }}>Cargando…</p>
-                    : eventosSel.length === 0 && fijasSel.length === 0 && salasSel.length === 0 && pagosSel.length === 0 && recordatoriosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin nada este día.<br />Toca «Agregar» para crear algo.</p>
+                    : eventosSel.length === 0 && fijasSel.length === 0 && salasSel.length === 0 && pagosSel.length === 0 && recordatoriosSel.length === 0 ? <p style={{ fontSize: 12, color: '#8696A0', textAlign: 'center', padding: '24px 0' }}>Sin nada este día.<br />Toca «Añadir», arriba, para crear algo.</p>
                     : eventosSel.map(c => {
                       const pc = profeColor(c.profe)
                       return (
-                        <div key={c.id} style={{ background: pc.bg, border: `1px solid ${pc.bd}`, borderLeft: `3px solid ${pc.color}`, borderRadius: 10, padding: '9px 11px', marginBottom: 8 }}>
-                          <div className="flex items-center gap-2" style={{ marginBottom: 5 }}>
+                        <div key={c.id} style={{ background: '#fff', border: '1px solid #E7F1EC', borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                          <div className="flex items-center gap-2" style={{ marginBottom: 7 }}>
+                            <span style={{ width: 9, height: 9, borderRadius: '50%', background: pc.color, flexShrink: 0 }} />
                             <span style={{ fontSize: 15, fontWeight: 800, color: '#1F2937' }}>{c.hora || '—'}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: pc.color, flex: 1 }}>{c.profe}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#667781', flex: 1 }}>{c.profe}</span>
                             <button onClick={() => openEdit(c)} title="Editar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#667781' }}><Pencil size={13} /></button>
                             <button onClick={() => del(c)} title="Borrar" style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: '#667781' }}><Trash2 size={13} /></button>
                           </div>
@@ -917,19 +976,19 @@ export default function CalendarioPage() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar alumno…"
               style={{ width: '100%', margin: '4px 0 8px', padding: '8px 10px', borderRadius: 8, border: '1px solid #D3E7DE', fontFamily: 'inherit', fontSize: 13 }} />
             <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #E7F1EC', borderRadius: 8 }}>
-              {clientesOrdenados.map(c => {
-                const selA = form.alumnos.includes(c.id)
-                const esDelDia = c.horario.includes(diaForm)
+              {alumnosOrdenados.map(a => {
+                const selA = estaElegido(a.nombre)
+                const esDelDia = vieneEseDia(a)
                 return (
-                  <button type="button" key={c.id} onClick={() => toggleAlumno(c.id)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', border: 'none', borderBottom: '1px solid #F3F9F6', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, textAlign: 'left', background: selA ? '#E7F1EC' : '#fff' }}>
+                  <button type="button" key={a.id} data-alumno={a.nombre} onClick={() => toggleAlumno(a.nombre)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '7px 10px', border: 'none', borderBottom: '1px solid #F3F9F6', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, textAlign: 'left', background: selA ? '#E7F1EC' : '#fff' }}>
                     <span style={{ width: 15, height: 15, borderRadius: 4, border: '1px solid ' + (selA ? '#00A884' : '#D3E7DE'), background: selA ? '#00A884' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, flexShrink: 0 }}>{selA ? '✓' : ''}</span>
-                    <span style={{ flex: 1, color: '#374151' }}>{c.nombre || c.telefono}</span>
+                    <span style={{ flex: 1, color: '#374151' }}>{a.nombre}</span>
                     {esDelDia && <span style={{ fontSize: 10, fontWeight: 700, color: '#00A884', background: '#E7F1EC', borderRadius: 5, padding: '1px 6px' }}>viene {DIA_LABEL[diaForm] ?? diaForm}</span>}
                   </button>
                 )
               })}
-              {clientesOrdenados.length === 0 && <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '14px 0' }}>Sin clientes</p>}
+              {alumnosOrdenados.length === 0 && <p style={{ fontSize: 12, color: '#9AA7AD', textAlign: 'center', padding: '14px 0' }}>{search.trim() ? 'Ningún alumno con ese nombre' : 'Todavía no hay alumnos en el CRM'}</p>}
             </div>
 
             <button type="submit" disabled={guardando} style={{ width: '100%', marginTop: 16, minHeight: 46, padding: '10px', borderRadius: 9, border: 'none', background: '#00A884', color: '#fff', fontWeight: 700, fontSize: 14, cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.6 : 1, fontFamily: 'inherit' }}>{guardando ? 'Guardando…' : 'Guardar'}</button>

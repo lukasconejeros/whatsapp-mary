@@ -5,8 +5,9 @@
 //   (1) el mes va arriba, grande y en negrita
 //   (2) los días de la semana salen L M M J V S D, con sábado y domingo en gris
 //   (3) la rejilla separa las SEMANAS con una línea; entre días NO hay líneas verticales
-//   (4) las celdas son ALTAS (antes 58 px fijos) y traen la etiqueta del evento ESCRITA
-//       dentro (antes solo puntitos de color, `.cal-ev-dots`)
+//   (4) [CAMBIADO el 08-09-2026] la celda vuelve a ser compacta y lleva UN SOLO punto:
+//       verde si ese día solo hay clases de Mary, morado si solo son de Paula, partido
+//       por la mitad si están las dos. Los nombres, a un toque, en el detalle del día.
 //   (5) hoy = número blanco dentro de un círculo lleno
 //   (6) los días de otro mes salen en gris
 // Y lo que NO puede cambiar: en el computador la vista sigue como estaba.
@@ -79,40 +80,51 @@ try {
   const bordeAbajo = await celdas.nth(0).evaluate(el => getComputedStyle(el).borderBottomWidth)
   ok(parseFloat(bordeAbajo) > 0, `las semanas van separadas por una línea (${bordeAbajo})`, bordeAbajo)
 
-  // ── (4) Celdas altas con el texto del evento dentro ────────────────────────
-  console.log('\nLas celdas y sus eventos')
+  // ── (4) UN SOLO PUNTO por día ──────────────────────────────────────────────
+  // ⚠️ REGLA NUEVA, 08-09-2026. Hasta hoy acá se exigía justo lo contrario: celda
+  // alta (≥90 px) con las etiquetas ESCRITAS dentro, que fue lo que Lukas pidió el
+  // 27-08. Lo miró un mes en el teléfono de su mamá y lo cambió: "que no esté lleno
+  // de puntos, busca una forma más minimalista, como solo un punto mitad morado y
+  // verde… cada bloque se ve muy recargado". Los nombres siguen a un toque, en el
+  // detalle del día, y en el COMPUTADOR no cambia nada (se comprueba más abajo).
+  console.log('\nLas celdas y su punto único')
   const alto = (await celdas.nth(0).boundingBox())?.height ?? 0
-  ok(alto >= 90, `la celda es alta como en el iPhone (${Math.round(alto)}px, antes 58)`, String(alto))
+  ok(alto >= 50 && alto <= 82, `la celda vuelve a ser compacta (${Math.round(alto)}px)`, String(alto))
 
-  // Se busca un día que tenga clases para comprobar que el nombre se LEE.
-  const conEvento = page.locator('.cal-cell:has([data-ev])').first()
-  ok(await conEvento.count() > 0, 'hay al menos un día con clases dibujadas')
-  if (await conEvento.count() > 0) {
-    const etiqueta = conEvento.locator('[data-ev]').first()
-    const visible = await etiqueta.isVisible()
-    ok(visible, 'la etiqueta del evento se VE en el teléfono (antes estaba oculta)')
-    const texto = (await etiqueta.innerText()).trim()
-    ok(texto.length > 0, `la etiqueta trae texto escrito ("${texto}")`, texto)
-    const puntito = await etiqueta.locator('[data-ev-punto]').count()
-    ok(puntito > 0, 'la etiqueta lleva su puntito de color a la izquierda')
+  // Nada de píldoras escritas dentro de la celda en el teléfono.
+  const pildoras = await page.locator('.cal-cell [data-ev]:visible').count()
+  ok(pildoras === 0, `ninguna etiqueta escrita dentro de la celda (${pildoras})`, String(pildoras))
 
-    // 🔑 Lo que dos intentos hicieron mal y el test no cazaba: en una celda de 55 px
-    // NADA largo cabe. Primero decía "16:…" (la hora se comía el renglón) y después
-    // "Alis…", "Ant…" (los nombres cortados). Lukas eligió el 27-08-2026 que acá vaya
-    // **cuántos vienen y con quién**, que sí entra entero. La prueba de que sirve es
-    // que NO queden puntos suspensivos.
-    ok(!texto.includes('…') && !texto.endsWith('...'),
-      `la etiqueta se lee ENTERA, sin cortarse ("${texto}")`, texto)
+  const conPunto = page.locator('.cal-cell [data-punto]:visible')
+  const cuantos = await conPunto.count()
+  ok(cuantos > 0, `hay días con su punto (${cuantos})`, String(cuantos))
+  if (cuantos > 0) {
+    // Un punto por día como mucho: la queja era justamente "está lleno de puntos".
+    const maxPorCelda = await page.locator('.cal-cell').evaluateAll(els =>
+      Math.max(0, ...els.map(el => el.querySelectorAll('[data-punto]').length)))
+    ok(maxPorCelda <= 1, `ningún día tiene más de un punto (máximo ${maxPorCelda})`, String(maxPorCelda))
 
-    // ⚠️ Y se miden TODAS, no una: la primera versión de este test miraba solo la
-    // primera etiqueta —que sí cabía— y dio por bueno un mes entero de "5 Pa…" y "4 M…".
-    // Una sola etiqueta cortada ya arruina la pantalla, así que basta con que falle una.
-    const cortadas = await page.locator('.cal-cell [data-ev]').evaluateAll(els => els
-      .map(el => { const t = el.querySelector('.cal-ev-corto') || el; return { txt: t.innerText.trim(), sobra: t.scrollWidth - t.clientWidth } })
-      .filter(x => x.sobra > 1))
-    ok(cortadas.length === 0,
-      `ninguna de las ${await page.locator('.cal-cell [data-ev]').count()} etiquetas del mes se corta`,
-      JSON.stringify(cortadas.slice(0, 4)))
+    // Y el color dice de quién es: verde Mary, morado Paula, partido si están las dos.
+    const claves = await conPunto.evaluateAll(els => els.map(el => el.getAttribute('data-punto')))
+    const validas = claves.every(c => ['mary', 'paula', 'mixto', 'sin-profe'].includes(c))
+    ok(validas, `cada punto dice de quién es la clase (${[...new Set(claves)].join(', ')})`, JSON.stringify(claves.slice(0, 6)))
+
+    const fondos = await conPunto.evaluateAll(els => els.map(el => ({
+      clave: el.getAttribute('data-punto'),
+      fondo: getComputedStyle(el.firstElementChild).backgroundImage + ' | ' + getComputedStyle(el.firstElementChild).backgroundColor,
+    })))
+    const mixtos = fondos.filter(f => f.clave === 'mixto')
+    if (mixtos.length > 0) {
+      const partido = mixtos.every(f => /gradient/.test(f.fondo) && /168, 132/.test(f.fondo) && /139, 92, 246/.test(f.fondo))
+      ok(partido, `el día con las dos profesoras va mitad verde y mitad morado (${mixtos.length})`, JSON.stringify(mixtos[0]))
+    } else {
+      console.log('  ℹ️ ningún día de este mes tiene a las dos profesoras: no se puede medir el punto partido')
+    }
+    const solas = fondos.filter(f => f.clave === 'mary' || f.clave === 'paula')
+    if (solas.length > 0) {
+      const enteros = solas.every(f => !/gradient/.test(f.fondo))
+      ok(enteros, `los días de una sola profesora llevan el punto de un color (${solas.length})`, JSON.stringify(solas[0]))
+    }
   }
   // El mes no puede salir dos veces (arriba entre las flechas Y grande abajo).
   const veces = await page.locator(':visible', { hasText: /^Agosto/ }).count()
