@@ -1072,3 +1072,36 @@ actuar dentro de esa ventana.
 Antes de decir nada se construyó la app con el código viejo y fallaban igual. Comparar contra el
 build viejo, no contra el código viejo con el build nuevo — el primer intento fue justo ese error
 y no probaba nada.
+
+
+## 08-09-2026 (noche) · La limpieza de la app: cuando el test custodia una regla que el dueño ya cambió
+
+Encargo de Lukas: sacar «Bot» y «Entrenar IA» de la app, quitar el «Dictar» del calendario,
+renombrar «Formulario» a «Añadir» y subirlo, dejar UN punto por día en vez de las píldoras,
+sacar la línea verde de los bloques, ordenar los horarios de lunes a sábado con el color de
+cada profesora y que el buscador de alumnos liste solo el CRM.
+
+**1. Un test verde puede estar custodiando la regla contraria a la que el dueño quiere hoy.**
+`test-calendario-iphone` exigía celda ≥90 px con las etiquetas ESCRITAS dentro — literalmente
+lo que Lukas pidió el 27-08 y lo que pidió cambiar hoy. Al ejecutar sin mirar, el test habría
+"protegido" la pantalla vieja. La regla: cuando el pedido nuevo contradice un candado, se
+reescribe el candado con la fecha y el porqué, no se borra ni se ignora.
+
+**2. Preguntar «¿en todo o solo en el teléfono?» evitó dejarlo a él sin acceso.** Sacar «Bot» y
+«Entrenar IA» de `menu.ts` habría quitado también SU puerta en el computador, que es de donde
+entrena el bot. Se escondieron solo en la barra del teléfono (mismo patrón que el QR), y
+`test:menu` siguió en 48/48 sin tocar nada.
+
+**3. Cambiar de tabla de origen sin mirar los ids habría cambiado nombres en clases viejas.**
+El buscador tiraba de `clientes` (74 contactos de WhatsApp) y el CRM es otra tabla (37 fichas).
+Si se guardaban los ids del CRM tal cual, `nombreCliente(id)` habría pintado a OTRA persona en
+las clases ya guardadas. Se guarda por nombre, que es lo que ya soportaban `etiquetaAlumno` y el
+POST de `/api/clases`, y las clases viejas se traducen al editarlas.
+
+**4. Un `<option>` no se puede pintar de color en el Safari del iPhone.** Por eso el «¿en qué
+horario?» dejó de ser un `<select>` y pasó a ser una lista de botones con el punto de la
+profesora. Si el pedido dice "en verde los de mi mamá", un desplegable nativo no sirve.
+
+Pruebas corridas: `typecheck` limpio, `test:menu` 48/48, `test:calendario-iphone` 33/33,
+`test:calendario-extras` 20/20, `test:alumnos` 25/25, `test:alumnos-api` 21/21 y el nuevo
+`test:telefono-limpia` 21/21.
