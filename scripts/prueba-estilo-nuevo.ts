@@ -18,7 +18,7 @@ import { pideDatosParaTransferir } from "../src/lib/interes-prueba.js";
 import { getGastoIA, type Message } from "../src/lib/db.js";
 import { todaySantiago, monthSantiago } from "../src/lib/fechas.js";
 
-const TOPE_USD = 0.15;
+const TOPE_USD = 0.28; // subido el 08-09 (noche) al entrar los casos 6 y 7
 
 // El saludo que Mary tiene guardado en producción hoy.
 const SALUDO_REAL =
@@ -121,6 +121,45 @@ if (hayPresupuesto()) {
   const emojis = (r.match(/\p{Extended_Pictographic}/gu) ?? []).length;
   check("máximo 2 emojis en toda la tanda", emojis <= 2, `${emojis} emojis`);
   check("sin dos puntos de documento", !/[a-záéíóúñ]:\s/i.test(r));
+}
+
+// ── 6. Preguntan por UN taller: va ESE entero, y no se sueltan los otros ─────
+// Encargo de Lukas del 08-09 por audio: "cuando alguien pregunte por una clase en
+// específico, que le dé todos los detalles, los que aparecen en la página web igual".
+console.log("\n── 6. «¿en qué consiste el taller de acuarela?» ──");
+if (hayPresupuesto()) {
+  const r = await preguntar("y en que consiste el taller de acuarela?");
+  const b = r.toLowerCase();
+  check("dice el precio de ESE taller", /45[.\s]?000/.test(r), r.slice(0, 160));
+  const detalles = [/3 clases|tres clases/i.test(r), /flora|fauna|retrato/i.test(r), /matr[ií]cula/i.test(r), /\b6\b|seis/.test(r)];
+  check("cuenta al menos 2 detalles del taller (cuántas clases, qué se pinta, matrícula, tamaño del grupo)",
+    detalles.filter(Boolean).length >= 2, JSON.stringify(detalles));
+  // Preguntar por uno y recibir los tres es justo lo que hizo que una clienta dijera
+  // que la habían mareado con la información (auditoría del 08-09).
+  check("NO suelta los otros dos talleres", !(b.includes("60.000") || b.includes("120.000")), r.slice(0, 200));
+}
+
+// ── 7. La clase de prueba, contada bonita la PRIMERA vez ────────────────────
+// "que las clases de prueba, cuando las diga el chatbot, las deje muy bonitas" (08-09).
+console.log("\n── 7. «¿cómo es la clase de prueba?» (primera vez que sale el tema) ──");
+if (hayPresupuesto()) {
+  const r = await preguntar("y como es la clase de prueba? nunca hemos ido");
+  const beneficios = [
+    /2 horas|dos horas/i.test(r),
+    /material/i.test(r),
+    /regalo|acuarela/i.test(r),
+    /\b6\b|seis/.test(r),
+    /sin compromiso|no queda|sin obligaci/i.test(r),
+    /19[.\s]?990/.test(r),
+  ];
+  check("cuenta al menos 4 de los 6 beneficios (2 h, materiales, regalo, grupo de 6, sin compromiso, precio)",
+    beneficios.filter(Boolean).length >= 4, JSON.stringify(beneficios));
+  // El bloque "Nuestro espacio" nace VACÍO porque el audio de Lukas se cortó y no dijo
+  // cuáles son las 5 salas. Hasta que alguien las escriba, el bot no puede inventárselas
+  // a una mamá de verdad.
+  check("NO se inventa salas ni salones (el bloque está vacío)",
+    !/(sala|sal[oó]n)(es)?\s+(de arte|sensorial|tem[aá]tic)/i.test(r), r.slice(0, 220));
+  check("no se pasa de 3 burbujas ni contando todos los beneficios", partirEnMensajes(r).length <= 3);
 }
 
 setBienvenida(originalSaludo);

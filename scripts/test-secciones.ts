@@ -72,7 +72,11 @@ ok(claveDeSeccion("Descuentos") === "promociones", "un titulo de descuentos cae 
 // Esta es la que importa: el FILTRO es una regla del repo. Si fuera editable, Mary podría
 // dejar al bot contestándole a las amigas de la familia sin querer.
 ok(claveDeSeccion("FILTRO DE ENTRADA — evaluar SIEMPRE antes de responder") === null, "el FILTRO NO es editable");
-ok(Object.keys(ETIQUETAS).length === 6, "hay 6 secciones editables y ni una más");
+ok(Object.keys(ETIQUETAS).length === 7, "hay 7 secciones editables y ni una más");
+// "Nuestro espacio" entró el 08-09-2026: las salas del taller. Nace vacía y el manual le
+// prohíbe al bot hablar del espacio mientras siga diciendo "Todavía no está escrito".
+ok(claveDeSeccion("Nuestro espacio") === "espacio", "reconoce el bloque del espacio");
+ok(claveDeSeccion("Nuestras salas") === "espacio", "y lo reconoce si lo titulan 'salas'");
 ok(typeof ETIQUETAS.promociones === "string" && ETIQUETAS.promociones.length > 3, "promociones tiene nombre en cristiano");
 
 console.log("\nAplicar lo que escribió Mary");
@@ -155,7 +159,10 @@ try {
   ok(/no hay promociones/i.test(promo?.contenido ?? ""), "de fabrica dice que no hay promociones vigentes");
   const claves5 = ["ubicacion", "horarios", "precios", "transferencia", "equipo"];
   ok(claves5.every((k) => real.some((b) => b.clave === k && b.editable)), "los 5 bloques de siempre siguen editables");
-  ok(real.filter((b) => b.editable).length === 6, "en la pantalla real quedan 6 bloques editables");
+  ok(real.filter((b) => b.editable).length === 7, "en la pantalla real quedan 7 bloques editables");
+  const espacio = real.find((b) => b.clave === "espacio");
+  ok(espacio?.editable === true, "el bloque del espacio sale editable en Entrenar IA");
+  ok(/todav[ií]a no est[aá] escrito/i.test(espacio?.contenido ?? ""), "y de fabrica dice que todavia no esta escrito");
 
   setOverrides({ promociones: "🎉 2x1 en la clase de prueba hasta el 31 de agosto." });
   const conP = buildSystemPrompt();

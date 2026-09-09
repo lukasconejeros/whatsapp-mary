@@ -22,7 +22,7 @@ const CLAVE = "secciones_negocio";
 
 // Solo estas secciones son DATO de Mary. Cualquier otra es una regla del repo y NO se persiste
 // (si se persistiera, un arreglo del prompt nunca volvería a aplicarse).
-export type ClaveSeccion = "ubicacion" | "horarios" | "precios" | "promociones" | "transferencia" | "equipo";
+export type ClaveSeccion = "ubicacion" | "horarios" | "precios" | "promociones" | "transferencia" | "equipo" | "espacio";
 
 export const ETIQUETAS: Record<ClaveSeccion, string> = {
   ubicacion: "Dónde están",
@@ -31,6 +31,11 @@ export const ETIQUETAS: Record<ClaveSeccion, string> = {
   promociones: "Promociones y descuentos",
   transferencia: "Datos para transferir",
   equipo: "Quiénes hacen las clases",
+  // Las salas del taller (Lukas, 08-09-2026). Nace VACÍA a propósito: él nombró "5 salones
+  // de arte, cada uno con un propósito" y salas sensoriales, pero el audio se cortó antes de
+  // decir cuáles son. Mientras el bloque diga "Todavía no está escrito", el manual le PROHÍBE
+  // al bot hablar del espacio. Inventarlas sería darle un dato falso a una mamá de verdad.
+  espacio: "Nuestro espacio (las salas)",
 };
 
 function norm(s: string): string {
@@ -48,6 +53,9 @@ export function claveDeSeccion(titulo: string): ClaveSeccion | null {
   // "Promociones", "Promociones vigentes (agosto)", "Descuentos": la misma seccion.
   if (t.startsWith("promo") || t.startsWith("descuento")) return "promociones";
   if (t.startsWith("quienes") || t.startsWith("equipo")) return "equipo";
+  // "Nuestro espacio", "Espacio", "El espacio", "Salas", "Salones": la misma sección.
+  if (t.startsWith("nuestro espacio") || t.startsWith("el espacio") || t.startsWith("espacio")) return "espacio";
+  if (t.startsWith("sala") || t.startsWith("salon") || t.startsWith("nuestras sala")) return "espacio";
   return null; // regla del repo
 }
 
