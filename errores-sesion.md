@@ -1037,3 +1037,38 @@ dice lo que debe decir, **no que el modelo obedezca**. Se corre en cuanto entre 
 **De regalo, el error de Python otra vez** (sexta): un `\n` dentro de un string de Python se
 convirtió en salto real dentro de un string de TypeScript y dejó el test sin compilar. Se cazó al
 correrlo. Los scripts de edición se corren SIEMPRE contra el test después de tocarlo.
+
+## 08-09-2026 (noche) · Lo que solo se ve hablando con el bot de verdad
+
+Lukas pidió probar los cambios del día "a full" antes de desplegarlos. La batería estaba verde
+(63/63 el cerebro, 75/75 el saludo) y aun así el bot desobedecía en **tres** de las cinco reglas
+nuevas. **Un test que lee el prompt comprueba que el manual está bien escrito, no que el modelo
+haga caso.** Por eso ahora existe `npm run prueba:estilo`, que conversa con el cerebro real.
+
+**1. Una orden del código le gana a cualquier regla del manual.** El manual mandaba callarse ante
+un diagnóstico; el bot contestaba igual *"Le paso con una persona del equipo"*. Esa frase se la
+ordena la tool `derivarHumano` en el resultado que devuelve, y ese texto llega DESPUÉS del prompt.
+Cuando una regla del manual choca con lo que devuelve una herramienta, gana la herramienta:
+revisar siempre las instrucciones que las tools inyectan de vuelta.
+
+**2. La conducta del modelo no es estable: hay que correr la prueba dos veces.** Con el MISMO
+mensaje ("me pasa los datos para transferir"), una corrida contestó la frase correcta y la
+siguiente se quedó muda. Una sola pasada verde no prueba nada. Lo que no puede fallar se saca del
+modelo y se escribe en el código — es la tercera vez que este repo aprende lo mismo (el saludo, el
+veto del tuteo, y ahora los datos del banco).
+
+**3. Los ejemplos mandan más que las reglas.** El paso 4 decía "los horarios que le sirven según
+la edad" y el modelo pedía la edad en vez de dar los horarios, contra la regla nueva escrita tres
+párrafos antes. Se arregló poniendo el EJEMPLO de la respuesta correcta. Y apareció otro tuteo
+escondido en un ejemplo ("Puedes elegir el horario") — el mismo error de esta mañana.
+
+**4. Un cambio de tiempos crea un bug que no estaba.** Al partir la respuesta en burbujas con
+pausa, si Mary entraba al chat en medio, ella contestaba y el bot le hablaba encima diez segundos
+después. Lo cazó preguntarse "¿qué pasa si alguien más escribe mientras espero?" antes de que
+pasara en producción. Cada vez que se introduce una espera, hay que enumerar quién más puede
+actuar dentro de esa ventana.
+
+**5. Un fallo ajeno no se cuenta como propio.** `pago-api` (2) y `avisos-envio` (4) fallaban.
+Antes de decir nada se construyó la app con el código viejo y fallaban igual. Comparar contra el
+build viejo, no contra el código viejo con el build nuevo — el primer intento fue justo ese error
+y no probaba nada.
