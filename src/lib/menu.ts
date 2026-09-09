@@ -10,7 +10,7 @@
 // El nombre del ícono se resuelve en AppNav; aquí no entra React para que el test
 // pueda importar esta lista tal cual.
 
-export type NombreIcono = "chats" | "finanzas" | "calendario" | "alumnos" | "bot" | "entrenar" | "conexion";
+export type NombreIcono = "chats" | "finanzas" | "calendario" | "alumnos" | "bot" | "entrenar" | "conexion" | "formularios";
 
 export interface ItemMenu {
   href: string;
@@ -18,6 +18,13 @@ export interface ItemMenu {
   icono: NombreIcono;
   /** Cómo se llama en la barra de abajo del teléfono, donde no cabe el nombre largo. */
   labelCorto?: string;
+  /**
+   * No sale en la barra de abajo del teléfono (lo esconde el CSS `.app-nav-<pantalla>`).
+   * La marca vive acá además de en el CSS para que `npm run test:menu` sepa a cuáles NO
+   * exigirles un nombre de 10 caracteres: esa regla es del ancho de la barra del teléfono,
+   * y a estos no les aplica porque ahí no se ven.
+   */
+  soloPC?: boolean;
 }
 
 // El Asistente salió del menú (Lukas, 09-08-2026: "sácalo nomás, no lo va a ocupar
@@ -33,6 +40,10 @@ export const MENU: ItemMenu[] = [
   // El CRM de alumnos va pegado al Calendario: Lukas lo pidió "en correlación" con él
   // (26-08-2026), y es donde Mary va a mirar quién viene y quién pagó.
   { href: "/alumnos",       label: "Alumnos",     icono: "alumnos"    },
+  // Formularios (Lukas, 08-09-2026): se arman y se mandan desde el COMPUTADOR
+  // ("que haya una parte, en mi computador, que uno pueda agregar un formulario").
+  // En el teléfono se esconde con .app-nav-formularios, igual que Bot y Entrenar IA.
+  { href: "/formularios",   label: "Formularios", icono: "formularios", soloPC: true },
   { href: "/ensayo",        label: "Bot",         icono: "bot"        },
   { href: "/configuracion", label: "Entrenar IA", icono: "entrenar", labelCorto: "Entrenar" },
   { href: "/conexion",      label: "Conexión",    icono: "conexion"   },

@@ -7,6 +7,7 @@ import { normalizeChilePhone } from "./phone";
 import type { Ausencia, TipoAusencia } from "./dia-clases.js";
 import type { FilaMensualidad } from "./mensualidades.js";
 import { repartirMonto } from "./pago-alumno";
+import type { Formulario, Pregunta, Respuestas, FormularioInput } from "./formularios";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
@@ -504,6 +505,58 @@ CREATE TABLE IF NOT EXISTS gasto_ia (
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 CREATE INDEX IF NOT EXISTS idx_gasto_ia_dia ON gasto_ia(dia, prueba);
+
+-- FORMULARIOS (Lukas, 08-09-2026). Mary arma un formulario en el panel y se lo manda
+-- a la gente por WhatsApp con un link. Las preguntas van en JSON y no en una tabla
+-- aparte a propósito: se guardan y se leen SIEMPRE juntas, nunca se consulta una
+-- pregunta suelta, y una tabla hija obligaría a un borrado en cascada por cada
+-- edición del formulario (con las respuestas viejas apuntando a preguntas muertas).
+CREATE TABLE IF NOT EXISTS formularios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE NOT NULL,
+  titulo TEXT NOT NULL,
+  intro TEXT NOT NULL DEFAULT '',
+  cierre TEXT NOT NULL DEFAULT '',
+  preguntas TEXT NOT NULL DEFAULT '[]',        -- JSON: Pregunta[]
+  activo INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_formularios_slug ON formularios(slug);
+
+-- A QUIÉN se le mandó. Una fila por persona y formulario, con SU token: el link es
+-- distinto para cada una, así se sabe quién respondió sin pedirle el teléfono dentro
+-- del formulario. El UNIQUE(formulario_id, telefono) es el candado que impide
+-- mandarle dos veces lo mismo a la misma persona.
+CREATE TABLE IF NOT EXISTS formulario_envios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  formulario_id INTEGER NOT NULL REFERENCES formularios(id),
+  token TEXT UNIQUE NOT NULL,
+  telefono TEXT NOT NULL,
+  nombre TEXT,
+  conversation_id INTEGER,
+  estado TEXT NOT NULL DEFAULT 'pendiente',    -- pendiente | encolado | respondido | omitido
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  sent_at INTEGER,
+  respondido_at INTEGER,
+  UNIQUE(formulario_id, telefono)
+);
+CREATE INDEX IF NOT EXISTS idx_form_envios_form ON formulario_envios(formulario_id, estado);
+CREATE INDEX IF NOT EXISTS idx_form_envios_token ON formulario_envios(token);
+
+-- Lo que contestó la gente. 'token' puede venir NULL: el link sin token (el que Mary
+-- copia y pega a mano en una historia o en un grupo) también tiene que poder responderse.
+CREATE TABLE IF NOT EXISTS formulario_respuestas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  formulario_id INTEGER NOT NULL REFERENCES formularios(id),
+  token TEXT,
+  telefono TEXT,
+  nombre TEXT,
+  respuestas TEXT NOT NULL DEFAULT '{}',       -- JSON: Respuestas
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+CREATE INDEX IF NOT EXISTS idx_form_resp_form ON formulario_respuestas(formulario_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_form_resp_token ON formulario_respuestas(token) WHERE token IS NOT NULL;
 `;
 
 interface Ctx {
@@ -2613,4 +2666,214 @@ export function getGastoIA(hoy: string, mes: string): GastoIA {
 /** Solo para tests: borra las filas que dejó una corrida marcada. */
 export function borrarGastoIADeMarca(marca: string): number {
   return ctx().db.prepare("DELETE FROM gasto_ia WHERE marca = ?").run(marca).changes as number;
+}
+
+// ── FORMULARIOS ─────────────────────────────────────────────────────────────
+// Encargo de Lukas del 08-09-2026. La lógica pura (slug, tokens, validación) vive
+// en `formularios.ts`; acá solo está el acceso a la base.
+
+interface FormularioRow {
+  id: number; slug: string; titulo: string; intro: string; cierre: string;
+  preguntas: string; activo: number; created_at: number; updated_at: number;
+}
+
+function parseFormulario(r: FormularioRow): Formulario {
+  let preguntas: Pregunta[] = [];
+  // Una fila con JSON corrupto NO puede tumbar la pantalla pública: se devuelve el
+  // formulario sin preguntas y quien lo abra ve "no está disponible", no un 500.
+  try { const p = JSON.parse(r.preguntas); if (Array.isArray(p)) preguntas = p as Pregunta[]; } catch { preguntas = []; }
+  return {
+    id: r.id, slug: r.slug, titulo: r.titulo, intro: r.intro ?? "", cierre: r.cierre ?? "",
+    preguntas, activo: r.activo === 1, created_at: r.created_at, updated_at: r.updated_at,
+  };
+}
+
+export function listFormularios(): Formulario[] {
+  return (ctx().db.prepare("SELECT * FROM formularios ORDER BY updated_at DESC, id DESC").all() as FormularioRow[])
+    .map(parseFormulario);
+}
+
+export function getFormulario(id: number): Formulario | null {
+  const r = ctx().db.prepare("SELECT * FROM formularios WHERE id = ?").get(id) as FormularioRow | undefined;
+  return r ? parseFormulario(r) : null;
+}
+
+export function getFormularioPorSlug(slug: string): Formulario | null {
+  const r = ctx().db.prepare("SELECT * FROM formularios WHERE slug = ?").get(slug) as FormularioRow | undefined;
+  return r ? parseFormulario(r) : null;
+}
+
+export function listSlugsFormularios(): string[] {
+  return (ctx().db.prepare("SELECT slug FROM formularios").all() as { slug: string }[]).map((r) => r.slug);
+}
+
+export function crearFormulario(slug: string, d: FormularioInput): number {
+  const r = ctx().db
+    .prepare("INSERT INTO formularios (slug, titulo, intro, cierre, preguntas, activo) VALUES (?,?,?,?,?,?)")
+    .run(slug, d.titulo, d.intro ?? "", d.cierre ?? "", JSON.stringify(d.preguntas), d.activo === false ? 0 : 1);
+  return r.lastInsertRowid as number;
+}
+
+export function actualizarFormulario(id: number, d: FormularioInput): boolean {
+  const r = ctx().db
+    .prepare("UPDATE formularios SET titulo=?, intro=?, cierre=?, preguntas=?, activo=?, updated_at=unixepoch() WHERE id=?")
+    .run(d.titulo, d.intro ?? "", d.cierre ?? "", JSON.stringify(d.preguntas), d.activo === false ? 0 : 1, id);
+  return (r.changes as number) > 0;
+}
+
+/** Borra el formulario y todo su rastro. Las respuestas se van con él: se avisa en la pantalla. */
+export function borrarFormulario(id: number): boolean {
+  const db = ctx().db;
+  return db.transaction(() => {
+    db.prepare("DELETE FROM formulario_respuestas WHERE formulario_id = ?").run(id);
+    db.prepare("DELETE FROM formulario_envios WHERE formulario_id = ?").run(id);
+    return (db.prepare("DELETE FROM formularios WHERE id = ?").run(id).changes as number) > 0;
+  })();
+}
+
+// ── A quién se le mandó ─────────────────────────────────────────────────────
+
+export interface FormEnvio {
+  id: number; formulario_id: number; token: string; telefono: string; nombre: string | null;
+  conversation_id: number | null; estado: string; created_at: number;
+  sent_at: number | null; respondido_at: number | null;
+}
+
+export function listEnviosFormulario(formularioId: number): FormEnvio[] {
+  return ctx().db
+    .prepare("SELECT * FROM formulario_envios WHERE formulario_id = ? ORDER BY id DESC")
+    .all(formularioId) as FormEnvio[];
+}
+
+export function getEnvioPorToken(token: string): FormEnvio | null {
+  return (ctx().db.prepare("SELECT * FROM formulario_envios WHERE token = ?").get(token) as FormEnvio | undefined) ?? null;
+}
+
+/**
+ * Registra un destinatario. Devuelve la fila creada, o null si a ese teléfono YA se le
+ * mandó este formulario: el candado que impide mandar dos veces lo mismo a la misma
+ * persona. Va en la base (UNIQUE) y no en un `if`, para que dos clics seguidos en
+ * "Enviar" no dupliquen el envío.
+ */
+export function registrarEnvioFormulario(
+  formularioId: number, token: string, telefono: string,
+  nombre: string | null, conversationId: number | null
+): { id: number; token: string } | null {
+  try {
+    const r = ctx().db
+      .prepare("INSERT INTO formulario_envios (formulario_id, token, telefono, nombre, conversation_id) VALUES (?,?,?,?,?)")
+      .run(formularioId, token, telefono, nombre, conversationId);
+    return { id: r.lastInsertRowid as number, token };
+  } catch (e) {
+    if (String(e).toUpperCase().includes("UNIQUE")) return null; // ya lo tenía
+    throw e;
+  }
+}
+
+export function marcarEnvioEncolado(id: number): void {
+  ctx().db.prepare("UPDATE formulario_envios SET estado='encolado', sent_at=unixepoch() WHERE id=?").run(id);
+}
+
+// ── Respuestas ──────────────────────────────────────────────────────────────
+
+export interface FormRespuestaRow {
+  id: number; formulario_id: number; token: string | null; telefono: string | null;
+  nombre: string | null; respuestas: string; created_at: number;
+}
+export interface FormRespuesta {
+  id: number; formulario_id: number; token: string | null; telefono: string | null;
+  nombre: string | null; respuestas: Respuestas; created_at: number;
+}
+
+function parseResp(r: FormRespuestaRow): FormRespuesta {
+  let respuestas: Respuestas = {};
+  try { const o = JSON.parse(r.respuestas); if (o && typeof o === "object") respuestas = o as Respuestas; } catch { /* fila ilegible: se ve vacía y no rompe la pantalla */ }
+  return { ...r, respuestas };
+}
+
+export function listRespuestasFormulario(formularioId: number): FormRespuesta[] {
+  return (ctx().db
+    .prepare("SELECT * FROM formulario_respuestas WHERE formulario_id = ? ORDER BY created_at DESC, id DESC")
+    .all(formularioId) as FormRespuestaRow[]).map(parseResp);
+}
+
+export function contarRespuestas(formularioId: number): number {
+  return (ctx().db.prepare("SELECT COUNT(*) AS n FROM formulario_respuestas WHERE formulario_id = ?").get(formularioId) as { n: number }).n;
+}
+
+export function yaRespondio(token: string): boolean {
+  return !!ctx().db.prepare("SELECT 1 FROM formulario_respuestas WHERE token = ? LIMIT 1").get(token);
+}
+
+/**
+ * Guarda una respuesta. Devuelve false si ese token YA contestó — el candado va en la
+ * base (índice único sobre token) y no en un `if`, porque el link es público y dos
+ * envíos simultáneos del mismo formulario pasan por encima de cualquier comprobación
+ * previa hecha en memoria.
+ */
+export function guardarRespuesta(
+  formularioId: number, token: string | null, telefono: string | null,
+  nombre: string | null, respuestas: Respuestas
+): boolean {
+  const db = ctx().db;
+  try {
+    db.transaction(() => {
+      db.prepare("INSERT INTO formulario_respuestas (formulario_id, token, telefono, nombre, respuestas) VALUES (?,?,?,?,?)")
+        .run(formularioId, token, telefono, nombre, JSON.stringify(respuestas));
+      if (token) db.prepare("UPDATE formulario_envios SET estado='respondido', respondido_at=unixepoch() WHERE token=?").run(token);
+    })();
+    return true;
+  } catch (e) {
+    if (String(e).toUpperCase().includes("UNIQUE")) return false;
+    throw e;
+  }
+}
+
+// ── Audiencias: a quién se le puede mandar ───────────────────────────────────
+// Los dos grupos que él nombró ("clientes nuevos, clientes antiguos") más los
+// apoderados de los alumnos que están viniendo ahora. Cada persona aparece UNA vez
+// por grupo, y el teléfono sale ya normalizado al formato de WhatsApp ('569XXXXXXXX').
+
+export interface CandidatoFormulario {
+  telefono: string;
+  nombre: string | null;
+  conversationId: number | null;
+}
+
+export type Audiencia = "alumnos" | "clientes" | "interesados";
+
+export const AUDIENCIAS: Record<Audiencia, string> = {
+  alumnos: "Apoderados de los alumnos de ahora",
+  clientes: "Clientes de la libreta",
+  interesados: "Interesados que escribieron y todavía no entran",
+};
+
+export function candidatosFormulario(audiencia: Audiencia): CandidatoFormulario[] {
+  const db = ctx().db;
+  const vistos = new Set<string>();
+  const out: CandidatoFormulario[] = [];
+  const push = (tel: string | null | undefined, nombre: string | null, convId: number | null) => {
+    const t = normalizeChilePhone(tel ?? "");
+    if (!t || vistos.has(t)) return;
+    vistos.add(t);
+    out.push({ telefono: t, nombre: nombre?.trim() || null, conversationId: convId });
+  };
+
+  if (audiencia === "alumnos") {
+    const rows = db.prepare(
+      "SELECT telefono, COALESCE(NULLIF(TRIM(apoderado),''), nombre) AS nombre FROM alumnos WHERE activo = 1 AND telefono IS NOT NULL AND TRIM(telefono) <> '' ORDER BY nombre COLLATE NOCASE"
+    ).all() as { telefono: string; nombre: string | null }[];
+    for (const r of rows) push(r.telefono, r.nombre, null);
+  } else if (audiencia === "clientes") {
+    const rows = db.prepare(
+      "SELECT telefono, nombre FROM clientes WHERE telefono IS NOT NULL AND TRIM(telefono) <> '' ORDER BY nombre COLLATE NOCASE"
+    ).all() as { telefono: string; nombre: string | null }[];
+    for (const r of rows) push(r.telefono, r.nombre, null);
+  } else {
+    const rows = db.prepare(
+      "SELECT id, phone, name FROM conversations WHERE categoria = 'potencial' AND COALESCE(cerrado,0) = 0 ORDER BY COALESCE(last_message_at, created_at) DESC"
+    ).all() as { id: number; phone: string; name: string | null }[];
+    for (const r of rows) push(r.phone, r.name, r.id);
+  }
+  return out;
 }

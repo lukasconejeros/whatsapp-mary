@@ -27,12 +27,18 @@ const deAntes = ["/inbox", "/finanzas", "/calendario", "/ensayo", "/conexion"];
 for (const h of deAntes) check(`sigue estando ${h}`, hrefs.includes(h));
 check("el orden de los de antes no cambió", JSON.stringify(hrefs.filter(h => deAntes.includes(h))) === JSON.stringify(deAntes), hrefs.join(","));
 check("Conexión sigue siendo el último", hrefs[hrefs.length - 1] === "/conexion", hrefs.join(","));
-check("son 7 botones, sin repetidos", MENU.length === 7 && new Set(hrefs).size === 7, String(MENU.length));
+// 8 desde el 08-09-2026: entró "Formularios". En el teléfono se esconde por CSS
+// (.app-nav-formularios), igual que Bot, Entrenar IA y Conexión.
+check("son 8 botones, sin repetidos", MENU.length === 8 && new Set(hrefs).size === 8, String(MENU.length));
+check("Formularios tiene su botón", hrefs.includes("/formularios"), hrefs.join(","));
 
 // ── Que quepan en la barra de abajo del teléfono ──────────────────────────────
 for (const i of MENU) check(`'${i.label}' es corto para la barra del teléfono`, i.label.length <= 11, String(i.label.length));
 check("Entrenar IA tiene etiqueta corta para el teléfono", entrenar?.labelCorto === "Entrenar", String(entrenar?.labelCorto));
-for (const i of MENU) check(`la etiqueta del teléfono de '${i.label}' cabe en una línea`, (i.labelCorto ?? i.label).length <= 10, String(i.labelCorto ?? i.label));
+// Los marcados `soloPC` no entran: no se ven en la barra del teléfono, así que el
+// techo de 10 caracteres (que es del ancho de esa barra) no les aplica.
+for (const i of MENU.filter(m => !m.soloPC)) check(`la etiqueta del teléfono de '${i.label}' cabe en una línea`, (i.labelCorto ?? i.label).length <= 10, String(i.labelCorto ?? i.label));
+check("Formularios está marcado como solo del computador", MENU.find(m => m.href === "/formularios")?.soloPC === true);
 for (const i of MENU) check(`'${i.label}' tiene ícono`, typeof i.icono === "string" && i.icono.length > 0);
 
 // ── Que cada botón lleve a una pantalla que existe de verdad ─────────────────

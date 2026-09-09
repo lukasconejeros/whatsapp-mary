@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot, GraduationCap, Users } from 'lucide-react'
+import { MessagesSquare, Wallet, CalendarDays, Plug, Brush, Bot, GraduationCap, Users, ClipboardList } from 'lucide-react'
 import { MENU, type NombreIcono } from '@/lib/menu'
 
 // La lista vive en src/lib/menu.ts para poder probarla sin navegador y para que no
@@ -16,6 +16,7 @@ const ICONOS: Record<NombreIcono, typeof MessagesSquare> = {
   bot: Bot,
   entrenar: GraduationCap,
   conexion: Plug,
+  formularios: ClipboardList,
 }
 const items = MENU.map(i => ({ href: i.href, Icon: ICONOS[i.icono], label: i.label, labelCorto: i.labelCorto }))
 
