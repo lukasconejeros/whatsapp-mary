@@ -529,6 +529,7 @@ export default function CalendarioPage() {
                 del día queda DEBAJO del mes entero, así que el botón vivía a un scroll
                 de distancia. Acá está siempre a la vista y agenda en el día elegido. */}
             <button onClick={() => openNew(sel)} title="Añadir una clase o un recado a este día"
+              className="cal-boton-anadir"
               style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 4, minHeight: 36, border: 'none', background: '#00A884', color: '#fff', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700 }}>
               <Plus size={15} /> Añadir
             </button>

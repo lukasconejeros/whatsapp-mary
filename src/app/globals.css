@@ -131,6 +131,18 @@ button { transition: background .15s ease, color .15s ease, opacity .15s ease, b
   .app-sidebar .app-navitems a.app-nav-ensayo,
   .app-sidebar .app-navitems a.app-nav-configuracion { display: none !important; }
 
+  /* Y lo mismo con "Formularios" (08-09-2026). Él lo pidió explícito: "que haya una
+     parte, en mi computador, que uno pueda agregar un formulario". Armar preguntas
+     con el pulgar no se hace; el formulario que ve la GENTE (/f/...) sí está pensado
+     para el teléfono y no pasa por esta barra. */
+  .app-sidebar .app-navitems a.app-nav-formularios { display: none !important; }
+
+  /* El botón «Añadir» del calendario medía 83x36 en el teléfono y no llegaba a los
+     44 px que exige `npm run test:botones` (se coló el 08-09-2026 al subirlo a la
+     barra del mes). Con el pulgar hay que apuntar, y es EL botón con el que Mary
+     agenda. En el computador se queda como está: ahí se apunta con el ratón. */
+  .cal-boton-anadir { min-height: 44px !important; padding: 8px 14px !important; }
+
   .app-sidebar .app-navitems {
     flex-direction: row !important;
     justify-content: space-around;

@@ -5,6 +5,14 @@
 // ella. Este test lo comprueba en un iPhone 13 emulado (la barra de abajo) y en
 // pantalla de computador (la columna de la izquierda).
 //
+// ⚠️ REESCRITO el 08-09-2026 (segunda vez ese día). El 08-09 Lukas pidió limpiar la
+// app del teléfono y "Entrenar IA" se escondió allí a propósito: desde entonces este
+// test exigía verlo en el iPhone, fallaba 4 casos y se caía con un TypeError al pedir
+// el tamaño de un botón invisible (boundingBox() de un display:none devuelve null).
+// Custodiaba una regla derogada. Ahora comprueba la regla de VERDAD, que son dos:
+// en el teléfono Entrenar IA NO se ve, y en el computador sí, se puede apretar y lleva
+// a su pantalla. Es la misma lección que dejó test:calendario-iphone ese mismo día.
+//
 // Cómo correrlo:
 //   1) levanta la app:  $env:PANEL_PASSWORD="test1234"; npx next start -p 3011
 //   2) en otra consola: $env:BASE="http://localhost:3011"; npm run test:menu-pantalla
@@ -13,7 +21,6 @@ import { chromium, devices } from 'playwright-core'
 
 const BASE = process.env.BASE || 'http://localhost:3011'
 const PASSWORD = process.env.PANEL_PASSWORD || 'test1234'
-const MINIMO = 44
 
 let pass = 0, fail = 0
 const check = (n, c, e = '') => { if (c) { console.log(`  ✅ ${n}`); pass++ } else { console.log(`  ❌ ${n} ${e}`); fail++ } }
@@ -30,13 +37,29 @@ for (const [nombre, opciones] of [['iPhone 13', devices['iPhone 13']], ['computa
   await page.goto(BASE + '/inbox', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('nav.app-sidebar a', { timeout: 20000 })
 
-  // innerText da lo que se VE: en el teléfono la etiqueta corta, en el computador la larga.
-  const labels = await page.$$eval('nav.app-sidebar a', ns => ns.map(n => n.innerText.trim().replace(/\s+/g, ' ')))
-  const esperada = nombre === 'iPhone 13' ? 'Entrenar' : 'Entrenar IA'
-  check(`el menú muestra "${esperada}"`, labels.includes(esperada), labels.join(','))
-  check('no se ven las dos etiquetas juntas', !labels.some(l => /Entrenar IA ?Entrenar/.test(l)), labels.join(','))
-  check('siguen los 5 de siempre', ['Chats', 'Finanzas', 'Calendario', 'Bot', 'Conexión'].every(l => labels.includes(l)), labels.join(','))
-  check('Entrenar IA va después de Bot', labels.indexOf(esperada) === labels.indexOf('Bot') + 1, labels.join(','))
+  // Lo que se VE de verdad: en el teléfono la barra de abajo solo deja Chats, Finanzas,
+  // Calendario y Alumnos; el resto está escondido por CSS.
+  const visibles = await page.$$eval('nav.app-sidebar a', ns => ns
+    .filter(n => getComputedStyle(n).display !== 'none')
+    .map(n => n.innerText.trim().replace(/\s+/g, ' ')))
+
+  if (nombre === 'iPhone 13') {
+    check('en el teléfono se ven los 4 de Mary', ['Chats', 'Finanzas', 'Calendario', 'Alumnos'].every(l => visibles.includes(l)), visibles.join(','))
+    check('y Entrenar IA NO se ve (es del computador)', !visibles.some(l => /Entrenar/.test(l)), visibles.join(','))
+    check('ni Bot, ni Conexión, ni Formularios', !visibles.some(l => /^(Bot|Conexión|Formularios)$/.test(l)), visibles.join(','))
+    check('la pantalla /configuracion sigue viva escribiendo la dirección', true)
+    await page.goto(BASE + '/configuracion', { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('h1:has-text("Entrenar IA")', { timeout: 20000 })
+    check('y se abre bien en el teléfono', /configuracion/.test(page.url()), page.url())
+    await ctx.close()
+    continue
+  }
+
+  check('el menú muestra "Entrenar IA"', visibles.includes('Entrenar IA'), visibles.join(','))
+  check('no se ven las dos etiquetas juntas', !visibles.some(l => /Entrenar IA ?Entrenar/.test(l)), visibles.join(','))
+  check('siguen los 5 de siempre', ['Chats', 'Finanzas', 'Calendario', 'Bot', 'Conexión'].every(l => visibles.includes(l)), visibles.join(','))
+  check('Entrenar IA va después de Bot', visibles.indexOf('Entrenar IA') === visibles.indexOf('Bot') + 1, visibles.join(','))
+  check('y Formularios entró antes de Bot (08-09-2026)', visibles.indexOf('Formularios') === visibles.indexOf('Bot') - 1, visibles.join(','))
 
   const boton = page.locator('nav.app-sidebar a[href="/configuracion"]').first()
   const caja = await boton.boundingBox()
@@ -44,12 +67,8 @@ for (const [nombre, opciones] of [['iPhone 13', devices['iPhone 13']], ['computa
   // se comprueba que mida IGUAL que los botones de siempre (38 px de alto, el
   // estilo de la barra lateral), no que llegue a 44.
   const cajaChats = await page.locator('nav.app-sidebar a[href="/inbox"]').first().boundingBox()
-  if (nombre === 'iPhone 13') {
-    check(`se puede apretar con el dedo (${Math.round(caja.width)}x${Math.round(caja.height)})`, caja.height >= MINIMO, JSON.stringify(caja))
-  } else {
-    check(`mide lo mismo que los botones de siempre (${Math.round(caja.width)}x${Math.round(caja.height)})`,
-      Math.abs(caja.height - cajaChats.height) < 1 && Math.abs(caja.width - cajaChats.width) < 1, JSON.stringify({ caja, cajaChats }))
-  }
+  check(`mide lo mismo que los botones de siempre (${Math.round(caja.width)}x${Math.round(caja.height)})`,
+    Math.abs(caja.height - cajaChats.height) < 1 && Math.abs(caja.width - cajaChats.width) < 1, JSON.stringify({ caja, cajaChats }))
   check('no se sale de la pantalla', caja.x >= 0 && caja.x + caja.width <= (opciones.viewport?.width ?? 390) + 1, JSON.stringify(caja))
 
   await boton.click()

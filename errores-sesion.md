@@ -1105,3 +1105,86 @@ profesora. Si el pedido dice "en verde los de mi mamá", un desplegable nativo n
 Pruebas corridas: `typecheck` limpio, `test:menu` 48/48, `test:calendario-iphone` 33/33,
 `test:calendario-extras` 20/20, `test:alumnos` 25/25, `test:alumnos-api` 21/21 y el nuevo
 `test:telefono-limpia` 21/21.
+
+---
+
+## 47 · Los formularios, el detalle de los talleres y 3 candados que se rompieron solos (08-09-2026, noche)
+
+Encargo de Lukas, tres cosas de una: (1) que el bot cuente **bonita** la clase de prueba, (2) que si
+preguntan por **un taller concreto** lo detalle entero como en la web, y (3) una pantalla de
+**formularios** tipo Tally para mandárselos a la gente por WhatsApp con un link. Dijo "no me hagas
+preguntas, hazte un autoprompt y hazlo todo" → `docs/PROMPT-FORMULARIOS-Y-MANUAL-2026-09-08.md`.
+
+### El acierto: no inventar las salas
+
+Él había pedido (23:05) que la clase de prueba contara "los 5 salones de arte, cada uno con un
+propósito, y las salas sensoriales". **El audio se le cortó y nunca dijo cuáles son.** No están en
+`negocio.md`, ni en `arteluk-web`, ni en `llms.txt`. Escribirlas habría sido darle un dato falso a una
+mamá de verdad. Solución: se creó el bloque editable **"Nuestro espacio"** en Entrenar IA, **vacío**,
+y el manual le prohíbe al bot hablar del espacio mientras diga "Todavía no está escrito". El candado
+está probado contra el modelo real (caso 7 de `prueba:estilo`): no se las inventa.
+
+De paso apareció una **contradicción que tiene que zanjar Mary**: los horarios de la web (Acuarela
+martes 16:00-17:00, Artes 18:30-19:30, Premium 17:30-19:30) NO son los que ella confirmó el 10-08
+(lunes a sábado). Se resolvió así: a la ficha de cada taller entra solo el CONTENIDO (cuántas clases,
+duración, materiales, precio, matrícula); **la hora sale siempre del bloque de horarios que ella edita**.
+
+### Los 3 errores que se cazaron al ejecutar
+
+**1. Escribir un archivo con Python en Windows lo convierte entero a CRLF, y eso rompió `test:cerebro`.**
+`prompts/negocio.md` pasó de 439 líneas LF a 498 CRLF sin que nadie lo pidiera. El test busca el texto
+literal `"no un libreto para\ncopiar y pegar"` y con `\r\n` dejó de encontrarlo: **63/63 pasó a 62/1**.
+Además el diff de git se llenó de 23 archivos cambiados enteros. Lección: en este repo se escribe con
+`newline='\n'` o se normaliza antes de dar nada por terminado, y un fallo raro en un test de texto se
+mira primero en los bytes del archivo, no en la lógica.
+
+**2. `test:menu-pantalla` llevaba desde la tarde caído y nadie lo vio, porque no se corrió.**
+Al esconder "Entrenar IA" en el teléfono (mismo 08-09, unas horas antes), ese test siguió exigiendo
+verlo en el iPhone: fallaba 4 casos y **se caía con un TypeError**, porque `boundingBox()` de un
+elemento `display:none` devuelve `null`. Es la MISMA lección que dejó `test:calendario-iphone` esa
+tarde, repetida el mismo día en otro archivo: **si un pedido nuevo deroga una regla, hay que buscar
+TODOS los tests que la custodian, no solo el que se acuerde uno.** Reescrito para la regla vigente.
+
+**3. El botón «Añadir» del calendario medía 83x36 en el teléfono.** `npm run test:botones` lo cazaba
+("1 control por debajo de 44x44") y también venía de la tarde, al subir el botón a la barra del mes.
+Con el pulgar hay que apuntarle, y es EL botón con el que Mary agenda. Arreglado con
+`.cal-boton-anadir { min-height: 44px }` solo en el teléfono. Ahora `test:botones` pasa entero.
+
+### Cómo se armó el envío para que no arriesgue el número
+
+Lo que él pidió fue "toda una estructura para poder enviarlo de la manera correcta sin que haya ningún
+problema". El envío **no abre una vía nueva de mensajería**: encola en `seguimientos`, la cola que ya
+tiene goteo de 40-90 s, tope de 35 al día y ventana 9:00-21:00. Y va en cuatro pasos, cada uno tapando
+un fallo conocido: elegir a quién → escribir el mensaje con la vista previa EXACTA → **mandar una
+prueba a un teléfono de verdad (obligatorio, el botón de enviar está bloqueado hasta hacerlo)** →
+enviar. Dos candados más, los dos en la base y no en un `if`, porque dos clics seguidos pasan por
+encima de cualquier comprobación en memoria: `UNIQUE(formulario_id, telefono)` (no se le manda dos
+veces a la misma persona) y un índice único sobre el token (el mismo link no contesta dos veces).
+
+### Lo que hubo que pensar dos veces en la parte pública
+
+`/f/<slug>` es **lo único de la app que se abre sin login**, así que se tocó el middleware, que es lo
+único que separa los datos de Mary de internet. El test de API comprueba las dos caras desde un
+navegador ANÓNIMO: que el formulario se abra, y que `/api/conversations` y `/inbox` **sigan cerrados**.
+Sin el contexto anónimo, "es público" no queda probado: el contexto con sesión pasaría igual llevando
+la cookie puesta. La validación se rehace entera en el servidor (el POST se puede escribir a mano) y
+la respuesta pública no devuelve ningún teléfono.
+
+### Pruebas corridas
+
+`typecheck` y `build` limpios · **`test:formularios` 83/83** (nuevo) · **`test:formularios-api` 27/27**
+(nuevo) · **`test:formulario-pantalla` 17/17** (nuevo, iPhone 390x844 con el dedo) · `test:secciones`
+56/56 · `test:menu` 53/53 · `test:menu-pantalla` 16/16 (reescrito) · `test:botones` OK en 10 pantallas
+(antes fallaba 1) · `test:telefono-limpia` 21/21 · `test:calendario-iphone` 33/33 · `test:cerebro`
+63/63 · `test:saludo` 75/75 · `test:antituteo` 44/44 · alumnos, crm, horario, mensualidades, ausencias,
+clases-fijas, contactos, inbox-filtros, interruptor-bot, quien-contesta, mudos, db, feedback, mensajes,
+comprobante, ia-proveedor, interes-prueba, partir, datos, derivar, outbox: todos verdes.
+
+Y la que importa, **contra el modelo de verdad**: `npm run prueba:estilo` **26/26**, con dos casos
+nuevos (el taller concreto y la clase de prueba bonita). US$0,12, marcado como PRUEBA en `gasto_ia`.
+⚠️ La clave de Anthropic de este repo devuelve **401**; se corrió con la de `whatsapp-monaco` y con
+`ANTHROPIC_MODEL=claude-haiku-4-5-20251001` (el `.env.local` local trae
+`OPENROUTER_MODEL=anthropic/claude-haiku-4.5`, un alias que la API contesta con 404).
+
+Siguen fallando `test:avisos-envio` (4) y `test:pago-api` (2), **igual que antes de tocar nada**: es
+estado de la base local, ya anotado el 08-09 por la tarde.
