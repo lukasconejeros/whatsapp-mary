@@ -105,7 +105,8 @@
     "prueba:conversacional": "tsx scripts/prueba-conversacional.ts",
     "prueba:estilo": "tsx scripts/prueba-estilo-nuevo.ts",
     "humo:saludo-hora": "tsx scripts/humo-saludo-hora.ts",
-    "humo:pase-lista": "tsx scripts/humo-pase-lista.ts"
+    "humo:pase-lista": "tsx scripts/humo-pase-lista.ts",
+    "test:porteria": "tsx scripts/test-porteria.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

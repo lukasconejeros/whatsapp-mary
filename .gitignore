@@ -46,3 +46,6 @@ RESCATE-DATOS-2026-08-12/
 # Bajado de produccion para las pruebas: trae precios y DATOS BANCARIOS. El repo es publico.
 scripts/fixtures/arteluk-prod-config.json
 scripts/salida/
+data/porteria.db
+data/porteria.db-shm
+data/porteria.db-wal
