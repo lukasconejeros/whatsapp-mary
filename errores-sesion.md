@@ -1227,3 +1227,37 @@ ventana equivocada acusa al bot de algo que sí hizo. Se corrigió a mirar toda 
 **Seguridad:** el archivo con la config de producción trae los datos de transferencia y **el repo es
 público** (comprobado hoy: la API de GitHub lo devuelve sin credenciales). Va al `.gitignore`. Ojo
 que `prompts/negocio.md:239` ya tiene el RUT de la empresa versionado desde antes.
+
+## Login sin limite de intentos en los 7 paneles (11-09-2026)
+
+**El error, y era de los cuatro bots a la vez.** El login de este panel aceptaba intentos infinitos.
+Medido antes de arreglarlo: 10 intentos seguidos con contrasenas distintas respondieron 401 en ~20 ms
+cada uno, o sea ~3.000 claves por minuto, con fichas de pacientes y el boton de escribirles por
+WhatsApp detras. La memoria lo tenia anotado desde el 02-08-2026 y llevaba 40 dias sin arreglar.
+
+**El acierto: medir antes de creer la memoria.** La nota decia que Medifis y Monaco tambien estaban
+sin freno; al leer el codigo, Medifis, Monaco y Yaber SI tenian uno (6 intentos, 15 min). O sea la
+memoria estaba desactualizada y la lista de verdad era otra: sin nada Anpalex, Arteluk y Huevos.
+
+**El hallazgo mas grave no era el que se pidio.** Las 4 contrasenas que se pudieron revisar llevan el
+nombre del cliente adentro y miden 9-13 caracteres. Contra eso el freno de 6 intentos no sirve: quien
+sepa que la clinica es Anpalex la adivina a mano, y el freno le deja 576 pruebas al dia. El freno es
+necesario pero no suficiente: hace falta cambiar las claves.
+
+**Dos agujeros del freno que SI existia**, y valen para cualquier contador futuro:
+1. Vivia en memoria: cada deploy en EasyPanel lo olvidaba. Ahora se guarda en disco y se verifico
+   matando el servidor y volviendolo a levantar.
+2. Nadie se enteraba nunca. Ahora el cierre manda un WhatsApp con el codigo.
+
+**Cuidado con el alcance del castigo.** El conteo va por direccion de internet, NO global. Si fuera
+global, cualquiera podria dejar a la clinica sin panel tirando 6 intentos malos a proposito.
+
+**Error propio en el camino:** se uso `git add -A` en huevos-dashboard-web y el commit arrastro 8
+archivos ajenos (auditorias y scripts de otra sesion). Se deshizo con `git reset --soft` y se rehizo
+selectivo. Justo antes habia pasado al reves: otra ventana abierta en whatsapp-monaco hizo `git add
+-A` y se llevo la porteria dentro de su commit de Reservo. Con varias ventanas trabajando la misma
+carpeta, el add es SIEMPRE por archivo.
+
+**Lo que NO prueba el aviso.** `enqueueOutbox` deja el mensaje EN LA COLA; lo despacha el bot. Si el
+bot esta desconectado, el aviso no sale. Por eso existe CODIGO_MAESTRO, que no depende de WhatsApp.
+
